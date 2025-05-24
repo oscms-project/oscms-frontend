@@ -1,0 +1,1252 @@
+openapi: 3.0.3
+info:
+  title: OCSMS API
+  description: |
+    本文档基于 OpenAPI 3.0 规范，定义了软课程管理平台（在线课程管理、教学资料、练习、历史记录、用户管理等）的一组 RESTful 接口。
+    平台支持教师、助教、学生三类角色，所有接口返回均使用统一响应格式 `ApiResponse<T>`：
+      ```java
+      public class ApiResponse<T> {
+        private int code;       // 业务状态码，与 HTTP 状态码不同
+        private String message; // 说明信息
+        private T data;         // 返回的数据主体
+      }
+      ```
+    意味着所有返回都为以下格式：
+      ```json
+      {
+        "code": ..., (e.g. 400, 1001)
+        "message": ..., (e.g. "success")
+        "data": {
+          "xxx": ...
+          "xxx": ...,
+          ...
+        }
+      }
+      ```
+    HTTP状态码，400表示参数错误，404表示资源不存在（如用户ID不存在）
+    业务状态码，待更新
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: 开发环境
+
+tags:
+  - name: Auth
+    description: 用户认证与授权
+  - name: Users
+    description: 用户管理
+  - name: Courses
+    description: 课程管理
+  - name: Classes
+    description: 班级管理
+  - name: Materials
+    description: 教学资料管理
+  - name: Exercises
+    description: 在线练习
+  - name: Records
+    description: 历史记录
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: 用户注册
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseUser'
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: 用户登录
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登录成功，返回 JWT Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseToken'
+        '401':
+          description: 认证失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+
+  /users/{userId}:
+    get:
+      tags: [Users]
+      summary: 获取用户信息
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: 用户信息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseUser'
+        '404':
+          description: 未找到用户
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+    put:
+      tags: [Users]
+      summary: 更新个人信息
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseUser'
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+  /users/{userId}/courses:
+    get:
+      tags: [Users]
+      summary: 获取指定学生参与的所有课程
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: 学生的课程列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseCourseList'
+
+  /users/{userId}/courses/{courseId}/class:
+    get:
+      tags: [Users]
+      summary: 获取指定学生在某课程中的班级信息
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/CourseId'
+      responses:
+        '200':
+          description: 学生所在班级
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseClass'
+        '404':
+          description: 未加入此课程
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+
+  /courses:
+    get:
+      tags: [Courses]
+      summary: 列出指定教师的所有课程
+      parameters:
+        - in: query
+          name: teacherId
+          schema:
+            type: string
+          description: 指定教师ID
+      responses:
+        '200':
+          description: 课程列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseCourseList'
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+        '404':
+          description: 未找到教师
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+    post:
+      tags: [Courses]
+      summary: 教师创建课程
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CourseCreate'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseCourse'
+
+  /courses/{courseId}:
+    get:
+      tags: [Courses]
+      summary: 获取课程详情
+      parameters:
+        - $ref: '#/components/parameters/CourseId'
+      responses:
+        '200':
+          description: 课程详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseCourse'
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+        '404':
+          description: 未找到课程
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+    put:
+      tags: [Courses]
+      summary: 更新课程信息
+      parameters:
+        - $ref: '#/components/parameters/CourseId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CourseUpdate'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseCourse'
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+        '404':
+          description: 未找到课程
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+
+    delete:
+      tags: [Courses]
+      summary: 删除课程
+      parameters:
+        - $ref: '#/components/parameters/CourseId'
+      responses:
+        '204':
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+        '404':
+          description: 未找到课程
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+
+  /courses/{courseId}/classes:
+    get:
+      tags: [ Classes ]
+      summary: 获取某课程下的所有班级
+      parameters:
+        - $ref: '#/components/parameters/CourseId'
+      responses:
+        '200':
+          description: 班级列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseClassList'
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+        '404':
+          description: 未找到课程
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+
+  /courses/{courseId}/resources:
+    post:
+      tags: [Courses]
+      summary: 上传课程资源
+      parameters:
+        - $ref: '#/components/parameters/CourseId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ResourceUpload'
+      responses:
+        '201':
+          description: 上传成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseResource'
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+        '404':
+          description: 未找到课程
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+
+  /classes:
+    get:
+      tags: [Classes]
+      summary: 列出所有班级
+      parameters:
+        - in: query
+          name: courseId
+          schema:
+            type: string
+          description: 按课程筛选
+      responses:
+        '200':
+          description: 班级列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseClassList'
+    post:
+      tags: [Classes]
+      summary: 创建班级
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClassCreate'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseClass'
+
+  /classes/{classId}/students:
+    get:
+      tags: [Classes]
+      summary: 列出班级学生
+      parameters:
+        - $ref: '#/components/parameters/ClassId'
+      responses:
+        '200':
+          description: 学生列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseUserList'
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+        '404':
+          description: 未找到班级
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+    post:
+      tags: [Classes]
+      summary: 批量导入学生
+      parameters:
+        - $ref: '#/components/parameters/ClassId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                studentIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: 导入结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseImportResult'
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+        '404':
+          description: 未找到班级
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVoid'
+
+  /classes/{classId}/assignments:
+    post:
+      tags: [ Classes ]
+      summary: 布置练习给班级
+      parameters:
+        - $ref: '#/components/parameters/ClassId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignmentCreate'
+      responses:
+        '201':
+          description: 布置成功，返回布置记录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseClassExerciseAssignment'
+    get:
+      tags: [ Classes ]
+      summary: 查询某班所有布置记录
+      parameters:
+        - $ref: '#/components/parameters/ClassId'
+      responses:
+        '200':
+          description: 布置列表（包含模板信息）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseClassExerciseAssignmentList'
+
+
+  /materials/{classId}:
+    get:
+      tags: [Materials]
+      summary: 列出教学资料
+      parameters:
+        - name: classId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 班级唯一标识
+        - in: query
+          name: chapter
+          schema:
+            type: string
+          description: 按章节筛选
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [ppt, pdf, video, code]
+          description: 按资料类型筛选
+      responses:
+        '200':
+          description: 资料列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseMaterialList'
+    post:
+      tags: [Materials]
+      summary: 向指定班级上传教学资料
+      parameters:
+        - name: classId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 班级唯一标识
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MaterialUpload'
+      responses:
+        '201':
+          description: 上传成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseMaterial'
+
+  /exercises:
+    get:
+      tags: [Exercises]
+      summary: 列出练习
+      parameters:
+        - in: query
+          name: courseId
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 练习列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseExerciseList'
+    post:
+      tags: [Exercises]
+      summary: 创建练习
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExerciseCreate'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseExercise'
+
+  /exercises/templates:
+    post:
+      tags: [ Exercises ]
+      summary: 创建题库模板
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExerciseTemplateCreate'
+      responses:
+        '201':
+          description: 创建成功，返回新模板
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseExerciseTemplate'
+    get:
+      tags: [ Exercises ]
+      summary: 列出所有题库模板
+      responses:
+        '200':
+          description: 模板列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseExerciseTemplateList'
+
+
+  /assignments/{assignmentId}/submissions:
+    get:
+      tags: [Exercises]
+      summary: 查询指定布置的所有提交记录
+      parameters:
+        - name: assignmentId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 布置记录唯一标识
+      responses:
+        '200':
+          description: 提交记录列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseSubmissionList'
+    post:
+      tags: [ Exercises ]
+      summary: 学生提交作业
+      parameters:
+        - name: assignmentId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 布置记录唯一标识
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmissionCreate'
+      responses:
+        '201':
+          description: 提交成功，返回 Submission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseSubmission'
+  /records/learning:
+    get:
+      tags: [Records]
+      summary: 学习记录查询
+      responses:
+        '200':
+          description: 学习轨迹
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseLearningRecordList'
+
+  /records/exercise:
+    get:
+      tags: [Records]
+      summary: 练习记录查询
+      responses:
+        '200':
+          description: 练习记录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseExerciseRecordList'
+
+components:
+  parameters:
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: 用户唯一标识
+    CourseId:
+      name: courseId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: 课程唯一标识
+    ClassId:
+      name: classId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: 班级唯一标识
+
+  schemas:
+    ApiResponse:
+      type: object
+      description: 统一响应体
+      properties:
+        code:
+          type: integer
+          description: 业务状态码，与 HTTP 状态码不同
+          example: 200
+        message:
+          type: string
+          description: 说明信息
+          example: "success"
+        data:
+          description: 返回的数据主体
+
+    ApiResponseVoid:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+      properties:
+        data:
+          type: object
+          nullable: true
+
+    ApiResponseUser:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+      properties:
+        data:
+          $ref: '#/components/schemas/User'
+
+    ApiResponseToken:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+      properties:
+        data:
+          $ref: '#/components/schemas/TokenResponse'
+
+    ApiResponseUserList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+
+    ApiResponseCourse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+      properties:
+        data:
+          $ref: '#/components/schemas/Course'
+
+    ApiResponseCourseList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Course'
+
+    ApiResponseClass:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+      properties:
+        data:
+          $ref: '#/components/schemas/Class'
+
+    ApiResponseClassList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Class'
+
+    ApiResponseResource:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+      properties:
+        data:
+          $ref: '#/components/schemas/Resource'
+
+    ApiResponseMaterial:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+      properties:
+        data:
+          $ref: '#/components/schemas/Material'
+
+    ApiResponseMaterialList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Material'
+
+    ApiResponseExercise:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+      properties:
+        data:
+          $ref: '#/components/schemas/Exercise'
+
+    ApiResponseExerciseList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Exercise'
+
+    ApiResponseSubmission:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+      properties:
+        data:
+          $ref: '#/components/schemas/Submission'
+
+    ApiResponseSubmissionList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Submission'
+
+    ApiResponseLearningRecordList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/LearningRecord'
+
+    ApiResponseImportResult:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+      properties:
+        data:
+          type: object
+          properties:
+            importedCount:
+              type: integer
+              description: 成功导入的学生数量
+
+    ApiResponseExerciseTemplate:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+      properties:
+        data:
+          $ref: '#/components/schemas/ExerciseTemplate'
+
+    ApiResponseExerciseTemplateList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExerciseTemplate'
+    ApiResponseClassExerciseAssignment:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+      properties:
+        data:
+          $ref: '#/components/schemas/ClassExerciseAssignment'
+
+    ApiResponseClassExerciseAssignmentList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClassExerciseAssignment'
+
+    ApiResponseExerciseRecordList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExerciseRecord'
+    TokenResponse:
+      type: object
+      properties:
+        token:
+          type: string
+
+    RegisterRequest:
+      type: object
+      required: [username, password, role]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+          enum: [teacher, ta, student]
+        email:
+          type: string
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        role:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+
+    UserUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+
+    Course:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        code:
+          type: string
+        outline:
+          type: string
+          description: 课程大纲
+        objectives:
+          type: string
+          description: 课程目标
+        assessment:
+          type: string
+          description: 考核方式
+        teacherId:
+          type: string
+        chapters:
+          type: array
+          description: 课程章节列表
+          items:
+            $ref: '#/components/schemas/ChapterCreate'
+        completed:
+          type: boolean
+          description: 课程是否结课
+
+    ChapterCreate:
+      type: object
+      required: [title, order]
+      properties:
+        title:
+          type: string
+          description: 章节标题
+        order:
+          type: integer
+          description: 本章节在课程中的编号，从1开始
+
+    CourseCreate:
+      type: object
+      required: [name, code]
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+        outline:
+          type: string
+          description: 课程大纲
+        objectives:
+          type: string
+          description: 课程目标
+        assessment:
+          type: string
+          description: 考核方式
+        chapters:
+          type: array
+          description: 课程章节列表
+          items:
+            $ref: '#/components/schemas/ChapterCreate'
+        completed:
+          type: boolean
+          description: 课程是否结课
+
+    CourseUpdate:
+      allOf:
+        - $ref: '#/components/schemas/CourseCreate'
+      description: 与 `CourseCreate` 相同，支持修改包括章节列表在内的所有字段
+
+    Resource:
+      type: object
+      properties:
+        id:
+          type: string
+        filename:
+          type: string
+        url:
+          type: string
+        uploadedAt:
+          type: string
+          format: date-time
+
+    ResourceUpload:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+        chapter:
+          type: string
+        description:
+          type: string
+
+    Class:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        code:
+          type: string
+        courseId:
+          type: string
+
+    ClassCreate:
+      type: object
+      required: [name, code, courseId]
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+        courseId:
+          type: string
+
+    ExerciseTemplateCreate:
+      type: object
+      required: [ title, type, totalPoints, openTime ]
+      properties:
+        title:
+          type: string
+          description: 练习标题
+        type:
+          type: string
+          enum: [ choice, coding ]
+          description: 练习类型
+        totalPoints:
+          type: integer
+          description: 总分
+        openTime:
+          type: string
+          format: date-time
+          description: 开放时间
+        allowResubmit:
+          type: boolean
+          description: 是否允许重做
+
+    ExerciseTemplate:
+      type: object
+      properties:
+        templateId:
+          type: string
+          description: 题库模板唯一标识
+        title:
+          type: string
+        type:
+          type: string
+        totalPoints:
+          type: integer
+        openTime:
+          type: string
+          format: date-time
+        allowResubmit:
+          type: boolean
+
+    ClassExerciseAssignment:
+      type: object
+      properties:
+        assignmentId:
+          type: string
+          description: 布置记录唯一标识
+        classId:
+          type: string
+        templateId:
+          type: string
+        assignedAt:
+          type: string
+          format: date-time
+        dueDate:
+          type: string
+          format: date-time
+
+
+    Material:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+          enum: [ppt, pdf, video, code]
+        url:
+          type: string
+        chapter:
+          type: string
+        version:
+          type: integer
+
+    MaterialUpload:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+        title:
+          type: string
+        type:
+          type: string
+          enum: [ppt, pdf, video, code]
+        chapter:
+          type: string
+
+    Exercise:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+          enum: [choice, coding]
+        totalPoints:
+          type: integer
+        openTime:
+          type: string
+          format: date-time
+        allowResubmit:
+          type: boolean
+
+    ExerciseCreate:
+      type: object
+      required: [title, type, openTime]
+      properties:
+        title:
+          type: string
+        type:
+          type: string
+          enum: [choice, coding]
+        totalPoints:
+          type: integer
+        openTime:
+          type: string
+          format: date-time
+        allowResubmit:
+          type: boolean
+
+    Submission:
+      type: object
+      properties:
+        submissionId:
+          type: string
+        assignmentId:
+          type: string
+        studentId:
+          type: string
+        answers:
+          type: object
+        score:
+          type: number
+        feedback:
+          type: string
+        submittedAt:
+          type: string
+          format: date-time
+
+    SubmissionCreate:
+      type: object
+      required: [answers]
+      properties:
+        answers:
+          type: object
+          description: 学生提交的答案结构（视题型而定）
+
+    ExerciseRecord:
+      type: object
+      properties:
+        assignmentId:
+          type: string
+        score:
+          type: number
+        status:
+          type: string
+          enum:
+            - submitted
+            - not_submitted
+            - late
+          description: 提交状态
+
+    LearningRecord:
+      type: object
+      properties:
+        courseId:
+          type: string
+        chapter:
+          type: string
+        completedAt:
+          type: string
+          format: date-time
+
+    AssignmentCreate:
+      type: object
+      required: [ templateId, dueDate ]
+      properties:
+        templateId:
+          type: string
+          description: 题库模板 ID
+        dueDate:
+          type: string
+          format: date-time
+          description: 截止提交时间
+
+
+    AssignmentResult:
+      type: object
+      properties:
+        assignedCount:
+          type: integer
+          description: 成功分配的练习数量
