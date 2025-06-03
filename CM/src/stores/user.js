@@ -28,14 +28,17 @@ export const useUserStore = defineStore('user', () => {
   const isLoggedIn = computed(() => !!token.value)
 
   // 初始化 - 从token中解析用户信息
-  function initUserFromToken() {
-    const payload = parseJwt(token.value)
-    if (payload) {
-      name.value = payload.username || payload.name || ''
-      role.value = payload.role || ''
-      // 其他可能存在的信息...
-    }
+  // 修改 initUserFromToken 函数来正确解析后端返回的 token 数据
+function initUserFromToken() {
+  const payload = parseJwt(token.value)
+  if (payload) {
+    // 直接使用 payload 中的字段，不再使用 username 兜底
+    userId.value = payload.userId || userId.value
+    name.value = payload.username || ''
+    role.value = payload.roles && payload.roles.length > 0 ? payload.roles[0] : ''
+    // 不再期望 avatar 等其他字段从 token 中获取
   }
+}
 
   // 登录
   function login(loginData) {
