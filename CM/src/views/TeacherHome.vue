@@ -205,7 +205,8 @@ const createCourse = async () => {
     !newCourse.value.code ||
     !newCourse.value.outline ||
     !newCourse.value.assessment ||
-    !newCourse.value.chapters 
+    !newCourse.value.chapters
+
   ) {
     alert('请填写完整课程信息');
     return;
@@ -214,8 +215,12 @@ const createCourse = async () => {
     // 处理章节为数组
     const chaptersArr = newCourse.value.chapters
       .split(',')
-      .map(s => s.trim())
-      .filter(Boolean);
+     .map((s, index) => ({
+        title: s.trim(), // 章节名称
+        order: index + 1, // 章节序号，从1开始
+        //completed: false  // 默认未完成状态
+      }))
+      .filter(chapter => chapter.title); 
 
     const res = await apiCreateCourse({
       name: newCourse.value.name,
