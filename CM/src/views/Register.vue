@@ -73,6 +73,7 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { register } from '@/api/auth';
+import { useUserStore } from '@/stores/user'; // 导入用户状态管理
 
 const studentId = ref('');
 const username = ref('');
@@ -81,7 +82,8 @@ const password = ref('');
 const confirmPassword = ref('');
 const role = ref('');
 const router = useRouter();
-
+const userStore = useUserStore(); // 使用用户状态存储
+  
 const handleRegister = async() => {
   if (!studentId.value || !username.value || !email.value || !password.value||!role.value) {
     alert('请填写完整信息');

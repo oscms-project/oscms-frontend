@@ -10,8 +10,8 @@
         <div class="user-info">
           <div class="avatar"></div>
           <div class="user-details">
-            <div class="username">张腾月</div>
-            <div class="user-id">23371309</div>
+             <div class="username">{{ userStore.name }}</div>
+            <div class="user-id">{{ userStore.userId }}</div>
           </div>
         </div>
       </div>
@@ -148,8 +148,9 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-
+import { ref, computed, onMounted } from 'vue';
+import { useUserStore } from '@/stores/user';
+const userStore = useUserStore();
 const activeTab = ref('outline')
 
 const tabs = [

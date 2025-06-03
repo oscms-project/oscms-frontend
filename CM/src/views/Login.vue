@@ -73,13 +73,14 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { login } from '@/api/auth';
-
+import { useUserStore } from '@/stores/user'; // 导入用户状态管理
 // 响应式状态
 const id = ref('');
 const password = ref('');
 const rememberMe = ref(false);
 const router = useRouter();
 const role = ref(''); 
+const userStore = useUserStore(); // 使用用户状态存储
 
 // 处理登录
 const handleLogin = async() => {
@@ -103,10 +104,10 @@ const handleLogin = async() => {
         alert('角色与账号不匹配，请检查后重试');
         return;
       }
-        localStorage.setItem('token', res.data.data.token);
-         if (res.data.data.user && res.data.data.user.id) {
-        localStorage.setItem('userId', res.data.data.user.id);
-      }
+       userStore.login({
+        token: res.data.data.token,
+        userId: res.data.data.user?.id || id.value
+      });
       alert('登录成功！');
       // 跳转到首页
       if(role.value === 'student') {
