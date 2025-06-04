@@ -204,7 +204,7 @@ const startExercise = (practice) => {
   courseStore.setCurrentExerciseId(practice.id);
   
   // 跳转到简洁的URL，无需查询参数
-  router.push('/exercise');
+  router.push('/exercise/:id');
 };
 // 添加加载状态和错误处理
 const loading = ref(true);

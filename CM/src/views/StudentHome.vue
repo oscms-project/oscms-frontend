@@ -71,6 +71,7 @@
           <div class="progress-bar uncompleted" :style="{ width: (course.uncompletedUnits / course.totalUnits * 100) + '%' }"></div>
         </div>
       </div>
+
     </div>
   </div>
 </div>
