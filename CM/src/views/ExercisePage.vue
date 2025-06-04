@@ -124,8 +124,14 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router'
 <<<<<<< HEAD
+<<<<<<< HEAD
 import { getAssignmentQuestions, submitAssignmentAnswers } from '@/api/assignment'
 
+=======
+import { getAssignmentInfo, getAssignmentQuestions } from '@/api/assignment'
+import { useCourseStore } from '@/stores/course';
+const courseStore = useCourseStore();
+>>>>>>> 57ed0beb1fe9551614ecd8bfbb2b931816ea15d7
 =======
 import { getAssignmentInfo, getAssignmentQuestions } from '@/api/assignment'
 import { useCourseStore } from '@/stores/course';
@@ -282,9 +288,12 @@ onMounted(async () => {
 
   try {
 <<<<<<< HEAD
+<<<<<<< HEAD
     const assignmentId = route.params.assignmentId
     const questions = await getAssignmentQuestions(assignmentId)
 =======
+=======
+>>>>>>> 57ed0beb1fe9551614ecd8bfbb2b931816ea15d7
     const exerciseId = courseStore.currentExerciseId;
     console.log('获取练习信息，ID:', exerciseId);
     // 检查是否有有效的练习ID
@@ -297,6 +306,9 @@ onMounted(async () => {
 
     const info = await getAssignmentInfo(exerciseId)
     const questions = await getAssignmentQuestions(exerciseId)
+<<<<<<< HEAD
+>>>>>>> 57ed0beb1fe9551614ecd8bfbb2b931816ea15d7
+=======
 >>>>>>> 57ed0beb1fe9551614ecd8bfbb2b931816ea15d7
     exercise.value = {
       questions
