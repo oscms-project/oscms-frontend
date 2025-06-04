@@ -17,6 +17,7 @@
           :key="index"
           class="course-card"
           :style="{ backgroundColor: course.bgColor }"
+          @click="navigateToCourseDetail(course)"
         >
           <div class="course-image" :style="{ backgroundImage: `url(${course.image})` }">
             <h3 class="course-title">{{ course.name }}</h3>
@@ -94,6 +95,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useUserStore } from '@/stores/user';
+import { useCourseStore } from '@/stores/course';
 import { useRouter } from 'vue-router';
 import { getUser } from '@/api/user'
 import { getCourses, createCourse as apiCreateCourse } from '@/api/course'
@@ -118,6 +120,7 @@ import BaseWindow from '@/components/BaseWindow.vue'
 // }
 
 const userStore = useUserStore();
+const courseStore = useCourseStore();
 const router = useRouter(); // 添加路由器
 const teacherInfo = ref({
   // 使用store中的信息初始化
@@ -249,13 +252,24 @@ const createCourse = async () => {
   }
 };
 
+// 课程详情页导航函数
+const navigateToCourseDetail = (course) => {
+  // 使用 courseStore 存储当前选中的课程ID
+  courseStore.setCurrentCourseId(course.id);
+  
+  // 使用简洁的URL进行导航
+  router.push(`/course/${course.id}`);
+};
+
 onMounted(() => {
   // 不再需要解析token，直接使用store中信息
+  /*
   if (!userStore.isLoggedIn) {
     // 处理未登录状态
     router.push('/login');
     return;
   }
+  */
   fetchTeacherInfo();
   fetchTeacherCourses();
 });
@@ -309,6 +323,7 @@ onUnmounted(() => {
   overflow: hidden;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   transition: transform 0.3s;
+  cursor: pointer;
 }
 .course-card:hover {
   transform: translateY(-5px);
