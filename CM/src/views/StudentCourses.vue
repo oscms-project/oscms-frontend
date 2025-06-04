@@ -95,22 +95,35 @@
   </div>
 </div>
 
-      <!-- Course Materials -->
-      <div v-if="activeTab === 'materials'" class="tab-content">
+    <!-- filepath: e:\test\git_test\CM\src\views\StudentCourses.vue -->
+<!-- Course Materials -->
+<div v-if="activeTab === 'materials'" class="tab-content">
   <div class="content-header">
     <h3>📁 课程资料</h3>
   </div>
   <div class="materials-list">
     <div class="material-item" v-for="material in courseMaterials" :key="material.id">
-      <div class="material-icon">{{ material.type === 'pdf' ? '📄' : material.type === 'ppt' ? '📊' : '📁' }}</div>
+      <!-- 文件类型图标 -->
+      <div class="material-icon">{{ getFileIcon(material.filename) }}</div>
       <div class="material-info">
-        <div class="material-name">{{ material.name }}</div>
+        <!-- 资料标题 -->
+        <div class="material-name">{{ material.filename }}</div>
         <div class="material-meta">
-          <span>大小：{{ material.size }}</span>
-          <span>上传时间：{{ material.uploadTime }}</span>
+          <!-- 上传时间 -->
+          <span>上传时间：{{ material.updateAt }}</span>
+          <!-- 章节信息 -->
+          <span v-if="material.chapterOrder">章节：{{ material.chapterOrder }}</span>
         </div>
       </div>
-      <button class="download-btn">下载</button>
+      <!-- 下载按钮链接到文件URL -->
+      <a 
+        :href="material.url" 
+        class="download-btn" 
+        target="_blank" 
+        :download="material.filename"
+      >
+        下载
+      </a>
     </div>
   </div>
 </div>
