@@ -101,6 +101,23 @@
   <div class="content-header">
     <h3>📁 课程资料</h3>
   </div>
+  <div class="filter-container">
+    <label for="chapter-filter">按章节筛选：</label>
+    <select 
+      id="chapter-filter" 
+      v-model="selectedChapter" 
+      class="chapter-filter"
+    >
+      <option value="all">全部章节</option>
+      <option 
+        v-for="chapter in availableChapters" 
+        :key="chapter.order" 
+        :value="chapter.order"
+      >
+        {{ chapter.order }}. {{ chapter.title }}
+      </option>
+    </select>
+  </div>
   <div class="materials-list">
     <div class="material-item" v-for="material in courseMaterials" :key="material.id">
       <!-- 文件类型图标 -->
@@ -307,7 +324,46 @@ const fetchAllCourseInfo = async () => {
     loading.value = false;
   }
 };
+// 添加在script部分的ref引用列表中
+const selectedChapter = ref('all'); // 默认显示全部章节
 
+// 计算可用的章节列表，用于筛选器
+const availableChapters = computed(() => {
+  // 从课程章节数据中获取章节列表
+  const chaptersFromData = courseChapters.value.map(chapter => ({
+    order: chapter.order || chapter.chapterOrder,
+    title: chapter.title
+  }));
+
+  // 从资料中提取可能存在的其他章节
+  const chaptersFromMaterials = new Map();
+  courseMaterials.value.forEach(material => {
+    if (material.chapterOrder && !chaptersFromData.some(c => c.order === material.chapterOrder)) {
+      chaptersFromMaterials.set(material.chapterOrder, {
+        order: material.chapterOrder,
+        title: `第${material.chapterOrder}章`
+      });
+    }
+  });
+  
+  // 合并两个章节来源
+  return [
+    ...chaptersFromData,
+    ...Array.from(chaptersFromMaterials.values())
+  ].sort((a, b) => a.order - b.order); // 按章节序号排序
+});
+
+// 根据选中的章节过滤资料
+const filteredMaterials = computed(() => {
+  if (selectedChapter.value === 'all') {
+    return courseMaterials.value; // 返回所有资料
+  } else {
+    // 过滤属于选定章节的资料
+    return courseMaterials.value.filter(material => 
+      material.chapterOrder === selectedChapter.value
+    );
+  }
+});
 // 完善下载函数
 const downloadFile = (url, filename) => {
   fetch(url)
@@ -894,5 +950,36 @@ onMounted(() => {
   font-size: 24px;
   width: 32px;
   text-align: center;
+}
+/* 添加在<style>部分 */
+.filter-container {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 12px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+}
+
+.chapter-filter {
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  margin-left: 12px;
+  background-color: white;
+  font-size: 14px;
+  min-width: 200px;
+}
+
+.chapter-filter:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #4b5563;
 }
 </style>
