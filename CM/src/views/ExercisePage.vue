@@ -127,8 +127,14 @@ import { useRouter, useRoute } from 'vue-router'
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 import { getAssignmentQuestions, submitAssignmentAnswers } from '@/api/assignment'
 
+=======
+import { getAssignmentInfo, getAssignmentQuestions } from '@/api/assignment'
+import { useCourseStore } from '@/stores/course';
+const courseStore = useCourseStore();
+>>>>>>> 57ed0beb1fe9551614ecd8bfbb2b931816ea15d7
 =======
 import { getAssignmentInfo, getAssignmentQuestions } from '@/api/assignment'
 import { useCourseStore } from '@/stores/course';
@@ -303,9 +309,12 @@ onMounted(async () => {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     const assignmentId = route.params.assignmentId
     const questions = await getAssignmentQuestions(assignmentId)
 =======
+=======
+>>>>>>> 57ed0beb1fe9551614ecd8bfbb2b931816ea15d7
 =======
 >>>>>>> 57ed0beb1fe9551614ecd8bfbb2b931816ea15d7
 =======
@@ -327,6 +336,9 @@ onMounted(async () => {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> 57ed0beb1fe9551614ecd8bfbb2b931816ea15d7
+=======
 >>>>>>> 57ed0beb1fe9551614ecd8bfbb2b931816ea15d7
 =======
 >>>>>>> 57ed0beb1fe9551614ecd8bfbb2b931816ea15d7
