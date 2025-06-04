@@ -251,11 +251,11 @@ const createCourse = async () => {
 
 onMounted(() => {
   // 不再需要解析token，直接使用store中信息
-  if (!userStore.isLoggedIn) {
-    // 处理未登录状态
-    router.push('/login');
-    return;
-  }
+  // if (!userStore.isLoggedIn) {
+  //   // 处理未登录状态
+  //   router.push('/login');
+  //   return;
+  // }
   fetchTeacherInfo();
   fetchTeacherCourses();
 });
