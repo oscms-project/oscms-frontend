@@ -127,12 +127,8 @@
         <h4>{{ practice.title }}</h4>
         <div class="practice-meta">
           <span>题目数量：{{ practice.questionCount }}题</span>
-          <span>时间限制：{{ practice.timeLimit }}分钟</span>
-          <span>最高分：{{ practice.bestScore }}分</span>
         </div>
         <div class="practice-stats">
-          <span>完成次数：{{ practice.attempts }}次</span>
-          <span>错题数：{{ practice.wrongCount }}题</span>
         </div>
       </div>
       <div class="practice-actions">
@@ -193,7 +189,24 @@ const fetchAllCourseInfo = async () => {
     
     if (res.data && res.data.data) {
       courseData.value = res.data.data;
-      courseOutline.value = res.data.data.outline || [];
+      //处理大纲数据
+     if (typeof res.data.data.outline === 'string') {
+    // 如果大纲是字符串，将其封装为对象数组
+    courseOutline.value = [
+      {
+        chapter: 1,
+        title: '课程大纲',
+        description: res.data.data.outline
+      }
+    ];
+  } else if (Array.isArray(res.data.data.outline)) {
+    // 如果已经是数组，直接使用
+    courseOutline.value = res.data.data.outline;
+  } else {
+    // 默认为空数组
+    courseOutline.value = [];
+  }
+  
       courseChapters.value = res.data.data.chapters || [];
       console.log("课程基本信息处理完成:", courseData.value);
       console.log("大纲数据:", courseOutline.value);
