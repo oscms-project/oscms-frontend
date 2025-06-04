@@ -105,3 +105,39 @@ export function createAssignment(classId, assignmentData) {
             }
         })
 }
+
+/**
+ * 获取某班级下某作业的全部提交（教师端）
+ * @param {string} classId
+ * @param {string} assignmentId
+ * @returns {Promise<Array>} 提交列表
+ */
+export function getAssignmentSubmissions(classId, assignmentId) {
+    return axios
+        .get(`/api/classes/${classId}/assignments/${assignmentId}/submissions`)
+        .then(res => {
+            if (res.data && res.data.code === 200) {
+                return res.data.data;
+            } else {
+                throw new Error(res.data?.message || '获取提交列表失败');
+            }
+        });
+}
+
+/**
+ * 教师批改主观题
+ * @param {string} submissionId
+ * @param {Array} grades 形如 [{ questionId, score, feedback }]
+ * @returns {Promise<Object>} 更新后的提交详情
+ */
+export function gradeSubmission(submissionId, grades) {
+    return axios
+        .put(`/api/submissions/${submissionId}/grade`, { grades })
+        .then(res => {
+            if (res.data && res.data.code === 200) {
+                return res.data.data;
+            } else {
+                throw new Error(res.data?.message || '批改失败');
+            }
+        });
+}
