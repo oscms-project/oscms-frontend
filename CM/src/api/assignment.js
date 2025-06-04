@@ -52,3 +52,56 @@ export function getSubmissionDetail(submissionId) {
             }
         })
 }
+
+/**
+ * 列出题库中所有题目
+ * @param {Object} params 可选参数，如 { courseId }
+ * @returns {Promise<Array>}
+ */
+export function getQuestionBank(params = {}) {
+    return axios
+        .get('/api/questions', { params })
+        .then(res => {
+            if (res.data && res.data.code === 200) {
+                return res.data.data
+            } else {
+                throw new Error(res.data?.message || '获取题库失败')
+            }
+        })
+}
+
+/**
+ * 从题库导入题目到作业
+ * @param {string} assignmentId
+ * @param {Array<string>} questionIds
+ * @returns {Promise<Object>}
+ */
+export function importQuestionsToAssignment(assignmentId, questionIds) {
+    return axios
+        .post(`/api/assignments/${assignmentId}/questions`, { ids: questionIds })
+        .then(res => {
+            if (res.data && res.data.code === 200) {
+                return res.data.data
+            } else {
+                throw new Error(res.data?.message || '导入题目失败')
+            }
+        })
+}
+
+/**
+ * 老师给某个班级布置作业
+ * @param {string} classId
+ * @param {Object} assignmentData
+ * @returns {Promise<Object>}
+ */
+export function createAssignment(classId, assignmentData) {
+    return axios
+        .post(`/api/classes/${classId}/assignments`, assignmentData)
+        .then(res => {
+            if (res.data && res.data.code === 201) {
+                return res.data.data
+            } else {
+                throw new Error(res.data?.message || '布置作业失败')
+            }
+        })
+}
