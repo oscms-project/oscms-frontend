@@ -122,13 +122,13 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue';
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { getAssignmentQuestions, submitAssignmentAnswers } from '@/api/assignment'
 import { useCourseStore } from '@/stores/course';
+import { useUserStore } from '@/stores/user';
+const userStore = useUserStore();
 const courseStore = useCourseStore();
 const router = useRouter();
-const route = useRoute()
-
 // 练习数据 - 使用接口数据
 const exercise = ref({
   id: 'ex-002',
@@ -243,19 +243,19 @@ const confirmSubmit = () => {
 // 提交练习
 const submitExercise = async () => {
   try {
-    const assignmentId = route.params.assignmentId
-    const classId = route.params.classId
-    const studentId = localStorage.getItem('userId') // 或你的登录用户ID获取方式
+    const assignmentId = userStore.currentAssignmentId;
+    const classId = courseStore.currentClassId; // 假设班级id也在store里
+    const studentId = userStore.userId;
 
     // 构造 answers 数组
-    const answers = exercise.value.questions.map((question, index) => ({
+    const answersArr = exercise.value.questions.map((question, index) => ({
       questionId: question.id,
       response: exercise.value.type === 'choice'
         ? answers.value[index]?.toString()
         : codeAnswers.value[index]
     }))
 
-    await submitAssignmentAnswers(classId, assignmentId, { studentId, answers })
+    await submitAssignmentAnswers(classId, assignmentId, { studentId, answers: answersArr })
 
     alert('答案已提交')
     router.push({ name: 'ExerciseFeedback', params: { id: exercise.value.id } })
@@ -276,6 +276,8 @@ onMounted(async () => {
   document.addEventListener('contextmenu', (e) => e.preventDefault());
 
   try {
+    const assignmentId = userStore.currentAssignmentId;
+    const questions = await getAssignmentQuestions(assignmentId);
     const exerciseId = courseStore.currentExerciseId;
     console.log('获取练习信息，ID:', exerciseId);
     // 检查是否有有效的练习ID
@@ -285,9 +287,6 @@ onMounted(async () => {
       router.push('/student/courses'); // 返回课程页面
       return;
     }
-
-    const info = await getAssignmentInfo(exerciseId)
-    const questions = await getAssignmentQuestions(exerciseId)
     exercise.value = {
       questions
     }

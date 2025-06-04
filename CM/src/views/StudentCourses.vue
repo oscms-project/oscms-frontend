@@ -110,7 +110,7 @@
         <div class="material-name">{{ material.filename }}</div>
         <div class="material-meta">
           <!-- 上传时间 -->
-         <span>上传时间：{{ formatDate(material.updateAt) }}</span>
+         <span>上传时间：{{ formatDate(material.updatedAt) }}</span>
           <!-- 章节信息 -->
           <span v-if="material.chapterOrder">章节：{{ material.chapterOrder }}</span>
         </div>
