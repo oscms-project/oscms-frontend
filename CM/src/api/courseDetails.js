@@ -43,12 +43,14 @@ export function getResourceVersion(materialId, version) {
 
 // 更新课程章节
 export function updateCourseChapters(courseId, chapters) {
+  // 将 chapters 数组转换为 JSON 字符串，并通过 outline 字段发送
+  const outlineString = JSON.stringify(chapters);
   return axios.put(`/courses/${courseId}`, {
-    chapters
-  })
+    outline: outlineString // 使用 outline 字段
+  });
 }
 
-// 获取班级列表
+// 获取课程下的所有班级
 export function getCourseClasses(courseId) {
   return axios.get(`/courses/${courseId}/classes`)
 }

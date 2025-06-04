@@ -258,7 +258,7 @@ const navigateToCourseDetail = (course) => {
   courseStore.setCurrentCourseId(course.id);
   
   // 使用简洁的URL进行导航
-  router.push(`/course/${course.id}`);
+  router.push(`/teacher/courses`);
 };
 
 onMounted(() => {

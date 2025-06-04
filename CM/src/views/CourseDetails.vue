@@ -5,7 +5,7 @@
     <div class="container header-content">
       <div class="course-info">
         <h1 class="course-title">{{ courseName }}</h1>
-        <p class="course-meta">{{ courseStudents }}人 · {{ courseDuration }}</p>
+        <p class="course-meta">{{ courseStudents }}{{ courseDuration }}</p>
       </div>
       <div class="action-buttons">
         <button class="btn btn-primary" @click="showPublishExerciseModal">
@@ -142,13 +142,13 @@
             </div>
           </div>
           <div class="resource-info">
-            <h3 class="resource-title">{{ resource.title }}</h3>
+            <h3 class="resource-title">{{ resource.filename }}</h3>
             <p class="resource-meta">
               <span class="resource-size">{{ formatFileSize(resource.size) }}</span>
             </p>
             <p class="resource-date">
               <i class="i-lucide-calendar mr-1"></i>
-              {{ resource.uploadDate }}
+              {{ resource.updatedAt}}
             </p>
             <p class="resource-description" v-if="resource.description">{{ resource.description }}</p>
           </div>
@@ -171,7 +171,9 @@
         <div class="chapter-item" v-for="chapter in courseChapters" :key="chapter.id">
           <div class="chapter-header" @click="toggleChapter(chapter.id)">
             <div class="chapter-title-container">
-              <div class="chapter-number-badge">{{ chapter.number.replace('第', '').replace('章', '') }}</div>
+              <div class="chapter-number-badge">
+                {{ (chapter && typeof chapter.number === 'string') ? chapter.number.replace('第', '').replace('章', '') : '' }}
+              </div>
               <h3 class="chapter-title">{{ chapter.title }}</h3>
             </div>
             <div class="chapter-meta">
@@ -187,7 +189,9 @@
               <div class="section-item" v-for="section in chapter.sections" :key="section.id">
                 <div class="section-header">
                   <div class="section-title-container">
-                    <span class="section-number">{{ chapter.number.replace('第', '').replace('章', '') }}.{{ section.number }}</span>
+                    <span class="section-number">
+                      {{ (chapter && typeof chapter.number === 'string') ? chapter.number.replace('第', '').replace('章', '') : '' }}.{{ section.number }}
+                    </span>
                     <h4 class="section-title">{{ section.title }}</h4>
                   </div>
                   <span class="section-duration">
@@ -433,8 +437,8 @@
       </div>
       <div class="modal-body">
         <div class="form-group">
-          <label for="resourceTitle">资源标题</label>
-          <input type="text" id="resourceTitle" v-model="newResource.title" placeholder="输入资源标题">
+          <label for="resourceChapterOrder">资源所属章节号</label>
+          <input type="number" id="resourceChapterOrder" v-model.number="newResource.chapterOrder" placeholder="输入章节序号 (例如: 1, 2, ...)">
         </div>
         <div class="form-group">
           <label for="resourceType">资源类型</label>
@@ -544,7 +548,7 @@
               <div v-if="resourcePermissions.visibility === 'specific'" class="class-select">
                 <div class="class-list">
                   <label
-                    v-for="cls in classList"
+                    v-for="cls in availableClassesForPermissions"
                     :key="cls.id"
                     class="class-option"
                     :class="{ selected: resourcePermissions.selectedClasses.includes(cls.id) }"
@@ -973,19 +977,25 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useUserStore } from '@/stores/user';
 import { useCourseStore } from '@/stores/course';
 import { useRouter, useRoute } from 'vue-router';
 import { getCourseDetail } from '@/api/course';
-import { getMaterials } from '@/api/materials';
+import { getMaterials, getCourseMaterials, uploadCourseMaterialFile } from '@/api/materials';
 import { getClassAssignments } from '@/api/class';
 import { getCourseClasses } from '@/api/course';
+import { updateCourseOutline } from '@/api/courseDetails'; // Added for outline update
 
 const userStore = useUserStore();
 const courseStore = useCourseStore();
 const router = useRouter();
 const route = useRoute();
+
+// Loading and error states
+const loading = ref(false);
+const error = ref('');
+const availableClassesForPermissions = ref([]); // New ref for dynamic class list
 
 // 从 store 获取课程ID
 const courseId = computed(() => courseStore.currentCourseId);
@@ -1309,6 +1319,7 @@ const newResource = ref({
   id: null,
   title: '',
   type: 'pdf',
+  chapterOrder: 1,
   description: '',
   size: 0,
   language: 'java',
@@ -1419,7 +1430,7 @@ const filteredResources = computed(() => {
   if (resourceSearchQuery.value) {
     const query = resourceSearchQuery.value.toLowerCase();
     result = result.filter(resource =>
-      resource.title.toLowerCase().includes(query) ||
+      resource.filename.toLowerCase().includes(query) ||
       (resource.description && resource.description.toLowerCase().includes(query))
     );
   }
@@ -1676,75 +1687,87 @@ const getFileType = (filename) => {
 
 // 上传资源
 const uploadResource = async () => {
-  if (newResource.value.title && selectedFile.value) {
-    const newId = courseResources.value.length > 0
-      ? Math.max(...courseResources.value.map(r => r.id)) + 1
-      : 1;
+  if (!selectedFile.value && !editingResource.value) {
+    console.error('错误：在尝试上传或更新资源时未选择任何文件。');
+    alert('请先选择要上传的文件。');
+    return;
+  }
 
-    // 调用 API 上传文件到服务器
-    try {
-      const formData = new FormData();
-      formData.append('file', selectedFile.value);
-      formData.append('title', newResource.value.title);
-      formData.append('type', newResource.value.type);
-      
-      await uploadCourseResource(route.params.id, formData);
-      await loadApiData(); // 重新加载资源列表
-    } catch (error) {
-      console.error('上传资源失败:', error);
-      
-      // API 调用失败时，使用本地处理逻辑作为备份
-      const fileUrl = URL.createObjectURL(selectedFile.value);
+  const formData = new FormData();
 
-      // 如果是代码文件，读取内容
-      if (newResource.value.type === 'code') {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const code = e.target.result;
+  // 1. Add the file (required by OpenAPI if it's a new upload)
+  if (selectedFile.value) {
+    formData.append('file', selectedFile.value);
+  }
 
-          courseResources.value.push({
-            id: newId,
-            title: newResource.value.title,
-            type: newResource.value.type,
-            size: selectedFile.value.size,
-            uploadDate: new Date().toLocaleString(),
-            language: getLanguageFromExtension(selectedFile.value.name.split('.').pop().toLowerCase()),
-            code: code,
-            url: fileUrl,
-            permissions: resourcePermissions.value
-          });
-        };
-        reader.readAsText(selectedFile.value);
-      } else {
-        courseResources.value.push({
-          id: newId,
-          title: newResource.value.title,
-          type: newResource.value.type,
-          size: selectedFile.value.size,
-          uploadDate: new Date().toLocaleString(),
-          url: fileUrl,
-          permissions: resourcePermissions.value
-        });
-      }
+  // 2. Add chapterOrder (REQUIRED by OpenAPI's MaterialUpload schema)
+  // Ensure newResource.value.chapterOrder is populated from your UI (e.g., modal input).
+  const chapterOrder = newResource.value.chapterOrder || 1; // Placeholder/default if not set
+  formData.append('chapterOrder', chapterOrder.toString());
+
+  // 3. Add description (optional)
+  if (newResource.value.description) {
+    formData.append('description', newResource.value.description);
+  }
+
+  // 4. Add visibleForClasses (optional)
+  if (resourcePermissions.value.visibility === 'specific' && resourcePermissions.value.selectedClasses.length > 0) {
+    resourcePermissions.value.selectedClasses.forEach(classId => {
+      formData.append('visibleForClasses', classId.toString());
+    });
+  } else if (resourcePermissions.value.visibility === 'all') {
+    // If visibility is 'all', OpenAPI suggests not sending 'visibleForClasses' implies all classes.
+  } else {
+    // If 'specific' but no classes selected, OpenAPI says "若为空列表则均不可见".
+    // How to send an "empty list" for a multi-value field in FormData can be backend-specific.
+    // Often, not sending the field or sending a specific marker is how this is handled.
+    // Consult backend if an explicit empty list needs to be signaled differently.
+  }
+
+  // Handle title and type: These are not in OpenAPI MaterialUpload schema for multipart.
+  // If your backend expects them in the form data, confirm field names.
+  // Using 'custom_' prefix as a suggestion if they are non-standard fields.
+
+  if (newResource.value.type) {
+    // Type is often inferred by backend from file extension/MIME type.
+    formData.append('type', newResource.value.type);
+  }
+  
+  // Include materialId if editing an existing resource and backend supports it via this POST endpoint
+  if (editingResource.value && newResource.value.id) {
+    // The OpenAPI states POST /courses/{courseId}/resources is for "创建新资源或更新已有资源新版本".
+    // If your backend uses a field like 'materialId' in the form data to identify an update, add it here.
+    // formData.append('materialId', newResource.value.id);
+    console.log('准备更新资源 ID:', newResource.value.id);
+  }
+
+  try {
+    loading.value = true;
+    error.value = '';
+    
+    console.log('上传资源 FormData 内容:', Object.fromEntries(formData.entries()));
+
+    const currentCourseId = courseId.value;
+    if (!currentCourseId) {
+      error.value = '课程ID无效，无法上传资源。';
+      alert(error.value);
+      loading.value = false;
+      return;
     }
+    
+    // Call the correctly imported API function
+    const response = await uploadCourseMaterialFile(currentCourseId, formData);
 
-    // 重置表单
-    newResource.value = {
-      title: '',
-      type: 'pdf',
-      language: 'java',
-      code: '',
-      url: null
-    };
-    resourcePermissions.value = {
-      visibility: 'all',
-      selectedClasses: [],
-      hasTimeLimit: false,
-      timeRange: null
-    };
-    removeSelectedFile();
+    console.log('上传/更新资源成功:', response);
+    await fetchAllCourseInfo(); // Refresh the list of resources
+    closeUploadResourceModal(); // Close the modal
 
-    showUploadResourceModal.value = false;
+  } catch (err) {
+    console.error('上传资源操作失败:', err);
+    error.value = err.response?.data?.message || err.message || '上传资源失败，请稍后重试';
+    // alert(error.value); // Consider a more user-friendly notification system
+  } finally {
+    loading.value = false;
   }
 };
 
@@ -1845,15 +1868,16 @@ const previewResource = (resource) => {
 // 下载资源
 const downloadResource = (resource) => {
   // 在实际应用中，这里应该触发文件下载
+  console.log(resource.filename);
   if (resource.url) {
     const a = document.createElement('a');
     a.href = resource.url;
-    a.download = resource.title;
+    a.download = resource.filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
   } else {
-    alert(`下载资源：${resource.title}`);
+    alert(`下载资源：${resource.filename}`);
   }
 };
 
@@ -2034,6 +2058,7 @@ const closeUploadResourceModal = () => {
     id: null,
     title: '',
     type: 'pdf',
+    chapterOrder: 1,
     description: '',
     size: 0,
     language: 'java',
@@ -2104,26 +2129,54 @@ const handleClickOutside = (event) => {
 // 生命周期钩子
 onMounted(() => {
   document.addEventListener('click', handleClickOutside);
-  loadApiData(); // 加载 API 数据
+  fetchAllCourseInfo(); // 加载 API 数据
 });
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside);
 });
-
 // 在 script setup 部分添加以下方法
 const openOutlineEditor = () => {
-  editingOutline.value = courseOutline.value;
+  try {
+    editingOutline.value = JSON.stringify(courseOutline.value, null, 2); // Pretty-print JSON for textarea
+  } catch (e) {
+    console.error("Error stringifying course outline for editor:", e);
+    editingOutline.value = "无法加载大纲内容进行编辑。"; // Fallback
+  }
   showOutlineEditModal.value = true;
 };
 
 const saveOutlineChanges = async () => {
+  if (!editingOutline.value) {
+    alert("大纲内容不能为空。");
+    return;
+  }
+
+  let parsedOutlineForDisplay;
   try {
-    await updateCourseOutline(route.params.id, editingOutline.value);
-    courseOutline.value = editingOutline.value;
+    parsedOutlineForDisplay = JSON.parse(editingOutline.value);
+  } catch (e) {
+    alert("大纲内容格式不正确 (非法的JSON格式)。请检查并修正。");
+    console.error("Error parsing outline from textarea:", e);
+    return;
+  }
+
+  // Add a loading state for this specific action if needed, e.g., const isSavingOutline = ref(false);
+  // isSavingOutline.value = true;
+  try {
+    loading.value = true; // Use global loading or a specific one
+    error.value = '';
+    await updateCourseOutline(courseId.value, editingOutline.value); // Send the string directly
+    courseOutline.value = parsedOutlineForDisplay; // Update main display with parsed structure
     showOutlineEditModal.value = false;
-  } catch (error) {
-    console.error('保存大纲失败:', error);
+    // alert('课程大纲更新成功！'); // Optional success message
+  } catch (err) {
+    console.error('保存大纲失败:', err);
+    error.value = err.response?.data?.message || err.message || '保存大纲失败，请重试';
+    alert(`保存大纲失败: ${error.value}`);
+  } finally {
+    loading.value = false;
+    // isSavingOutline.value = false;
   }
 };
 
@@ -2166,7 +2219,7 @@ const downloadVersion = (resourceId, version) => {
   if (resource && version.url) {
     const a = document.createElement('a');
     a.href = version.url;
-    a.download = `${resource.title}_v${version.version}`;
+    a.download = `${resource.filename}_v${version.version}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -2181,7 +2234,7 @@ const previewVersion = (resourceId, version) => {
     previewingResource.value = {
       ...resource,
       url: version.url,
-      title: `${resource.title} (v${version.version})`
+      title: `${resource.filename} (v${version.version})`
     };
     showResourcePreview.value = true;
   }
@@ -2341,10 +2394,11 @@ const selectedQuestionType = ref(null);
 const questionSearchQuery = ref('');
 
 // 添加 API 数据加载函数
+/*
 const loadApiData = async () => {
   try {
     // 获取课程基本信息
-    const courseResponse = await getCourseDetails(route.params.id);
+    const courseResponse = await getCourseDetail(route.params.id);
     if (courseResponse.data) {
       courseName.value = courseResponse.data.name;
       courseStudents.value = courseResponse.data.studentCount;
@@ -2378,41 +2432,129 @@ const loadApiData = async () => {
     console.error('加载数据失败:', error);
   }
 };
+*/
 
 // 获取课程所有信息
 const fetchAllCourseInfo = async () => {
+  if (!courseId.value) {
+    console.error('No course ID provided');
+    error.value = '未找到课程信息';
+    return;
+  }
+
   try {
     loading.value = true;
     error.value = '';
     
-    // 获取课程基本信息
+    console.log("正在获取课程详情，ID:", courseId.value);
+    
     const courseRes = await getCourseDetail(courseId.value);
-    courseData.value = courseRes;
-    courseName.value = courseRes.name;
-    courseStudents.value = courseRes.studentCount;
-    courseDuration.value = courseRes.duration;
-
-    // 获取课程大纲
-    courseOutline.value = courseRes.outline || [];
+    console.log("课程详情API返回:", courseRes);
+    
+    if (courseRes.data && courseRes.data.data) {
+      const courseData = courseRes.data.data;
+      courseName.value = courseData.name;
+      courseStudents.value = courseData.studentCount;
+      courseDuration.value = courseData.duration;
+      
+      // 处理大纲数据
+      const outlineDataFromApi = courseData.outline;
+      if (typeof outlineDataFromApi === 'string' && outlineDataFromApi.trim().startsWith('[')) {
+        try {
+          const parsed = JSON.parse(outlineDataFromApi);
+          if (Array.isArray(parsed)) {
+            courseOutline.value = parsed;
+          } else {
+            console.warn("Parsed outline data is not an array. Wrapping as description.");
+            courseOutline.value = [{ title: "课程大纲", description: outlineDataFromApi, points: [] }];
+          }
+        } catch (e) {
+          console.warn("Failed to parse course outline JSON string, treating as plain description:", e);
+          courseOutline.value = [{ title: "课程大纲", description: outlineDataFromApi, points: [] }];
+        }
+      } else if (Array.isArray(outlineDataFromApi)) { // Should not happen if API sends string per OpenAPI
+        courseOutline.value = outlineDataFromApi;
+      } else if (typeof outlineDataFromApi === 'string') { // Plain string, not JSON array
+         console.warn("Course outline is a plain string. Wrapping as description.");
+         courseOutline.value = [{ title: "课程大纲", description: outlineDataFromApi, points: [] }];
+      }else {
+        courseOutline.value = [];
+      }
+      
+      courseChapters.value = courseData.chapters || [];
+      console.log("课程基本信息处理完成");
+      console.log("大纲数据:", courseOutline.value);
+      console.log("章节数据:", courseChapters.value);
+    } else {
+      console.error("课程详情API返回数据格式异常");
+      error.value = "无法获取课程详情";
+    }
 
     // 获取课程资源
-    const materialsRes = await getMaterials(courseId.value);
-    courseMaterials.value = materialsRes || [];
-
-    // 获取课程章节
-    courseChapters.value = courseRes.chapters || [];
+    try {
+      const materialsRes = await getCourseMaterials(courseId.value);
+      console.log("课程资料API返回:", materialsRes);
+      if (materialsRes.data && materialsRes.data.data) {
+        courseResources.value = materialsRes.data.data;
+        console.log("课程资料获取成功:", courseResources.value);
+      } else {
+        console.warn("课程资料为空或格式异常");
+        courseResources.value = [];
+      }
+    } catch (err) {
+      console.error("获取课程资料失败:", err);
+      courseResources.value = []; // Set default on error
+    }
 
     // 获取课程练习
-    const assignmentsRes = await getClassAssignments(courseId.value);
-    exercises.value = assignmentsRes || [];
+    try {
+      const assignmentsRes = await getClassAssignments(courseId.value); // Assuming this takes courseId, check API if it's classId
+      console.log("课程练习API返回:", assignmentsRes);
+      if (assignmentsRes.data && assignmentsRes.data.data) {
+        exercises.value = assignmentsRes.data.data;
+        console.log("课程练习获取成功:", exercises.value);
+      } else {
+        console.warn("课程练习为空或格式异常");
+        exercises.value = [];
+      }
+    } catch (err) {
+      console.error("获取课程练习失败:", err);
+      exercises.value = []; // Set default on error
+    }
+
+    // 获取课程下的班级列表 for permissions
+    try {
+      console.log("正在获取课程班级列表 for permissions, ID:", courseId.value);
+      const classesRes = await getCourseClasses(courseId.value);
+      console.log("课程班级列表API返回:", classesRes);
+      if (classesRes.data && classesRes.data.data) {
+        availableClassesForPermissions.value = classesRes.data.data.map(cls => ({ id: cls.id, name: cls.name }));
+        console.log("课程班级列表获取成功:", availableClassesForPermissions.value);
+      } else {
+        console.warn("课程班级列表为空或格式异常");
+        availableClassesForPermissions.value = [];
+      }
+    } catch (err) {
+      console.error("获取课程班级列表失败:", err);
+      availableClassesForPermissions.value = []; // Set default on error
+      // Optionally set a specific error message for this part
+    }
 
   } catch (err) {
-    console.error('获取课程信息失败:', err);
-    error.value = '获取课程信息失败，请稍后重试';
+    // This top-level catch handles errors from getCourseDetail or if any specific error wasn't caught below
+    console.error('获取课程信息失败 (整体):', err);
+    error.value = err.response?.data?.message || err.message || "获取课程信息失败，请重试";
   } finally {
     loading.value = false;
   }
 };
+
+// Watch for courseId changes
+watch(courseId, (newId) => {
+  if (newId) {
+    fetchAllCourseInfo();
+  }
+});
 
 // 在组件挂载时获取数据
 onMounted(() => {
@@ -4387,4 +4529,63 @@ onMounted(() => {
 .question-bank-list::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
 }
+
+/* Add loading and error styles */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #3498db;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 10px;
+}
+
+.error-message {
+  background-color: #fee2e2;
+  border: 1px solid #ef4444;
+  color: #dc2626;
+  padding: 16px;
+  margin: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.retry-button {
+  background-color: #dc2626;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.retry-button:hover {
+  background-color: #b91c1c;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
 </style>
+
