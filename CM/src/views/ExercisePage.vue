@@ -110,10 +110,6 @@
           <span v-if="exercise.timeLimit">剩余时间: {{ formatTime(remainingTime) }}</span>
         </div>
         <div class="flex space-x-4">
-          <button class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-6 rounded-lg"
-            @click="saveProgress">
-            保存进度
-          </button>
           <button class="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-6 rounded-lg"
             @click="confirmSubmit">
             提交答案
@@ -127,7 +123,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router'
-import { getAssignmentInfo, getAssignmentQuestions } from '@/api/assignment'
+import { getAssignmentQuestions, submitAssignmentAnswers } from '@/api/assignment'
 
 const router = useRouter();
 const route = useRoute()
@@ -137,9 +133,6 @@ const exercise = ref({
   id: 'ex-002',
   title: '栈与队列实现',
   type: 'programming',
-  totalPoints: 100,
-  timeLimit: 90, // 分钟
-  description: '本练习旨在测试您对栈和队列数据结构的理解和实现能力。请仔细阅读每个问题，并按照要求完成代码实现。',
   questions: []
 });
 
@@ -239,13 +232,6 @@ const confirmExit = () => {
   }
 };
 
-// 保存进度
-const saveProgress = () => {
-  // 在实际应用中，这里应该调用API保存进度
-  console.log('保存进度');
-  alert('进度已保存');
-};
-
 // 确认提交
 const confirmSubmit = () => {
   if (confirm('确定要提交吗？提交后将无法修改答案。')) {
@@ -254,12 +240,28 @@ const confirmSubmit = () => {
 };
 
 // 提交练习
-const submitExercise = () => {
-  // 在实际应用中，这里应该调用API提交答案
-  console.log('提交答案', exercise.value.type === 'choice' ? answers.value : codeAnswers.value);
-  alert('答案已提交');
-  router.push({ name: 'ExerciseFeedback', params: { id: exercise.id } })
-};
+const submitExercise = async () => {
+  try {
+    const assignmentId = route.params.assignmentId
+    const classId = route.params.classId
+    const studentId = localStorage.getItem('userId') // 或你的登录用户ID获取方式
+
+    // 构造 answers 数组
+    const answers = exercise.value.questions.map((question, index) => ({
+      questionId: question.id,
+      response: exercise.value.type === 'choice'
+        ? answers.value[index]?.toString()
+        : codeAnswers.value[index]
+    }))
+
+    await submitAssignmentAnswers(classId, assignmentId, { studentId, answers })
+
+    alert('答案已提交')
+    router.push({ name: 'ExerciseFeedback', params: { id: exercise.value.id } })
+  } catch (e) {
+    alert(e.message || '提交失败')
+  }
+}
 
 // 组件挂载时
 onMounted(async () => {
@@ -274,10 +276,8 @@ onMounted(async () => {
 
   try {
     const assignmentId = route.params.assignmentId
-    const info = await getAssignmentInfo(assignmentId)
     const questions = await getAssignmentQuestions(assignmentId)
     exercise.value = {
-      ...info,
       questions
     }
   } catch (e) {
