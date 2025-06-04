@@ -110,20 +110,27 @@
         <div class="material-name">{{ material.filename }}</div>
         <div class="material-meta">
           <!-- 上传时间 -->
-          <span>上传时间：{{ material.updateAt }}</span>
+         <span>上传时间：{{ formatDate(material.updateAt) }}</span>
           <!-- 章节信息 -->
           <span v-if="material.chapterOrder">章节：{{ material.chapterOrder }}</span>
         </div>
       </div>
       <!-- 下载按钮链接到文件URL -->
-      <a 
+      <!-- <a 
         :href="material.url" 
         class="download-btn" 
         target="_blank" 
         :download="material.filename"
       >
         下载
-      </a>
+      </a> -->
+       <!-- 下载按钮链接到文件URL -->
+      <button 
+        class="download-btn" 
+        @click="downloadFile(material.url, material.filename)"
+      >
+        下载
+      </button>
     </div>
   </div>
 </div>
@@ -286,8 +293,54 @@ const fetchAllCourseInfo = async () => {
     loading.value = false;
   }
 };
-// 添加在script部分
-// 根据文件名确定文件类型图标
+
+// 完善下载函数
+const downloadFile = (url, filename) => {
+  fetch(url)
+    .then(response => response.blob())
+    .then(blob => {
+      // 创建一个临时的URL对象
+      const fileURL = window.URL.createObjectURL(blob);
+      // 创建一个链接元素
+      const fileLink = document.createElement('a');
+      fileLink.href = fileURL;
+      fileLink.setAttribute('download', filename);
+      // 模拟点击下载
+      document.body.appendChild(fileLink);
+      fileLink.click();
+      // 清理
+      document.body.removeChild(fileLink);
+      window.URL.revokeObjectURL(fileURL);
+    })
+    .catch(error => {
+      console.error('下载文件失败:', error);
+      alert('下载文件失败，请稍后重试');
+    });
+};
+
+// 添加日期格式化函数
+const formatDate = (dateString) => {
+  console.log('格式化日期:', dateString);
+  if (!dateString) return '未知时间';
+  
+  try {
+    // 尝试解析日期字符串
+    const date = new Date(dateString);
+    
+    // 检查日期是否有效
+    if (isNaN(date.getTime())) {
+      return dateString; // 如果解析失败，返回原始字符串
+    }
+    
+    // 格式化为 YYYY-MM-DD HH:MM 格式
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  } catch (e) {
+    console.error('日期格式化失败:', e);
+    return dateString; // 出现异常时返回原始字符串
+  }
+};
+
+// 根据文件名确定图标
 const getFileIcon = (filename) => {
   if (!filename) return '📁';
   
@@ -789,5 +842,43 @@ onMounted(() => {
     flex: 1;
     min-width: auto;
   }
+}
+/* 添加到<style>部分 */
+.download-btn {
+  background-color: #1e88e5;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+  min-width: 70px;
+}
+
+.download-btn:hover {
+  background-color: #1565c0;
+}
+
+.material-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  background-color: #fff;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.material-info {
+  flex: 1;
+  margin: 0 15px;
+}
+
+.material-icon {
+  font-size: 24px;
+  width: 32px;
+  text-align: center;
 }
 </style>
