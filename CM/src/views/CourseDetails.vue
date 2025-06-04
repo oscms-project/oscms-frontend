@@ -974,24 +974,21 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { useUserStore } from '@/stores/user';
+import { useCourseStore } from '@/stores/course';
 import { useRouter, useRoute } from 'vue-router';
-// 添加 API 导入
-import {
-  getCourseDetails,
-  getCourseOutline,
-  updateCourseOutline,
-  getCourseResources,
-  uploadCourseResource,
-  getResourceVersions,
-  getResourceVersion,
-  updateCourseChapters,
-  getCourseClasses,
-  getClassStudents,
-  getClassAssignments
-} from '@/api/courseDetails'
+import { getCourseDetail } from '@/api/course';
+import { getMaterials } from '@/api/materials';
+import { getClassAssignments } from '@/api/class';
+import { getCourseClasses } from '@/api/course';
 
+const userStore = useUserStore();
+const courseStore = useCourseStore();
 const router = useRouter();
-const route = useRoute()
+const route = useRoute();
+
+// 从 store 获取课程ID
+const courseId = computed(() => courseStore.currentCourseId);
 
 // 用户信息
 const userInfo = ref({
@@ -1009,7 +1006,7 @@ const navigateToProfile = () => {
 
 // 导航到班级管理页面
 const navigateToClassManagement = () => {
-  router.push(`/course/${route.params.id}/management`)
+  router.push(`/course/${courseId.value}/management`)
 };
 
 // Course information
@@ -2381,6 +2378,46 @@ const loadApiData = async () => {
     console.error('加载数据失败:', error);
   }
 };
+
+// 获取课程所有信息
+const fetchAllCourseInfo = async () => {
+  try {
+    loading.value = true;
+    error.value = '';
+    
+    // 获取课程基本信息
+    const courseRes = await getCourseDetail(courseId.value);
+    courseData.value = courseRes;
+    courseName.value = courseRes.name;
+    courseStudents.value = courseRes.studentCount;
+    courseDuration.value = courseRes.duration;
+
+    // 获取课程大纲
+    courseOutline.value = courseRes.outline || [];
+
+    // 获取课程资源
+    const materialsRes = await getMaterials(courseId.value);
+    courseMaterials.value = materialsRes || [];
+
+    // 获取课程章节
+    courseChapters.value = courseRes.chapters || [];
+
+    // 获取课程练习
+    const assignmentsRes = await getClassAssignments(courseId.value);
+    exercises.value = assignmentsRes || [];
+
+  } catch (err) {
+    console.error('获取课程信息失败:', err);
+    error.value = '获取课程信息失败，请稍后重试';
+  } finally {
+    loading.value = false;
+  }
+};
+
+// 在组件挂载时获取数据
+onMounted(() => {
+  fetchAllCourseInfo();
+});
 </script>
 
 <style scoped>

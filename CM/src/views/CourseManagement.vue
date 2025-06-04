@@ -25,12 +25,6 @@
           </div>
         </div>
       </div>
-      <!-- 添加用户头像按钮 -->
-      <div class="user-avatar-container container">
-        <div class="user-avatar" @click="navigateToProfile" title="查看个人资料">
-          <img :src="userInfo.avatar" alt="用户头像" />
-        </div>
-      </div>
     </header>
 
     <!-- Action buttons -->
@@ -577,38 +571,289 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import {ArrowLeftIcon } from 'lucide-vue-next'
+import { ArrowLeftIcon } from 'lucide-vue-next'
+import { getCourseDetail, getCourseClasses } from '@/api/course'
+import {
+  getCourseStats,
+  getClassStudents,
+  importStudents,
+  getClassAssignments,
+  exportCourseGrades,
+  sendAssignmentReminder,
+  getStudentsProgress,
+  getAssignmentChapters,
+  getBatchAssignmentStats,
+  getStudentDetails
+} from '@/api/courseManagement'
 
 const router = useRouter()
 const route = useRoute()
 
-// 用户信息
-const userInfo = ref({
-  id: 1,
-  name: '张教授',
-  avatar: '/placeholder.svg?height=100&width=100',
-  role: '教师',
-  isOnline: true
-});
+// 课程信息 - 动态数据
+const courseName = ref('')
+const courseStudents = ref('')
+const courseDuration = ref('')
+const stats = ref({
+  assignments: 0,
+  submissions: 0,
+  pending: 0
+})
+
+// 加载课程信息
+const loadCourseInfo = async () => {
+  try {
+    const courseId = route.params.id
+    const courseDetail = await getCourseDetail(courseId)
+    courseName.value = courseDetail.data.name
+  } catch (error) {
+    console.error('Failed to load course info:', error)
+  }
+}
+
+// 加载课程统计信息
+const loadCourseStats = async () => {
+  try {
+    const courseId = route.params.id
+    const classId = selectedClass.value?.id
+    const courseStats = await getCourseStats(courseId, classId)
+    
+    stats.value = {
+      assignments: courseStats.data.assignmentCount,
+      submissions: courseStats.data.submissionCount,
+      pending: courseStats.data.pendingCount
+    }
+    courseStudents.value = courseStats.data.studentCount
+  } catch (error) {
+    console.error('Failed to load course stats:', error)
+  }
+}
+
+// 加载班级列表
+const loadClasses = async () => {
+  try {
+    const courseId = route.params.id
+    const response = await getCourseClasses(courseId)
+    classes.value = response.data
+  } catch (error) {
+    console.error('Failed to load classes:', error)
+    // 加载失败时使用静态数据
+    /* 
+    classes.value = [
+      { id: 1, name: '2021级软件工程1班', studentCount: 45 },
+      { id: 2, name: '2021级软件工程2班', studentCount: 42 },
+      { id: 3, name: '2021级计算机科学1班', studentCount: 48 },
+      { id: 4, name: '2021级计算机科学2班', studentCount: 46 },
+    ]
+    */
+  }
+}
+
+// 基础数据定义
+const classes = ref([])
+const selectedClass = ref(null)
+const showClassSelector = ref(false)
+const classSearchQuery = ref('')
+const students = ref([])
+const exercises = ref([])
+
+// 加载学生列表
+const loadStudents = async () => {
+  try {
+    if (!selectedClass.value) return
+    const response = await getClassStudents(selectedClass.value.id)
+    const students = response.data
+
+    // 获取每个学生的详细信息
+    const studentsWithDetails = await Promise.all(
+      students.map(async student => {
+        try {
+          const details = await getStudentDetails(student.studentId)
+          return {
+            ...student,
+            contact: details.data.contact
+          }
+        } catch (error) {
+          console.error(`Failed to load details for student ${student.studentId}:`, error)
+          return student
+        }
+      })
+    )
+
+    students.value = studentsWithDetails
+    
+    // 加载学生进度信息
+    await loadStudentsProgress()
+  } catch (error) {
+    console.error('Failed to load students:', error)
+    // 加载失败时使用静态数据
+    students.value = [
+      {
+        id: 1,
+        studentId: '2021001',
+        name: '张三',
+        className: '软件工程1班',
+        submissions: 3,
+        unsubmitted: 0,
+        accuracy: 80,
+        totalExercises: 3,
+        contact: '13800138001',
+        submissionTime: '2023-10-05 14:30:22',
+        score: 92
+      },
+      // ... 其他静态数据 ...
+    ]
+  }
+}
+
+// 加载学生进度
+const loadStudentsProgress = async () => {
+  try {
+    const courseId = route.params.id
+    const response = await getStudentsProgress(courseId)
+    // 更新学生进度信息
+    students.value = students.value.map(student => {
+      const progress = response.data.find(p => p.studentId === student.studentId)
+      if (progress) {
+        return {
+          ...student,
+          submissions: progress.submittedCount,
+          unsubmitted: progress.unsubmittedCount,
+          accuracy: progress.accuracy,
+          totalExercises: progress.totalExercises
+        }
+      }
+      return student
+    })
+  } catch (error) {
+    console.error('Failed to load students progress:', error)
+  }
+}
+
+// 导入学生
+const handleImportStudents = async (studentIds) => {
+  try {
+    if (!selectedClass.value) return
+    await importStudents(selectedClass.value.id, studentIds)
+    // 重新加载学生列表
+    await loadStudents()
+  } catch (error) {
+    console.error('Failed to import students:', error)
+  }
+}
+
+// 导出成绩
+const handleExportGrades = async () => {
+  try {
+    const courseId = route.params.id
+    const response = await exportCourseGrades(courseId)
+    // 处理文件下载
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `${courseName.value}-成绩表.xlsx`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  } catch (error) {
+    console.error('Failed to export grades:', error)
+  }
+}
+
+// 发送提醒
+const handleSendReminder = async (assignmentId, studentIds) => {
+  try {
+    await sendAssignmentReminder(assignmentId, studentIds)
+    // 可以添加提示信息
+  } catch (error) {
+    console.error('Failed to send reminder:', error)
+  }
+}
+
+// 加载作业列表
+const loadAssignments = async () => {
+  try {
+    if (!selectedClass.value) return
+    const courseId = route.params.id
+    const [assignments, chapters] = await Promise.all([
+      getClassAssignments(selectedClass.value.id),
+      getAssignmentChapters(courseId)
+    ])
+
+    // 批量获取作业统计信息
+    const assignmentIds = assignments.data.map(a => a.id)
+    const statsResponse = await getBatchAssignmentStats(assignmentIds)
+    const statsMap = new Map(statsResponse.data.map(stat => [stat.assignmentId, stat]))
+
+    exercises.value = assignments.data.map(assignment => {
+      const stats = statsMap.get(assignment.id) || { submissionCount: 0, accuracyRate: 0, pendingCount: 0 }
+      return {
+        id: assignment.id,
+        title: assignment.title,
+        description: assignment.description,
+        date: new Date(assignment.openTime).toLocaleString(),
+        submissions: stats.submissionCount,
+        accuracy: stats.accuracyRate,
+        pending: stats.pendingCount,
+        status: new Date(assignment.dueDate) < new Date() ? '已结束' : '进行中',
+        chapter: chapters.data.find(c => c.id === assignment.chapterId)?.name || '未分类'
+      }
+    })
+  } catch (error) {
+    console.error('Failed to load assignments:', error)
+    // 加载失败时使用静态数据
+    exercises.value = [
+      {
+        id: 1,
+        title: '面向对象编程基础',
+        date: '2023-09-18 09:00:24',
+        description: '掌握面向对象的基本概念和Java中的实现方式，包括类、对象、继承、多态等核心概念。',
+        submissions: 4,
+        accuracy: 85,
+        pending: 1,
+        status: '进行中',
+        chapter: '第1章：Java基础'
+      },
+      // ... 其他静态数据 ...
+    ]
+  }
+}
+
+// 监听班级选择变化
+watch(() => selectedClass.value, async (newClass) => {
+  if (newClass) {
+    await Promise.all([
+      loadStudents(),
+      loadAssignments(),
+      loadCourseStats()
+    ])
+    await loadStudentsProgress()
+  } else {
+    // 当未选择班级时，清空相关数据
+    students.value = []
+    exercises.value = []
+    stats.value = {
+      assignments: 0,
+      submissions: 0,
+      pending: 0
+    }
+    courseStudents.value = '0'
+  }
+})
+
+// 页面加载时初始化数据
+onMounted(async () => {
+  await Promise.all([
+    loadCourseInfo(),
+    loadClasses()
+  ])
+})
 
 // 导航到个人中心页面
 const navigateToProfile = () => {
   router.push('/teacher/profile')
 }
-
-// Course information
-const courseName = ref('JavaSE');
-const courseStudents = ref('1968');
-const courseDuration = ref('2班');
-
-// Stats
-const stats = ref({
-  assignments: 3,  // 更新为练习总数
-  submissions: 4,
-  pending: 0
-});
 
 // Tabs
 const tabs = [
@@ -621,17 +866,17 @@ const tabs = [
 const activeTab = ref('exercises');  // 默认显示练习查看页面
 
 // Classes
+/* 静态数据
 const classes = ref([
   { id: 1, name: '2021级软件工程1班', studentCount: 45 },
   { id: 2, name: '2021级软件工程2班', studentCount: 42 },
   { id: 3, name: '2021级计算机科学1班', studentCount: 48 },
   { id: 4, name: '2021级计算机科学2班', studentCount: 46 },
-]);
-const selectedClass = ref(null);
-const showClassSelector = ref(false);
-const classSearchQuery = ref('');
+])
+*/
 
-// 添加更多学生数据用于分页演示
+// Students
+/* 静态数据
 const students = ref([
   {
     id: 1,
@@ -773,9 +1018,11 @@ const students = ref([
     totalExercises: 3,
     contact: '13800138012'
   }
-]);
+])
+*/
 
-// Exercises data with chapter information
+// Exercises
+/* 静态数据
 const exercises = ref([
   {
     id: 1,
@@ -801,10 +1048,10 @@ const exercises = ref([
   },
   {
     id: 3,
-    title: 'Java异常处理',
-    date: '2023-10-05 14:15:30',
-    description: '理解Java异常处理机制，学习如何使用try-catch-finally语句块处理异常，以及如何自定义异常类。',
-    submissions: 5,
+    title: '异常处理机制',
+    date: '2023-10-02 14:20:00',
+    description: '理解Java异常处理机制，掌握try-catch-finally的使用，学会自定义异常类。',
+    submissions: 2,
     accuracy: 92,
     pending: 2,
     status: '进行中',
@@ -812,60 +1059,61 @@ const exercises = ref([
   },
   {
     id: 4,
-    title: 'Java IO流',
-    date: '2023-10-12 11:20:45',
-    description: '学习Java中的输入输出流，包括字节流和字符流的使用，以及文件操作的基本方法。',
-    submissions: 2,
-    accuracy: 65,
-    pending: 0,
-    status: '已结束',
-    chapter: '第4章：IO与文件操作'
+    title: 'IO流操作',
+    date: '2023-10-09 16:45:30',
+    description: '掌握Java IO流的基本概念，学会使用文件流、缓冲流等进行文件操作。',
+    submissions: 1,
+    accuracy: 88,
+    pending: 3,
+    status: '进行中',
+    chapter: '第4章：IO编程'
   },
   {
     id: 5,
     title: '多线程编程',
-    date: '2023-10-18 09:30:00',
-    description: '学习Java多线程编程的基础知识，包括线程的创建、生命周期、同步与通信等内容。',
-    submissions: 1,
-    accuracy: 88,
-    pending: 1,
-    status: '进行中',
+    date: '2023-09-15 11:20:45',
+    description: '学习Java多线程的基本概念，掌握线程的创建、同步、通信等操作。',
+    submissions: 5,
+    accuracy: 78,
+    pending: 0,
+    status: '已结束',
     chapter: '第5章：并发编程'
   },
   {
     id: 6,
-    title: 'Java网络编程',
-    date: '2023-10-25 14:00:10',
-    description: '掌握Java网络编程的基础，学习如何使用Socket进行网络通信，以及HTTP客户端的实现。',
-    submissions: 0,
-    accuracy: 0,
-    pending: 0,
-    status: '进行中',
+    title: '网络编程基础',
+    date: '2023-09-22 15:10:20',
+    description: '了解网络编程基础知识，学会使用Socket进行网络通信。',
+    submissions: 4,
+    accuracy: 82,
+    pending: 1,
+    status: '已结束',
     chapter: '第6章：网络编程'
   },
   {
     id: 7,
     title: 'Java反射机制',
-    date: '2023-11-01 10:15:00',
-    description: '学习Java反射机制的基本原理和应用，了解如何在运行时获取类的信息并操作对象。',
+    date: '2023-09-29 13:40:10',
+    description: '理解Java反射机制的原理，学会使用反射API进行类的动态操作。',
     submissions: 3,
-    accuracy: 78,
-    pending: 1,
+    accuracy: 75,
+    pending: 2,
     status: '进行中',
-    chapter: '第1章：Java基础'
+    chapter: '第7章：反射与注解'
   },
   {
     id: 8,
-    title: 'Java泛型编程',
-    date: '2023-11-08 13:45:20',
-    description: '掌握Java泛型的使用方法，理解泛型的类型擦除机制和通配符的应用。',
+    title: 'JDBC数据库操作',
+    date: '2023-10-06 10:25:55',
+    description: '掌握JDBC的基本用法，学会进行数据库的增删改查操作。',
     submissions: 2,
-    accuracy: 82,
-    pending: 0,
-    status: '已结束',
-    chapter: '第1章：Java基础'
+    accuracy: 90,
+    pending: 1,
+    status: '进行中',
+    chapter: '第8章：数据库编程'
   }
-]);
+])
+*/
 
 // Search functionality
 const searchQuery = ref('');
