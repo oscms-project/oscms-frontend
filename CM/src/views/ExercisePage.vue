@@ -123,38 +123,16 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router'
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-import { getAssignmentQuestions, submitAssignmentAnswers } from '@/api/assignment'
 
-=======
-import { getAssignmentInfo, getAssignmentQuestions } from '@/api/assignment'
+
+
+import { getAssignmentInfo,getAssignmentQuestions, submitAssignmentAnswers } from '@/api/assignment'
 import { useCourseStore } from '@/stores/course';
 const courseStore = useCourseStore();
->>>>>>> 57ed0beb1fe9551614ecd8bfbb2b931816ea15d7
-=======
 import { getAssignmentInfo, getAssignmentQuestions } from '@/api/assignment'
+import { onMounted, ref, computed } from 'vue';
 import { useCourseStore } from '@/stores/course';
-const courseStore = useCourseStore();
->>>>>>> 57ed0beb1fe9551614ecd8bfbb2b931816ea15d7
-=======
-import { getAssignmentInfo, getAssignmentQuestions } from '@/api/assignment'
-import { useCourseStore } from '@/stores/course';
-const courseStore = useCourseStore();
->>>>>>> 57ed0beb1fe9551614ecd8bfbb2b931816ea15d7
-=======
-import { getAssignmentInfo, getAssignmentQuestions } from '@/api/assignment'
-import { useCourseStore } from '@/stores/course';
-const courseStore = useCourseStore();
->>>>>>> 57ed0beb1fe9551614ecd8bfbb2b931816ea15d7
-=======
-import { getAssignmentInfo, getAssignmentQuestions } from '@/api/assignment'
-import { useCourseStore } from '@/stores/course';
-const courseStore = useCourseStore();
->>>>>>> 57ed0beb1fe9551614ecd8bfbb2b931816ea15d7
+
 const router = useRouter();
 const route = useRoute()
 
@@ -305,22 +283,9 @@ onMounted(async () => {
   document.addEventListener('contextmenu', (e) => e.preventDefault());
 
   try {
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
+
     const assignmentId = route.params.assignmentId
     const questions = await getAssignmentQuestions(assignmentId)
-=======
-=======
->>>>>>> 57ed0beb1fe9551614ecd8bfbb2b931816ea15d7
-=======
->>>>>>> 57ed0beb1fe9551614ecd8bfbb2b931816ea15d7
-=======
->>>>>>> 57ed0beb1fe9551614ecd8bfbb2b931816ea15d7
-=======
->>>>>>> 57ed0beb1fe9551614ecd8bfbb2b931816ea15d7
     const exerciseId = courseStore.currentExerciseId;
     console.log('获取练习信息，ID:', exerciseId);
     // 检查是否有有效的练习ID
@@ -331,21 +296,7 @@ onMounted(async () => {
       return;
     }
 
-    const info = await getAssignmentInfo(exerciseId)
-    const questions = await getAssignmentQuestions(exerciseId)
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
->>>>>>> 57ed0beb1fe9551614ecd8bfbb2b931816ea15d7
-=======
->>>>>>> 57ed0beb1fe9551614ecd8bfbb2b931816ea15d7
-=======
->>>>>>> 57ed0beb1fe9551614ecd8bfbb2b931816ea15d7
-=======
->>>>>>> 57ed0beb1fe9551614ecd8bfbb2b931816ea15d7
-=======
->>>>>>> 57ed0beb1fe9551614ecd8bfbb2b931816ea15d7
+    const info = await getAssignmentInfo(assignmentId)
     exercise.value = {
       questions
     }

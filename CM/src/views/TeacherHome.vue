@@ -216,14 +216,15 @@ const createCourse = async () => {
   }
   try {
     // 处理章节为数组
-    const chaptersArr = newCourse.value.chapters
-      .split(',')
-     .map((s, index) => ({
-        title: s.trim(), // 章节名称
-        order: index + 1, // 章节序号，从1开始
-        //completed: false  // 默认未完成状态
-      }))
-      .filter(chapter => chapter.title); 
+    // 处理章节为数组 - 优化版本
+const chaptersArr = newCourse.value.chapters
+  .split(',')
+  .map(s => s.trim()) // 先清除每个章节的前后空格
+  .filter(title => title.length > 0) // 过滤掉空章节名
+  .map((title, index) => ({
+    title, // 章节名称
+    order: index + 1 // 章节序号，从1开始递增
+  }));
 
     const res = await apiCreateCourse({
       name: newCourse.value.name,
