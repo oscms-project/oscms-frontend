@@ -7,8 +7,11 @@
     "vue-router": "^4.5.1"
   },
   "devDependencies": {
+    "@vue/test-utils": "^2.4.6",
     "autoprefixer": "^10.4.21",
+    "msw": "^2.9.0",
     "postcss": "^8.5.3",
-    "tailwindcss": "^4.1.7"
+    "tailwindcss": "^4.1.7",
+    "vitest": "^3.2.1"
   }
 }

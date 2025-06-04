@@ -731,6 +731,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router'
+import { createAssignment } from '@/api/assignment'
 const router = useRouter()
 // 用户信息 - 使用模拟数据进行预览
 const user = ref({
@@ -793,270 +794,7 @@ const showQuestionPreview = ref(false);
 const previewQuestion = ref(null);
 
 // 题库数据 - 使用模拟数据进行预览
-const questionBank = ref([
-    {
-        id: 'qb-001',
-        text: '以下哪种数据结构支持常数时间的随机访问？',
-        type: 'choice',
-        difficulty: 'easy',
-        points: 10,
-        options: ['数组', '链表', '栈', '队列'],
-        correctAnswer: 0,
-        explanation: '数组支持常数时间O(1)的随机访问，因为可以通过索引直接计算内存地址。链表需要从头遍历，栈和队列只能按特定顺序访问元素。'
-    },
-    {
-        id: 'qb-002',
-        text: '链表的主要优点是什么？',
-        type: 'choice',
-        difficulty: 'easy',
-        points: 10,
-        options: ['快速的随机访问', '内存分配的灵活性', '缓存友好性', '节省内存空间'],
-        correctAnswer: 1,
-        explanation: '链表的主要优点是内存分配的灵活性，它可以动态地分配内存，不需要连续的内存空间。这使得插入和删除操作更加高效。'
-    },
-    {
-        id: 'qb-003',
-        text: '在最坏情况下，在数组中查找元素的时间复杂度是多少？',
-        type: 'choice',
-        difficulty: 'medium',
-        points: 15,
-        options: ['O(1)', 'O(log n)', 'O(n)', 'O(n²)'],
-        correctAnswer: 2,
-        explanation: '在未排序的数组中查找元素，最坏情况下需要遍历整个数组，时间复杂度为O(n)。如果数组已排序，可以使用二分查找，时间复杂度为O(log n)。'
-    },
-    {
-        id: 'qb-004',
-        text: '以下哪种操作在链表中比在数组中更高效？',
-        type: 'choice',
-        difficulty: 'medium',
-        points: 15,
-        options: ['随机访问元素', '在开头插入元素', '在末尾插入元素', '按索引查找元素'],
-        correctAnswer: 1,
-        explanation: '在链表开头插入元素的时间复杂度是O(1)，而在数组开头插入元素需要将所有元素向后移动，时间复杂度为O(n)。'
-    },
-    {
-        id: 'qb-005',
-        text: '实现一个栈（Stack）数据结构',
-        type: 'programming',
-        difficulty: 'medium',
-        points: 20,
-        language: 'JavaScript',
-        description: '请实现一个栈数据结构，包含push、pop、peek和isEmpty方法。',
-        sampleAnswer: `class Stack {
-    constructor() {
-      this.items = [];
-    }
-  
-    push(element) {
-      this.items.push(element);
-    }
-  
-    pop() {
-      if (this.isEmpty()) {
-        return "Underflow";
-      }
-      return this.items.pop();
-    }
-  
-    peek() {
-      if (this.isEmpty()) {
-        return "No elements in Stack";
-      }
-      return this.items[this.items.length - 1];
-    }
-  
-    isEmpty() {
-      return this.items.length === 0;
-    }
-  }`,
-        testCases: [
-            {
-                name: '基本操作测试',
-                input: 'push(1), push(2), peek()',
-                expectedOutput: '2'
-            },
-            {
-                name: 'pop操作测试',
-                input: 'push(1), push(2), pop(), pop()',
-                expectedOutput: '1'
-            },
-            {
-                name: '空栈测试',
-                input: 'isEmpty()',
-                expectedOutput: 'true'
-            }
-        ],
-        explanation: '栈是一种遵循后进先出(LIFO)原则的数据结构。上面的实现使用数组作为底层存储，提供了栈的基本操作：push(添加元素)、pop(移除顶部元素)、peek(查看顶部元素)和isEmpty(检查栈是否为空)。'
-    },
-    {
-        id: 'qb-006',
-        text: '实现一个队列（Queue）数据结构',
-        type: 'programming',
-        difficulty: 'medium',
-        points: 20,
-        language: 'JavaScript',
-        description: '请实现一个队列数据结构，包含enqueue、dequeue、peek和isEmpty方法。',
-        sampleAnswer: `class Queue {
-    constructor() {
-      this.items = [];
-    }
-  
-    enqueue(element) {
-      this.items.push(element);
-    }
-  
-    dequeue() {
-      if (this.isEmpty()) {
-        return "Underflow";
-      }
-      return this.items.shift();
-    }
-  
-    peek() {
-      if (this.isEmpty()) {
-        return "No elements in Queue";
-      }
-      return this.items[0];
-    }
-  
-    isEmpty() {
-      return this.items.length === 0;
-    }
-  }`,
-        testCases: [
-            {
-                name: '基本操作测试',
-                input: 'enqueue(1), enqueue(2), peek()',
-                expectedOutput: '1'
-            },
-            {
-                name: 'dequeue操作测试',
-                input: 'enqueue(1), enqueue(2), dequeue()',
-                expectedOutput: '1'
-            },
-            {
-                name: '空队列测试',
-                input: 'isEmpty()',
-                expectedOutput: 'true'
-            }
-        ],
-        explanation: '队列是一种遵循先进先出(FIFO)原则的数据结构。上面的实现使用数组作为底层存储，提供了队列的基本操作：enqueue(添加元素)、dequeue(移除队首元素)、peek(查看队首元素)和isEmpty(检查队列是否为空)。'
-    },
-    {
-        id: 'qb-007',
-        text: '实现快速排序算法',
-        type: 'programming',
-        difficulty: 'hard',
-        points: 30,
-        language: 'JavaScript',
-        description: '请实现快速排序算法，对给定的数组进行排序。',
-        sampleAnswer: `function quickSort(arr) {
-    if (arr.length <= 1) {
-      return arr;
-    }
-    
-    const pivot = arr[Math.floor(arr.length / 2)];
-    const left = [];
-    const right = [];
-    const equal = [];
-    
-    for (let val of arr) {
-      if (val < pivot) {
-        left.push(val);
-      } else if (val > pivot) {
-        right.push(val);
-      } else {
-        equal.push(val);
-      }
-    }
-    
-    return [...quickSort(left), ...equal, ...quickSort(right)];
-  }`,
-        testCases: [
-            {
-                name: '基本排序测试',
-                input: '[3, 1, 4, 1, 5, 9, 2, 6, 5]',
-                expectedOutput: '[1, 1, 2, 3, 4, 5, 5, 6, 9]'
-            },
-            {
-                name: '已排序数组测试',
-                input: '[1, 2, 3, 4, 5]',
-                expectedOutput: '[1, 2, 3, 4, 5]'
-            },
-            {
-                name: '逆序数组测试',
-                input: '[5, 4, 3, 2, 1]',
-                expectedOutput: '[1, 2, 3, 4, 5]'
-            }
-        ],
-        explanation: '快速排序是一种高效的排序算法，平均时间复杂度为O(n log n)。它的基本思想是选择一个"基准"元素，然后将数组分为两部分：小于基准的元素和大于基准的元素，然后递归地对这两部分进行排序。'
-    },
-    {
-        id: 'qb-008',
-        text: '二叉树的遍历方式有哪些？',
-        type: 'choice',
-        difficulty: 'medium',
-        points: 15,
-        options: ['前序、中序、后序', '前序、中序、后序、层序', '深度优先、广度优先', '先序、次序、末序'],
-        correctAnswer: 1,
-        explanation: '二叉树的遍历方式包括前序遍历（根-左-右）、中序遍历（左-根-右）、后序遍历（左-右-根）和层序遍历（逐层从左到右）。'
-    },
-    {
-        id: 'qb-009',
-        text: '哈希表的平均查找时间复杂度是多少？',
-        type: 'choice',
-        difficulty: 'medium',
-        points: 15,
-        options: ['O(1)', 'O(log n)', 'O(n)', 'O(n²)'],
-        correctAnswer: 0,
-        explanation: '哈希表的平均查找时间复杂度是O(1)，这是因为哈希函数可以直接计算出元素的存储位置。但在最坏情况下（所有元素都发生哈希冲突），时间复杂度可能退化为O(n)。'
-    },
-    {
-        id: 'qb-010',
-        text: '实现二分查找算法',
-        type: 'programming',
-        difficulty: 'medium',
-        points: 20,
-        language: 'JavaScript',
-        description: '请实现二分查找算法，在有序数组中查找目标值的索引，如果不存在则返回-1。',
-        sampleAnswer: `function binarySearch(arr, target) {
-    let left = 0;
-    let right = arr.length - 1;
-    
-    while (left <= right) {
-      const mid = Math.floor((left + right) / 2);
-      
-      if (arr[mid] === target) {
-        return mid;
-      } else if (arr[mid] < target) {
-        left = mid + 1;
-      } else {
-        right = mid - 1;
-      }
-    }
-    
-    return -1;
-  }`,
-        testCases: [
-            {
-                name: '基本查找测试',
-                input: 'arr = [1, 2, 3, 4, 5], target = 3',
-                expectedOutput: '2'
-            },
-            {
-                name: '目标不存在测试',
-                input: 'arr = [1, 2, 3, 4, 5], target = 6',
-                expectedOutput: '-1'
-            },
-            {
-                name: '边界值测试',
-                input: 'arr = [1, 2, 3, 4, 5], target = 1',
-                expectedOutput: '0'
-            }
-        ],
-        explanation: '二分查找是一种在有序数组中查找特定元素的高效算法，时间复杂度为O(log n)。它通过不断将搜索范围缩小一半来快速定位目标元素。'
-    }
-]);
+const questionBank = ref([]);
 
 // 过滤后的题库
 const filteredQuestionBank = computed(() => {
@@ -1272,7 +1010,7 @@ const previewTask = () => {
 };
 
 // 发布任务
-const publishTask = () => {
+const publishTask = async () => {
     // 验证必填字段
     if (!task.title) {
         showMessage('请输入任务标题');
@@ -1340,7 +1078,27 @@ const publishTask = () => {
     setTimeout(() => {
         goBackToCourseManagement();
     }, 2000);
+
+    // assignmentData 结构需参考 openapi.yaml AssignmentCreateDto
+    const assignmentData = {
+        title: task.title,
+        description: task.description,
+        courseId: task.courseId, // 需有
+        openTime: task.openTime,
+        dueDate: task.closeTime,
+        allowResubmit: task.allowResubmit,
+        questionIds: task.questions.map(q => q.id) // 先保存题目到题库再布置
+    }
+    try {
+        const classId = task.classId // 需有
+        await createAssignment(classId, assignmentData)
+        alert('布置作业成功')
+        // 跳转或刷新
+    } catch (e) {
+        alert(e.message || '布置作业失败')
+    }
 };
+
 
 // 返回课程管理
 const goBackToCourseManagement = () => {

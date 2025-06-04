@@ -42,32 +42,39 @@
     </div>
     
     <!-- 学习进度区域 -->
-    <div class="learning-progress">
-      <div class="section-header">
-        <h2>我的学习进度</h2>
-      </div>
-      <div class="progress-cards">
-        <div 
-          v-for="(course, index) in allStudentCourses" 
-          :key="index"
-          class="progress-card"
-        >
-          <div class="progress-info">
-            <h4>{{ course.title }}</h4>
-            <div class="progress-bar-container">
-              <div class="progress-bar" :style="{ width: course.progress + '%' }"></div>
-            </div>
-            <div class="progress-details">
-              <span>已完成: {{ course.completedUnits }}/{{ course.totalUnits }}</span>
-              <span>{{ course.progress }}%</span>
-            </div>
-          </div>
-          <div class="course-actions">
-            <button class="continue-btn">继续学习</button>
-          </div>
+    <!-- filepath: e:\test\git_test\CM\src\views\StudentHome.vue -->
+<!-- 学习进度区域 -->
+<div class="learning-progress">
+  <div class="section-header">
+    <h2>我的学习进度</h2>
+  </div>
+  <div class="progress-cards">
+    <div 
+      v-for="(course, index) in allStudentCourses" 
+      :key="index"
+      class="progress-card"
+    >
+      <div class="progress-info">
+        <h4>{{ course.title }}</h4>
+        <!-- 添加课程概览信息 -->
+        <div class="progress-overview">
+          <span class="progress-label">已完成练习：<b>{{ course.completedUnits }}</b></span>
+          <span class="progress-label">未完成练习：<b>{{ course.uncompletedUnits }}</b></span>
+          <span class="progress-label">总练习数：{{ course.totalUnits }}</span>
+        </div>
+        <!-- 已完成的练习进度条（蓝色） -->
+        <div class="progress-bar-container">
+          <div class="progress-bar completed" :style="{ width: (course.completedUnits / course.totalUnits * 100) + '%' }"></div>
+        </div>
+        <!-- 未完成的练习进度条（灰色） -->
+        <div class="progress-bar-container">
+          <div class="progress-bar uncompleted" :style="{ width: (course.uncompletedUnits / course.totalUnits * 100) + '%' }"></div>
         </div>
       </div>
+
     </div>
+  </div>
+</div>
     
     <!-- 通知公告区域 -->
     <div class="announcements">
@@ -150,19 +157,7 @@ const navigateToCourseDetail = (course) => {
   // 跳转到简洁的URL，无需查询参数
   router.push('/student/courses')
 };
-// function parseJwt(token) {
-//   if (!token) return null;
-//   const base64Url = token.split('.')[1];
-//   if (!base64Url) return null;
-//   const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-//   const jsonPayload = decodeURIComponent(
-//     atob(base64)
-//       .split('')
-//       .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-//       .join('')
-//   );
-//   return JSON.parse(jsonPayload);
-// }
+
 // 加入课程弹窗状态
 const showJoinCourseModal = ref(false);
 const courseCode = ref('');
@@ -254,23 +249,33 @@ const filteredCourses = computed(() => {
 const testStudentCourses = ref([
   {
     title: '操作系统',
-    progress: 75,
     completedUnits: 9,
-    totalUnits: 12
+    totalUnits: 12,
+    // 添加未完成练习数
+    get uncompletedUnits() { return this.totalUnits - this.completedUnits; }
   },
   {
     title: '人工智能',
-    progress: 60,
     completedUnits: 6,
-    totalUnits: 10
+    totalUnits: 10,
+    get uncompletedUnits() { return this.totalUnits - this.completedUnits; }
   },
   {
     title: '数据管理技术',
-    progress: 30,
     completedUnits: 3,
-    totalUnits: 10
+    totalUnits: 10,
+    get uncompletedUnits() { return this.totalUnits - this.completedUnits; }
   },
 ]);
+
+// 修改fetchStudentCourses函数中组装进度数据的部分
+// 修改相关代码：
+// realStudentCourses.value.push({
+//   title: course.title,
+//   completedUnits,
+//   totalUnits,
+//   uncompletedUnits: totalUnits - completedUnits // 添加未完成练习数
+// });
 
 // 后端进度数据
 const realStudentCourses = ref([]);
@@ -571,7 +576,46 @@ onMounted(() => {
 .continue-btn:hover {
   background-color: #003d82;
 }
+/* 修改进度条样式 */
+.progress-overview {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
 
+.progress-label {
+  color: #666;
+}
+
+.progress-bar-container {
+  height: 8px;
+  background-color: #f0f0f0;
+  border-radius: 4px;
+  margin-bottom: 5px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  border-radius: 4px;
+}
+
+.progress-bar.completed {
+  background-color: #1e88e5; /* 蓝色进度条 */
+}
+
+.progress-bar.uncompleted {
+  background-color: #bdbdbd; /* 灰色进度条 */
+}
+
+.progress-details {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 10px;
+}
 /* 通知公告区域样式 */
 .announcement-list {
   display: flex;

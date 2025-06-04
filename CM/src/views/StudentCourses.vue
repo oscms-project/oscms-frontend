@@ -101,8 +101,25 @@
   <div class="content-header">
     <h3>📁 课程资料</h3>
   </div>
+  <div class="filter-container">
+    <label for="chapter-filter">按章节筛选：</label>
+    <select 
+      id="chapter-filter" 
+      v-model="selectedChapter" 
+      class="chapter-filter"
+    >
+      <option value="all">全部章节</option>
+      <option 
+        v-for="outline in availableChapters" 
+        :key="outline.chapter"
+          :value="outline.chapter"
+      >
+        第{{ outline.chapter }}章
+      </option>
+    </select>
+  </div>
   <div class="materials-list">
-    <div class="material-item" v-for="material in courseMaterials" :key="material.id">
+    <div class="material-item" v-for="material in filteredMaterials" :key="material.id">
       <!-- 文件类型图标 -->
       <div class="material-icon">{{ getFileIcon(material.filename) }}</div>
       <div class="material-info">
@@ -110,7 +127,7 @@
         <div class="material-name">{{ material.filename }}</div>
         <div class="material-meta">
           <!-- 上传时间 -->
-         <span>上传时间：{{ formatDate(material.updateAt) }}</span>
+         <span>上传时间：{{ formatDate(material.updatedAt) }}</span>
           <!-- 章节信息 -->
           <span v-if="material.chapterOrder">章节：{{ material.chapterOrder }}</span>
         </div>
@@ -152,7 +169,10 @@
         </div>
       </div>
       <div class="practice-actions">
-        <button class="action-btn primary">开始做题</button>
+        <button 
+          class="action-btn primary"
+          @click="startExercise(practice)"
+        >开始做题</button>
         <button class="action-btn secondary" :disabled="practice.wrongCount === 0">错题重做</button>
         <button class="action-btn tertiary" :disabled="practice.attempts === 0">查看上次记录</button>
       </div>
@@ -173,6 +193,9 @@ import { getMaterials } from '@/api/materials'
 import { getStudentClassInCourse } from '@/api/class'; // 新增
 // 添加这个导入
 import { getClassAssignments } from '@/api/class';
+import { useRouter } from 'vue-router';
+const router = useRouter();
+
 const userStore = useUserStore();
 const courseStore = useCourseStore() 
 const activeTab = ref('outline')
@@ -192,6 +215,14 @@ const tabs = [
   { key: 'materials', label: '课程资料' },
   { key: 'practice', label: '在线练习' }
 ]
+
+const startExercise = (practice) => {
+  // 使用store保存练习ID
+  courseStore.setCurrentExerciseId(practice.id);
+  
+  // 跳转到简洁的URL，无需查询参数
+  router.push('/exercise/:id');
+};
 // 添加加载状态和错误处理
 const loading = ref(true);
 const error = ref('');
@@ -293,7 +324,47 @@ const fetchAllCourseInfo = async () => {
     loading.value = false;
   }
 };
+// 添加在script部分的ref引用列表中
+const selectedChapter = ref('all'); // 默认显示全部章节
 
+// 计算可用的章节列表，用于筛选器
+// 修改可用的章节列表，使用courseOutline中的chapter字段
+const availableChapters = computed(() => {
+  // 从课程大纲中获取章节列表
+  const chaptersFromOutline = courseOutline.value.map(outline => ({
+    chapter: outline.chapter,
+    title: outline.title
+  }));
+
+  // 从资料中提取可能存在的其他章节
+  const chaptersFromMaterials = new Map();
+  courseMaterials.value.forEach(material => {
+    if (material.chapterOrder && !chaptersFromOutline.some(c => c.chapter === material.chapterOrder)) {
+      chaptersFromMaterials.set(material.chapterOrder, {
+        chapter: material.chapterOrder,
+        title: `第${material.chapterOrder}章`
+      });
+    }
+  });
+  
+  // 合并两个章节来源
+  return [
+    ...chaptersFromOutline,
+    ...Array.from(chaptersFromMaterials.values())
+  ].sort((a, b) => a.chapter - b.chapter); // 按章节序号排序
+});
+
+// 根据选中的章节过滤资料
+const filteredMaterials = computed(() => {
+  if (selectedChapter.value === 'all') {
+    return courseMaterials.value; // 返回所有资料
+  } else {
+    // 过滤属于选定章节的资料
+    return courseMaterials.value.filter(material => 
+      material.chapterOrder === selectedChapter.value
+    );
+  }
+});
 // 完善下载函数
 const downloadFile = (url, filename) => {
   fetch(url)
@@ -880,5 +951,36 @@ onMounted(() => {
   font-size: 24px;
   width: 32px;
   text-align: center;
+}
+/* 添加在<style>部分 */
+.filter-container {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 12px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+}
+
+.chapter-filter {
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  margin-left: 12px;
+  background-color: white;
+  font-size: 14px;
+  min-width: 200px;
+}
+
+.chapter-filter:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #4b5563;
 }
 </style>
