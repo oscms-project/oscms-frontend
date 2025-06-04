@@ -18,23 +18,23 @@
     </div>
 
     <!-- Course Card -->
-    <div class="course-card">
-      <div class="course-image">
-        <div class="course-title">操作系统</div>
-        <div class="course-status">已发布</div>
-      </div>
-      <div class="course-info">
-        <div class="teacher-info">
-          <span class="teacher-icon">👨‍🏫</span>
-          <span class="teacher-name">教师：孙海龙,牛红璋</span>
-          <span class="course-time">时间：郭明明码,武江阳,安安帆</span>
-        </div>
-        <div class="course-tags">
-          <span class="tag">小航学伴</span>
-          <span class="tag">AI直播</span>
-        </div>
-      </div>
+   <!-- Course Card -->
+<div class="course-card">
+  <div class="course-image">
+    <div class="course-title">{{ courseData?.name || '加载中...' }}</div>
+    <div class="course-status">{{ courseData?.status || '已发布' }}</div>
+  </div>
+  <div class="course-info">
+    <div class="teacher-info">
+      <span class="teacher-icon">👨‍🏫</span>
+      <span class="teacher-name">教师：{{ courseData?.teacherName || route.query.courseTeacher || '未知教师' }}</span>
+      <span class="course-time" v-if="courseData?.assistants">助教：{{ courseData.assistants }}</span>
     </div>
+    <div class="course-tags" v-if="courseData?.tags && courseData.tags.length">
+      <span class="tag" v-for="tag in courseData.tags" :key="tag">{{ tag }}</span>
+    </div>
+  </div>
+</div>
 
     <!-- Navigation Tabs -->
     <div class="nav-tabs">
@@ -52,97 +52,106 @@
     <div class="content-area">
       <!-- Course Outline -->
       <div v-if="activeTab === 'outline'" class="tab-content">
-        <div class="content-header">
-          <h3>📋 课程大纲</h3>
-        </div>
-        <div class="outline-list">
-          <div class="outline-item" v-for="item in courseOutline" :key="item.id">
-            <div class="outline-number">{{ item.chapter }}</div>
-            <div class="outline-content">
-              <h4>{{ item.title }}</h4>
-              <p>{{ item.description }}</p>
-              <div class="outline-meta">
-                <span>学时：{{ item.hours }}</span>
-                <span>难度：{{ item.difficulty }}</span>
-              </div>
-            </div>
-          </div>
+  <div class="content-header">
+    <h3>📋 课程大纲</h3>
+  </div>
+  <div class="outline-list">
+    <div class="outline-item" v-for="(item, idx) in courseOutline" :key="idx">
+      <div class="outline-number">{{ item.chapter || (idx+1) }}</div>
+      <div class="outline-content">
+        <h4>{{ item.title }}</h4>
+        <p>{{ item.description }}</p>
+        <div class="outline-meta">
+          <span v-if="item.hours">学时：{{ item.hours }}</span>
+          <span v-if="item.difficulty">难度：{{ item.difficulty }}</span>
         </div>
       </div>
+    </div>
+  </div>
+</div>
 
       <!-- Course Chapters -->
       <div v-if="activeTab === 'chapters'" class="tab-content">
-        <div class="content-header">
-          <h3>📚 课程章节</h3>
-        </div>
-        <div class="chapters-list">
-          <div class="chapter-item" v-for="chapter in courseChapters" :key="chapter.id">
-            <div class="chapter-header">
-              <span class="chapter-title">{{ chapter.title }}</span>
-              <span class="chapter-progress">{{ chapter.progress }}%</span>
-            </div>
-            <div class="chapter-lessons">
-              <div class="lesson-item" v-for="lesson in chapter.lessons" :key="lesson.id">
-                <span class="lesson-icon">{{ lesson.type === 'video' ? '🎥' : '📄' }}</span>
-                <span class="lesson-title">{{ lesson.title }}</span>
-                <span class="lesson-duration">{{ lesson.duration }}</span>
-                <span :class="['lesson-status', lesson.completed ? 'completed' : 'pending']">
-                  {{ lesson.completed ? '已完成' : '未完成' }}
-                </span>
-              </div>
-            </div>
-          </div>
+  <div class="content-header">
+    <h3>📚 课程章节</h3>
+  </div>
+  <div class="chapters-list">
+    <div class="chapter-item" v-for="(chapter, idx) in courseChapters" :key="chapter.id || idx">
+      <div class="chapter-header">
+        <span class="chapter-title">{{ chapter.title }}</span>
+        <span class="chapter-progress" v-if="chapter.progress">{{ chapter.progress }}%</span>
+      </div>
+      <div class="chapter-lessons" v-if="chapter.lessons">
+        <div class="lesson-item" v-for="lesson in chapter.lessons" :key="lesson.id">
+          <span class="lesson-icon">{{ lesson.type === 'video' ? '🎥' : '📄' }}</span>
+          <span class="lesson-title">{{ lesson.title }}</span>
+          <span class="lesson-duration">{{ lesson.duration }}</span>
+          <span :class="['lesson-status', lesson.completed ? 'completed' : 'pending']">
+            {{ lesson.completed ? '已完成' : '未完成' }}
+          </span>
         </div>
       </div>
+    </div>
+  </div>
+</div>
 
-      <!-- Course Materials -->
-      <div v-if="activeTab === 'materials'" class="tab-content">
-        <div class="content-header">
-          <h3>📁 课程资料</h3>
-        </div>
-        <div class="materials-list">
-          <div class="material-item" v-for="material in courseMaterials" :key="material.id">
-            <div class="material-icon">{{ material.type === 'pdf' ? '📄' : material.type === 'ppt' ? '📊' : '📁' }}</div>
-            <div class="material-info">
-              <div class="material-name">{{ material.name }}</div>
-              <div class="material-meta">
-                <span>大小：{{ material.size }}</span>
-                <span>上传时间：{{ material.uploadTime }}</span>
-              </div>
-            </div>
-            <button class="download-btn">下载</button>
-          </div>
+    <!-- filepath: e:\test\git_test\CM\src\views\StudentCourses.vue -->
+<!-- Course Materials -->
+<div v-if="activeTab === 'materials'" class="tab-content">
+  <div class="content-header">
+    <h3>📁 课程资料</h3>
+  </div>
+  <div class="materials-list">
+    <div class="material-item" v-for="material in courseMaterials" :key="material.id">
+      <!-- 文件类型图标 -->
+      <div class="material-icon">{{ getFileIcon(material.filename) }}</div>
+      <div class="material-info">
+        <!-- 资料标题 -->
+        <div class="material-name">{{ material.filename }}</div>
+        <div class="material-meta">
+          <!-- 上传时间 -->
+          <span>上传时间：{{ material.updateAt }}</span>
+          <!-- 章节信息 -->
+          <span v-if="material.chapterOrder">章节：{{ material.chapterOrder }}</span>
         </div>
       </div>
+      <!-- 下载按钮链接到文件URL -->
+      <a 
+        :href="material.url" 
+        class="download-btn" 
+        target="_blank" 
+        :download="material.filename"
+      >
+        下载
+      </a>
+    </div>
+  </div>
+</div>
 
       <!-- Online Practice -->
       <div v-if="activeTab === 'practice'" class="tab-content">
-        <div class="content-header">
-          <h3>💻 在线练习</h3>
-          <button class="practice-report-btn">练习报告</button>
+  <div class="content-header">
+    <h3>💻 在线练习</h3>
+    <button class="practice-report-btn">练习报告</button>
+  </div>
+  <div class="practice-list">
+    <div class="practice-item" v-for="practice in onlinePractices" :key="practice.id">
+      <div class="practice-info">
+        <h4>{{ practice.title }}</h4>
+        <div class="practice-meta">
+          <span>题目数量：{{ practice.questionCount }}题</span>
         </div>
-        <div class="practice-list">
-          <div class="practice-item" v-for="practice in onlinePractices" :key="practice.id">
-            <div class="practice-info">
-              <h4>{{ practice.title }}</h4>
-              <div class="practice-meta">
-                <span>题目数量：{{ practice.questionCount }}题</span>
-                <span>时间限制：{{ practice.timeLimit }}分钟</span>
-                <span>最高分：{{ practice.bestScore }}分</span>
-              </div>
-              <div class="practice-stats">
-                <span>完成次数：{{ practice.attempts }}次</span>
-                <span>错题数：{{ practice.wrongCount }}题</span>
-              </div>
-            </div>
-            <div class="practice-actions">
-              <button class="action-btn primary">开始做题</button>
-              <button class="action-btn secondary" :disabled="practice.wrongCount === 0">错题重做</button>
-              <button class="action-btn tertiary" :disabled="practice.attempts === 0">查看上次记录</button>
-            </div>
-          </div>
+        <div class="practice-stats">
         </div>
       </div>
+      <div class="practice-actions">
+        <button class="action-btn primary">开始做题</button>
+        <button class="action-btn secondary" :disabled="practice.wrongCount === 0">错题重做</button>
+        <button class="action-btn tertiary" :disabled="practice.attempts === 0">查看上次记录</button>
+      </div>
+    </div>
+  </div>
+</div>
     </div>
   </div>
 </template>
@@ -150,119 +159,239 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useUserStore } from '@/stores/user';
+import { useCourseStore } from '@/stores/course'
+import { useRoute } from 'vue-router'; 
+import { getCourseDetail } from '@/api/course'; // 确保导入API
+import { getMaterials } from '@/api/materials'
+import { getStudentClassInCourse } from '@/api/class'; // 新增
+// 添加这个导入
+import { getClassAssignments } from '@/api/class';
 const userStore = useUserStore();
+const courseStore = useCourseStore() 
 const activeTab = ref('outline')
-
+// 从路由参数中获取课程信息
+const route = useRoute()
+const courseId = computed(() => courseStore.currentCourseId) // 修改为从store获取
+const courseData = ref(null)
+const courseOutline = ref([])
+const courseChapters = ref([])
+const courseMaterials = ref([])
+const onlinePractices = ref([])
+const classId = ref(null) 
+// 假设班级ID可以从课程详情或其他API获得，这里先用courseId代替
 const tabs = [
   { key: 'outline', label: '课程大纲' },
   { key: 'chapters', label: '课程章节' },
   { key: 'materials', label: '课程资料' },
   { key: 'practice', label: '在线练习' }
 ]
+// 添加加载状态和错误处理
+const loading = ref(true);
+const error = ref('');
 
-const courseOutline = [
-  {
-    id: 1,
-    chapter: '第一章',
-    title: '操作系统概述',
-    description: '介绍操作系统的基本概念、发展历史和主要功能',
-    hours: '4学时',
-    difficulty: '基础'
-  },
-  {
-    id: 2,
-    chapter: '第二章',
-    title: '进程管理',
-    description: '进程的概念、进程调度算法、进程同步与通信',
-    hours: '8学时',
-    difficulty: '中等'
-  },
-  {
-    id: 3,
-    chapter: '第三章',
-    title: '内存管理',
-    description: '内存分配策略、虚拟内存、页面置换算法',
-    hours: '6学时',
-    difficulty: '中等'
+const fetchAllCourseInfo = async () => {
+  loading.value = true;
+  error.value = '';
+  
+  try {
+    console.log("正在获取课程详情，ID:", courseId.value);
+    
+    // 1. 获取课程详情（课程名称、章节、大纲等基本信息）
+    const res = await getCourseDetail(courseId.value);
+    console.log("课程详情API返回:", res);
+    
+    if (res.data && res.data.data) {
+      courseData.value = res.data.data;
+      //处理大纲数据
+     if (typeof res.data.data.outline === 'string') {
+    // 如果大纲是字符串，将其封装为对象数组
+    courseOutline.value = [
+      {
+        chapter: 1,
+        title: '课程大纲',
+        description: res.data.data.outline
+      }
+    ];
+  } else if (Array.isArray(res.data.data.outline)) {
+    // 如果已经是数组，直接使用
+    courseOutline.value = res.data.data.outline;
+  } else {
+    // 默认为空数组
+    courseOutline.value = [];
   }
-]
+  
+      courseChapters.value = res.data.data.chapters || [];
+      console.log("课程基本信息处理完成:", courseData.value);
+      console.log("大纲数据:", courseOutline.value);
+      console.log("章节数据:", courseChapters.value);
+    } else {
+      console.error("课程详情API返回数据格式异常");
+      error.value = "无法获取课程详情";
+      return;
+    }
 
-const courseChapters = [
-  {
-    id: 1,
-    title: '第一章 操作系统概述',
-    progress: 100,
-    lessons: [
-      { id: 1, title: '1.1 操作系统的概念', type: 'video', duration: '25分钟', completed: true },
-      { id: 2, title: '1.2 操作系统的发展', type: 'video', duration: '30分钟', completed: true },
-      { id: 3, title: '1.3 课后练习', type: 'document', duration: '15分钟', completed: true }
-    ]
-  },
-  {
-    id: 2,
-    title: '第二章 进程管理',
-    progress: 60,
-    lessons: [
-      { id: 4, title: '2.1 进程的概念', type: 'video', duration: '35分钟', completed: true },
-      { id: 5, title: '2.2 进程调度', type: 'video', duration: '40分钟', completed: true },
-      { id: 6, title: '2.3 进程同步', type: 'video', duration: '45分钟', completed: false }
-    ]
+    // 2. 获取该学生在此课程中所在的班级ID
+    try {
+      console.log("查询学生班级，学生ID:", userStore.userId, "课程ID:", courseId.value);
+      const classRes = await getStudentClassInCourse(userStore.userId, courseId.value);
+      console.log("班级信息API返回:", classRes);
+      
+      if (classRes.data && classRes.data.data && classRes.data.data.id) {
+        classId.value = classRes.data.data.id;
+        console.log("获取到班级ID:", classId.value);
+        
+        // 3. 用班级id获取该班级的资料
+        try {
+          const matRes = await getMaterials(classId.value);
+          console.log("课程资料API返回:", matRes);
+          if (matRes.data && matRes.data.data) {
+            courseMaterials.value = matRes.data.data;
+            console.log("班级资料获取成功:", courseMaterials.value);
+          } else {
+            console.warn("班级资料为空或格式异常");
+            courseMaterials.value = [];
+          }
+        } catch (err) {
+          console.error("获取班级资料失败:", err);
+          courseMaterials.value = [];
+        }
+        
+        // 4. 用班级id获取该班级的练习
+        try {
+          const pracRes = await getClassAssignments(classId.value);
+          console.log("班级练习API返回:", pracRes);
+          if (pracRes.data && pracRes.data.data) {
+            onlinePractices.value = pracRes.data.data;
+            console.log("班级练习获取成功:", onlinePractices.value);
+          } else {
+            console.warn("班级练习为空或格式异常");
+            onlinePractices.value = [];
+          }
+        } catch (err) {
+          console.error("获取班级练习失败:", err);
+          onlinePractices.value = [];
+        }
+      } else {
+        console.error("未找到学生所在班级");
+        error.value = "未找到您在此课程中的班级信息";
+      }
+    } catch (e) {
+      console.error('获取班级信息失败:', e);
+      error.value = "无法获取班级信息";
+    }
+  } catch (e) {
+    console.error('课程详情获取失败:', e);
+    error.value = "获取课程信息失败";
+  } finally {
+    loading.value = false;
   }
-]
+};
+onMounted(() => {
+  fetchAllCourseInfo()
+})
+// const courseOutline = [
+//   {
+//     id: 1,
+//     chapter: '第一章',
+//     title: '操作系统概述',
+//     description: '介绍操作系统的基本概念、发展历史和主要功能',
+//     hours: '4学时',
+//     difficulty: '基础'
+//   },
+//   {
+//     id: 2,
+//     chapter: '第二章',
+//     title: '进程管理',
+//     description: '进程的概念、进程调度算法、进程同步与通信',
+//     hours: '8学时',
+//     difficulty: '中等'
+//   },
+//   {
+//     id: 3,
+//     chapter: '第三章',
+//     title: '内存管理',
+//     description: '内存分配策略、虚拟内存、页面置换算法',
+//     hours: '6学时',
+//     difficulty: '中等'
+//   }
+// ]
 
-const courseMaterials = [
-  {
-    id: 1,
-    name: '操作系统概述.pdf',
-    type: 'pdf',
-    size: '2.5MB',
-    uploadTime: '2024-01-15'
-  },
-  {
-    id: 2,
-    name: '进程管理课件.ppt',
-    type: 'ppt',
-    size: '5.2MB',
-    uploadTime: '2024-01-20'
-  },
-  {
-    id: 3,
-    name: '实验指导书.pdf',
-    type: 'pdf',
-    size: '1.8MB',
-    uploadTime: '2024-01-25'
-  }
-]
+// const courseChapters = [
+//   {
+//     id: 1,
+//     title: '第一章 操作系统概述',
+//     progress: 100,
+//     lessons: [
+//       { id: 1, title: '1.1 操作系统的概念', type: 'video', duration: '25分钟', completed: true },
+//       { id: 2, title: '1.2 操作系统的发展', type: 'video', duration: '30分钟', completed: true },
+//       { id: 3, title: '1.3 课后练习', type: 'document', duration: '15分钟', completed: true }
+//     ]
+//   },
+//   {
+//     id: 2,
+//     title: '第二章 进程管理',
+//     progress: 60,
+//     lessons: [
+//       { id: 4, title: '2.1 进程的概念', type: 'video', duration: '35分钟', completed: true },
+//       { id: 5, title: '2.2 进程调度', type: 'video', duration: '40分钟', completed: true },
+//       { id: 6, title: '2.3 进程同步', type: 'video', duration: '45分钟', completed: false }
+//     ]
+//   }
+// ]
 
-const onlinePractices = [
-  {
-    id: 1,
-    title: '第一章测试 - 操作系统基础概念',
-    questionCount: 20,
-    timeLimit: 30,
-    bestScore: 85,
-    attempts: 2,
-    wrongCount: 3
-  },
-  {
-    id: 2,
-    title: '第二章测试 - 进程管理',
-    questionCount: 25,
-    timeLimit: 45,
-    bestScore: 92,
-    attempts: 1,
-    wrongCount: 2
-  },
-  {
-    id: 3,
-    title: '综合练习 - 期中测试',
-    questionCount: 50,
-    timeLimit: 90,
-    bestScore: 0,
-    attempts: 0,
-    wrongCount: 0
-  }
-]
+// const courseMaterials = [
+//   {
+//     id: 1,
+//     name: '操作系统概述.pdf',
+//     type: 'pdf',
+//     size: '2.5MB',
+//     uploadTime: '2024-01-15'
+//   },
+//   {
+//     id: 2,
+//     name: '进程管理课件.ppt',
+//     type: 'ppt',
+//     size: '5.2MB',
+//     uploadTime: '2024-01-20'
+//   },
+//   {
+//     id: 3,
+//     name: '实验指导书.pdf',
+//     type: 'pdf',
+//     size: '1.8MB',
+//     uploadTime: '2024-01-25'
+//   }
+// ]
+
+// const onlinePractices = [
+//   {
+//     id: 1,
+//     title: '第一章测试 - 操作系统基础概念',
+//     questionCount: 20,
+//     timeLimit: 30,
+//     bestScore: 85,
+//     attempts: 2,
+//     wrongCount: 3
+//   },
+//   {
+//     id: 2,
+//     title: '第二章测试 - 进程管理',
+//     questionCount: 25,
+//     timeLimit: 45,
+//     bestScore: 92,
+//     attempts: 1,
+//     wrongCount: 2
+//   },
+//   {
+//     id: 3,
+//     title: '综合练习 - 期中测试',
+//     questionCount: 50,
+//     timeLimit: 90,
+//     bestScore: 0,
+//     attempts: 0,
+//     wrongCount: 0
+//   }
+// ]
 </script>
 
 <style scoped>
