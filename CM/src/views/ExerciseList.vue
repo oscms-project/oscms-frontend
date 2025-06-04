@@ -140,10 +140,13 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-const router = useRouter()
+import { useRouter, useRoute } from 'vue-router'
+import axios from 'axios'
 
-// 用户信息 - 使用模拟数据进行预览
+const router = useRouter()
+const route = useRoute()
+
+// 用户信息
 const user = ref({
     id: '12345',
     username: 'student001',
@@ -154,11 +157,11 @@ const user = ref({
     avatar: '/placeholder.svg?height=40&width=40'
 });
 
-// 课程信息 - 使用模拟数据进行预览
+// 课程信息
 const course = ref({
-    id: 'course-123',
-    name: '数据结构与算法',
-    code: 'CS101'
+    id: '',
+    name: '',
+    code: ''
 });
 
 // 用户菜单显示状态
@@ -179,54 +182,8 @@ const showMessage = (message) => {
     }, 2000);
 };
 
-// 练习列表数据 - 使用模拟数据进行预览
-const exercises = ref([
-    {
-        id: 'ex-001',
-        title: '数组与链表基础',
-        type: 'choice',
-        totalPoints: 100,
-        openTime: new Date(new Date().getTime() - 5 * 24 * 60 * 60 * 1000).toISOString(), // 5天前
-        allowResubmit: true,
-        submission: {
-            submittedAt: new Date(new Date().getTime() - 3 * 24 * 60 * 60 * 1000).toISOString(), // 3天前
-            score: 85
-        }
-    },
-    {
-        id: 'ex-002',
-        title: '栈与队列实现',
-        type: 'programming',
-        totalPoints: 100,
-        openTime: new Date().toISOString(), // 现在
-        allowResubmit: true,
-        submission: {
-            submittedAt: new Date().toISOString(),
-            score: null // 待批改
-        }
-    },
-    {
-        id: 'ex-003',
-        title: '树与图结构',
-        type: 'choice',
-        totalPoints: 100,
-        openTime: new Date(new Date().getTime() + 5 * 24 * 60 * 60 * 1000).toISOString(), // 5天后
-        allowResubmit: false
-    },
-    {
-        id: 'ex-004',
-        title: '排序算法实现',
-        type: 'programming',
-        totalPoints: 150,
-        openTime: new Date(new Date().getTime() - 15 * 24 * 60 * 60 * 1000).toISOString(), // 15天前
-        allowResubmit: false,
-        submission: {
-            submittedAt: new Date(new Date().getTime() - 10 * 24 * 60 * 60 * 1000).toISOString(), // 10天前
-            score: 120
-        }
-    }
-]);
-
+// 练习列表数据
+const exercises = ref([]);
 const loading = ref(false);
 const error = ref(null);
 
@@ -279,13 +236,11 @@ const getStatusText = (status) => {
 
 // 返回上一页
 const goBack = () => {
-    // 预览模式下不执行实际操作
-    console.log('返回上一页');
+    router.back();
 };
 
 // 进入练习
 const enterExercise = (exercise) => {
-    // 预览模式下不执行实际操作
     const status = getExerciseStatus(exercise);
 
     if (status === 'upcoming') {
@@ -298,8 +253,6 @@ const enterExercise = (exercise) => {
         return;
     }
 
-    console.log('Attempting to navigate to ExercisePage with ID:', exercise.id); // 调试输出
-
     router.push({ name: 'ExercisePage', params: { id: exercise.id } })
         .then(() => {
             console.log('Navigation to ExercisePage successful');
@@ -309,8 +262,50 @@ const enterExercise = (exercise) => {
         });
 };
 
-// 预览模式下不需要实际获取数据
+// 获取练习列表
+const fetchExercises = async () => {
+    loading.value = true;
+    error.value = null;
+    
+    try {
+        // Get courseId from the current route
+        const courseId = route.params.courseId;
+        
+        if (!courseId) {
+            throw new Error('Course ID is missing from route parameters');
+        }
+        
+        // Make API call to get exercises
+        const response = await axios.get(`/exercises`, {
+            params: {
+                courseId: courseId
+            }
+        });
+        
+        // Check if the response is successful
+        if (response.data && response.data.code === 200) {
+            // The exercises are in response.data.data
+            exercises.value = response.data.data || [];
+            
+            // If you want to set the course name and code, you would need to make another API call
+            // For example:
+            // const courseResponse = await axios.get(`/courses/${courseId}`);
+            // if (courseResponse.data && courseResponse.data.code === 200) {
+            //     course.value = courseResponse.data.data;
+            // }
+        } else {
+            throw new Error(response.data.message || 'Failed to fetch exercises');
+        }
+    } catch (err) {
+        console.error('Error fetching exercises:', err);
+        error.value = err.message || 'Failed to fetch exercises';
+    } finally {
+        loading.value = false;
+    }
+};
+
+// 组件挂载时获取练习列表
 onMounted(() => {
-    console.log('组件已挂载');
+    fetchExercises();
 });
 </script>

@@ -292,7 +292,7 @@
           </button>
         </div>
 
-        <form @submit.prevent="changePassword" class="space-y-5">
+        <form @submit.prevent="handleChangePassword" class="space-y-5">
           <div class="group">
             <label for="currentPassword" class="block text-sm font-medium text-gray-600 mb-2 group-hover:text-blue-600 transition-colors">当前密码</label>
             <div class="relative">
@@ -441,7 +441,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   BellIcon,
@@ -462,8 +462,11 @@ import {
   ClockIcon,
   LoaderIcon
 } from 'lucide-vue-next'
+import { getTeacherProfile, updateTeacherProfile, getTeacherCourses, changePassword } from '@/api/teacher'
+import { useUserStore } from '@/stores/user' // 假设你有一个用户store来存储当前用户信息
 
 const router = useRouter()
+const userStore = useUserStore()
 
 // 导航项
 const navItems = [
@@ -485,6 +488,8 @@ const departments = [
 
 // 教师信息
 const teacher = ref({
+  // 静态数据（用于测试）
+  /* 
   name: '张教授',
   title: '副教授',
   avatar: '/placeholder.svg?height=200&width=200',
@@ -503,11 +508,118 @@ const teacher = ref({
     { name: '机器学习导论', students: 56, hours: 48 },
     { name: '自然语言处理', students: 47, hours: 32 }
   ]
+  */
+
+  // 动态数据（实际使用）
+  name: '',
+  title: '',
+  avatar: '/placeholder.svg?height=200&width=200',
+  email: '',
+  phone: '',
+  department: '',
+  research: '',
+  passwordLastUpdated: '',
+  stats: {
+    courseCount: 0,
+    studentCount: 0
+  },
+  courses: []
 })
 
 // 页面状态
 const activeTab = ref('profile')
 const isEditing = ref(false)
+const isLoading = ref(false)
+
+// 加载教师信息
+const loadTeacherProfile = async () => {
+  try {
+    isLoading.value = true
+    const userId = userStore.userId
+    const [profileResponse, coursesResponse] = await Promise.all([
+      getTeacherProfile(userId),
+      getTeacherCourses(userId)
+    ])
+
+    // 更新教师基本信息
+    const profileData = profileResponse.data
+    teacher.value = {
+      ...teacher.value,
+      name: profileData.username,
+      email: profileData.email,
+      department: profileData.department || '',
+      title: profileData.title || '',
+      phone: profileData.phone || '',
+      research: profileData.research || ''
+    }
+
+    // 更新课程信息
+    const coursesData = coursesResponse.data
+    teacher.value.courses = coursesData.map(course => ({
+      name: course.name,
+      students: course.studentCount || 0,
+      hours: course.hours || 0
+    }))
+
+    // 更新统计信息
+    teacher.value.stats.courseCount = teacher.value.courses.length
+    teacher.value.stats.studentCount = teacher.value.courses.reduce((total, course) => total + course.students, 0)
+
+  } catch (error) {
+    console.error('加载教师信息失败:', error)
+    // 这里可以添加错误提示
+    
+    // 如果加载失败，使用静态数据（用于测试）
+    /* 
+    teacher.value = {
+      name: '张教授',
+      title: '副教授',
+      avatar: '/placeholder.svg?height=200&width=200',
+      email: 'zhang.professor@university.edu',
+      phone: '13800138000',
+      department: '计算机科学与技术学院',
+      research: '人工智能、机器学习、自然语言处理',
+      passwordLastUpdated: '2023-09-15',
+      stats: {
+        courseCount: 4,
+        studentCount: 210
+      },
+      courses: [
+        { name: '数据结构', students: 65, hours: 48 },
+        { name: '算法分析', students: 42, hours: 32 },
+        { name: '机器学习导论', students: 56, hours: 48 },
+        { name: '自然语言处理', students: 47, hours: 32 }
+      ]
+    }
+    */
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// 保存教师信息
+const saveTeacherProfile = async () => {
+  try {
+    isLoading.value = true
+    const userId = userStore.userId
+    const updateData = {
+      email: teacher.value.email,
+      title: teacher.value.title,
+      phone: teacher.value.phone,
+      department: teacher.value.department,
+      research: teacher.value.research
+    }
+
+    await updateTeacherProfile(userId, updateData)
+    isEditing.value = false
+    // 这里可以添加成功提示
+  } catch (error) {
+    console.error('更新教师信息失败:', error)
+    // 这里可以添加错误提示
+  } finally {
+    isLoading.value = false
+  }
+}
 
 // 返回上一页
 const goBack = () => {
@@ -653,14 +765,16 @@ const validatePasswordForm = () => {
 }
 
 // 修改密码
-const changePassword = async () => {
+const handleChangePassword = async () => {
   if (!validatePasswordForm()) return
 
   try {
     isSubmitting.value = true
-
-    // 模拟API请求
-    await new Promise(resolve => setTimeout(resolve, 1500))
+    const userId = userStore.userId
+    await changePassword(userId, {
+      currentPassword: passwordForm.currentPassword,
+      newPassword: passwordForm.newPassword
+    })
 
     // 更新密码最后修改时间
     teacher.value.passwordLastUpdated = new Date().toLocaleDateString()
@@ -677,6 +791,20 @@ const changePassword = async () => {
     isSubmitting.value = false
   }
 }
+
+// 监听编辑状态变化
+watch(isEditing, (newValue) => {
+  if (!newValue) {
+    // 如果退出编辑模式，重新加载数据
+    loadTeacherProfile()
+  }
+})
+
+// 页面加载时获取数据
+onMounted(() => {
+  // 如果需要使用静态数据进行测试，注释掉下面这行，并取消注释上面的静态数据
+  loadTeacherProfile()
+})
 </script>
 
 <style>
