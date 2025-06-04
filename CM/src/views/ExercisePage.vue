@@ -128,7 +128,8 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router'
 import { getAssignmentInfo, getAssignmentQuestions } from '@/api/assignment'
-
+import { useCourseStore } from '@/stores/course';
+const courseStore = useCourseStore();
 const router = useRouter();
 const route = useRoute()
 
@@ -273,12 +274,26 @@ onMounted(async () => {
   document.addEventListener('contextmenu', (e) => e.preventDefault());
 
   try {
-    const assignmentId = route.params.assignmentId
-    const info = await getAssignmentInfo(assignmentId)
-    const questions = await getAssignmentQuestions(assignmentId)
+    const exerciseId = courseStore.currentExerciseId;
+    console.log('获取练习信息，ID:', exerciseId);
+    // 检查是否有有效的练习ID
+    if (!exerciseId) {
+      console.error('未找到练习ID');
+      alert('未找到练习信息');
+      router.push('/student/courses'); // 返回课程页面
+      return;
+    }
+
+    const info = await getAssignmentInfo(exerciseId)
+    const questions = await getAssignmentQuestions(exerciseId)
     exercise.value = {
       ...info,
       questions
+    }
+    if (exercise.value.type === 'choice') {
+      answers.value = new Array(exercise.value.questions.length).fill(null);
+    } else if (exercise.value.type === 'programming') {
+      codeAnswers.value = new Array(exercise.value.questions.length).fill('');
     }
   } catch (e) {
     console.error('获取题目失败:', e.message || '请求失败')
