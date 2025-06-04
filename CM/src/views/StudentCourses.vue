@@ -148,121 +148,163 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import { useUserStore } from '@/stores/user';
-const userStore = useUserStore();
-const activeTab = ref('outline')
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import axios from 'axios' // Make sure to install axios if you haven't already
 
-const tabs = [
-  { key: 'outline', label: '课程大纲' },
-  { key: 'chapters', label: '课程章节' },
-  { key: 'materials', label: '课程资料' },
-  { key: 'practice', label: '在线练习' }
-]
+const router = useRouter()
 
-const courseOutline = [
-  {
-    id: 1,
-    chapter: '第一章',
-    title: '操作系统概述',
-    description: '介绍操作系统的基本概念、发展历史和主要功能',
-    hours: '4学时',
-    difficulty: '基础'
-  },
-  {
-    id: 2,
-    chapter: '第二章',
-    title: '进程管理',
-    description: '进程的概念、进程调度算法、进程同步与通信',
-    hours: '8学时',
-    difficulty: '中等'
-  },
-  {
-    id: 3,
-    chapter: '第三章',
-    title: '内存管理',
-    description: '内存分配策略、虚拟内存、页面置换算法',
-    hours: '6学时',
-    difficulty: '中等'
-  }
-]
+// 用户信息 - 可以从实际的用户认证系统中获取
+const user = ref({
+    id: '12345',
+    username: 'student001',
+    name: '张三',
+    role: 'student',
+    email: 'student001@example.com',
+    college: '计算机科学与技术学院',
+    avatar: '/placeholder.svg?height=40&width=40'
+});
 
-const courseChapters = [
-  {
-    id: 1,
-    title: '第一章 操作系统概述',
-    progress: 100,
-    lessons: [
-      { id: 1, title: '1.1 操作系统的概念', type: 'video', duration: '25分钟', completed: true },
-      { id: 2, title: '1.2 操作系统的发展', type: 'video', duration: '30分钟', completed: true },
-      { id: 3, title: '1.3 课后练习', type: 'document', duration: '15分钟', completed: true }
-    ]
-  },
-  {
-    id: 2,
-    title: '第二章 进程管理',
-    progress: 60,
-    lessons: [
-      { id: 4, title: '2.1 进程的概念', type: 'video', duration: '35分钟', completed: true },
-      { id: 5, title: '2.2 进程调度', type: 'video', duration: '40分钟', completed: true },
-      { id: 6, title: '2.3 进程同步', type: 'video', duration: '45分钟', completed: false }
-    ]
-  }
-]
+// 课程信息 - 应该从路由参数或实际课程数据中获取
+const course = ref({
+    id: 'course-123', // This should be dynamically set based on the current course
+    name: '数据结构与算法',
+    code: 'CS101'
+});
 
-const courseMaterials = [
-  {
-    id: 1,
-    name: '操作系统概述.pdf',
-    type: 'pdf',
-    size: '2.5MB',
-    uploadTime: '2024-01-15'
-  },
-  {
-    id: 2,
-    name: '进程管理课件.ppt',
-    type: 'ppt',
-    size: '5.2MB',
-    uploadTime: '2024-01-20'
-  },
-  {
-    id: 3,
-    name: '实验指导书.pdf',
-    type: 'pdf',
-    size: '1.8MB',
-    uploadTime: '2024-01-25'
-  }
-]
+// 用户菜单显示状态
+const showUserMenu = ref(false);
 
-const onlinePractices = [
-  {
-    id: 1,
-    title: '第一章测试 - 操作系统基础概念',
-    questionCount: 20,
-    timeLimit: 30,
-    bestScore: 85,
-    attempts: 2,
-    wrongCount: 3
-  },
-  {
-    id: 2,
-    title: '第二章测试 - 进程管理',
-    questionCount: 25,
-    timeLimit: 45,
-    bestScore: 92,
-    attempts: 1,
-    wrongCount: 2
-  },
-  {
-    id: 3,
-    title: '综合练习 - 期中测试',
-    questionCount: 50,
-    timeLimit: 90,
-    bestScore: 0,
-    attempts: 0,
-    wrongCount: 0
-  }
-]
+// 提示框状态
+const showAlert = ref(false);
+const alertMessage = ref('');
+
+// 显示提示信息
+const showMessage = (message) => {
+    alertMessage.value = message;
+    showAlert.value = true;
+
+    // 2秒后自动关闭
+    setTimeout(() => {
+        showAlert.value = false;
+    }, 2000);
+};
+
+// 练习列表数据 - 将从API获取
+const exercises = ref([]);
+const loading = ref(false);
+const error = ref(null);
+
+// 格式化日期时间
+const formatDateTime = (dateTimeStr) => {
+    if (!dateTimeStr) return '';
+    const date = new Date(dateTimeStr);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+};
+
+// 获取练习结束时间
+const getEndTime = (exercise) => {
+    const openTime = new Date(exercise.openTime);
+    const endTime = new Date(openTime);
+    endTime.setDate(endTime.getDate() + 7); // 假设练习有效期为7天
+    return endTime.toISOString();
+};
+
+// 获取练习状态
+const getExerciseStatus = (exercise) => {
+    const now = new Date();
+    const openTime = new Date(exercise.openTime);
+
+    // 假设练习有效期为7天
+    const endTime = new Date(openTime);
+    endTime.setDate(endTime.getDate() + 7);
+
+    if (now < openTime) {
+        return 'upcoming'; // 未开始
+    } else if (now > endTime) {
+        return 'expired'; // 已截止
+    } else {
+        return 'in-progress'; // 进行中
+    }
+};
+
+// 获取状态文本
+const getStatusText = (status) => {
+    switch (status) {
+        case 'expired':
+            return '已截止';
+        case 'in-progress':
+            return '进行中';
+        case 'upcoming':
+            return '未开始';
+        default:
+            return '';
+    }
+};
+
+// 返回上一页
+const goBack = () => {
+    // 实际应用中可能需要返回上一页
+    router.back();
+};
+
+// 进入练习
+const enterExercise = (exercise) => {
+    const status = getExerciseStatus(exercise);
+
+    if (status === 'upcoming') {
+        showMessage('别着急，老师还没开放');
+        return;
+    }
+
+    if (status === 'expired' && !exercise.allowResubmit && exercise.submission) {
+        showMessage('很遗憾，练习已截止');
+        return;
+    }
+
+    router.push({ name: 'ExercisePage', params: { id: exercise.id } })
+        .then(() => {
+            console.log('Navigation to ExercisePage successful');
+        })
+        .catch(err => {
+            console.error('Navigation to ExercisePage failed:', err);
+        });
+};
+
+// 获取练习列表
+const fetchExercises = async () => {
+    loading.value = true;
+    error.value = null;
+    
+    try {
+        // Get courseId from the current course
+        const courseId = course.value.id;
+        
+        // Make API call to get exercises
+        const response = await axios.get(`/exercises`, {
+            params: {
+                courseId: courseId
+            }
+        });
+        
+        // Check if the response is successful
+        if (response.data && response.data.code === 200) {
+            exercises.value = response.data.data || [];
+        } else {
+            throw new Error(response.data.message || 'Failed to fetch exercises');
+        }
+    } catch (err) {
+        console.error('Error fetching exercises:', err);
+        error.value = err.message || 'Failed to fetch exercises';
+    } finally {
+        loading.value = false;
+    }
+};
+
+// 组件挂载时获取练习列表
+onMounted(() => {
+    fetchExercises();
+});
 </script>
 
 <style scoped>

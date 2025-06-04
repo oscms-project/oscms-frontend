@@ -139,7 +139,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+const router = useRouter()
 
 // 用户信息 - 使用模拟数据进行预览
 const user = ref({
@@ -296,7 +298,15 @@ const enterExercise = (exercise) => {
         return;
     }
 
-    router.push({ name: 'ExercisePage', params: { id: exercise.id } });
+    console.log('Attempting to navigate to ExercisePage with ID:', exercise.id); // 调试输出
+
+    router.push({ name: 'ExercisePage', params: { id: exercise.id } })
+        .then(() => {
+            console.log('Navigation to ExercisePage successful');
+        })
+        .catch(err => {
+            console.error('Navigation to ExercisePage failed:', err);
+        });
 };
 
 // 预览模式下不需要实际获取数据

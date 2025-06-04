@@ -271,7 +271,8 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-
+import { useRouter } from 'vue-router'
+const router = useRouter()
 // 用户信息 - 使用模拟数据进行预览
 const user = ref({
     id: '12345',
@@ -654,7 +655,7 @@ const toggleBookmark = (questionIndex) => {
 const retryIncorrectQuestions = () => {
     showMessage('开始错题重做');
     // 在实际应用中，这里应该跳转到错题重做页面
-    console.log('错题重做', incorrectQuestions.value);
+    router.push({ name: 'IncorrectQuestionsRetry', params: { id: exercise.id } })
 };
 
 // 格式化日期时间
@@ -682,7 +683,7 @@ const formatDuration = (seconds) => {
 // 返回练习列表
 const goBackToList = () => {
     // 在实际应用中，这里应该跳转回练习列表页面
-    console.log('返回练习列表');
+    router.push({ name: 'ExerciseList' });
 };
 
 // 组件挂载时

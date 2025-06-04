@@ -190,7 +190,8 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-
+import { useRouter } from 'vue-router'
+const router = useRouter()
 // 用户信息 - 使用模拟数据进行预览
 const user = ref({
     id: '12345',
@@ -487,13 +488,13 @@ const submitAnswers = () => {
     // 2秒后跳转回反馈页面
     setTimeout(() => {
         goBackToFeedback();
-    }, 2000);
+    }, 1000);
 };
 
 // 返回反馈页面
 const goBackToFeedback = () => {
     // 在实际应用中，这里应该跳转回练习反馈页面
-    console.log('返回练习反馈页面');
+    router.push({ name: 'ExerciseFeedback', params: { id: exercise.id } })
 };
 
 // 确认退出

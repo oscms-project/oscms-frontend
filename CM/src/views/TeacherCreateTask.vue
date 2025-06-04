@@ -9,7 +9,7 @@
                         class="mr-2">
                         <path d="m15 18-6-6 6-6"></path>
                     </svg>
-                    <span class="text-lg font-medium">返回课程管理</span>
+                    <span class="text-lg font-medium">返回任务管理</span>
                 </button>
             </div>
 
@@ -70,17 +70,6 @@
                     <input v-model="task.title" type="text"
                         class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="请输入任务标题" />
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">所属课程</label>
-                    <select v-model="task.courseId"
-                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="">请选择课程</option>
-                        <option v-for="course in courses" :key="course.id" :value="course.id">
-                            {{ course.name }}
-                        </option>
-                    </select>
                 </div>
 
                 <div>
@@ -149,6 +138,17 @@
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-xl font-bold">题目列表</h2>
                 <div class="flex space-x-2">
+                    <button
+                        class="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded-lg text-sm flex items-center"
+                        @click="openQuestionBank">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                            class="mr-1">
+                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                        </svg>
+                        从题库导入
+                    </button>
                     <button v-if="task.type === 'choice' || task.type === 'mixed'"
                         class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg text-sm flex items-center"
                         @click="addQuestion('choice')">
@@ -161,7 +161,7 @@
                         添加选择题
                     </button>
                     <button v-if="task.type === 'programming' || task.type === 'mixed'"
-                        class="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded-lg text-sm flex items-center"
+                        class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-lg text-sm flex items-center"
                         @click="addQuestion('programming')">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
@@ -176,14 +176,14 @@
 
             <div v-if="task.questions.length === 0"
                 class="text-center py-8 text-gray-500 border border-dashed border-gray-300 rounded-lg">
-                请添加题目
+                请添加题目或从题库导入
             </div>
 
             <div v-else class="space-y-6">
                 <!-- 选择题 -->
                 <div v-for="(question, qIndex) in task.questions" :key="qIndex" class="border rounded-lg p-4" :class="{
                     'border-blue-200 bg-blue-50': question.type === 'choice',
-                    'border-purple-200 bg-purple-50': question.type === 'programming'
+                    'border-green-200 bg-green-50': question.type === 'programming'
                 }">
                     <div class="flex justify-between items-start mb-4">
                         <div class="flex items-start">
@@ -192,7 +192,7 @@
                                 <div class="flex items-center">
                                     <span class="px-2 py-0.5 text-xs rounded-full mr-2" :class="{
                                         'bg-blue-200 text-blue-800': question.type === 'choice',
-                                        'bg-purple-200 text-purple-800': question.type === 'programming'
+                                        'bg-green-200 text-green-800': question.type === 'programming'
                                     }">
                                         {{ question.type === 'choice' ? '选择题' : '编程题' }}
                                     </span>
@@ -476,12 +476,262 @@
                 </div>
             </div>
         </div>
+
+        <!-- 题库模态框 -->
+        <div v-if="showQuestionBank" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+                <div class="p-6 border-b">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-xl font-bold">题库</h2>
+                        <button class="text-gray-400 hover:text-gray-600 focus:outline-none"
+                            @click="showQuestionBank = false">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="p-6 border-b">
+                    <div class="flex flex-wrap gap-4">
+                        <div class="w-full md:w-64">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">题目类型</label>
+                            <select v-model="questionBankFilter.type"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">全部类型</option>
+                                <option value="choice">选择题</option>
+                                <option value="programming">编程题</option>
+                            </select>
+                        </div>
+
+                        <div class="w-full md:w-64">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">难度</label>
+                            <select v-model="questionBankFilter.difficulty"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">全部难度</option>
+                                <option value="easy">简单</option>
+                                <option value="medium">中等</option>
+                                <option value="hard">困难</option>
+                            </select>
+                        </div>
+
+                        <div class="w-full md:flex-1">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">关键词搜索</label>
+                            <div class="relative">
+                                <input v-model="questionBankFilter.keyword" type="text"
+                                    class="w-full px-3 py-2 pl-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="搜索题目..." />
+                                <div class="absolute left-3 top-2.5 text-gray-400">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <circle cx="11" cy="11" r="8"></circle>
+                                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-6">
+                    <div v-if="loadingQuestionBank" class="flex justify-center py-8">
+                        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-900"></div>
+                    </div>
+
+                    <div v-else-if="filteredQuestionBank.length === 0" class="text-center py-8 text-gray-500">
+                        没有找到符合条件的题目
+                    </div>
+
+                    <div v-else class="space-y-4">
+                        <div v-for="(question, index) in filteredQuestionBank" :key="index"
+                            class="border rounded-lg p-4 hover:bg-gray-50" :class="{
+                                'border-blue-200': question.type === 'choice',
+                                'border-green-200': question.type === 'programming',
+                                'bg-blue-50': selectedQuestions.includes(question.id) && question.type === 'choice',
+                                'bg-green-50': selectedQuestions.includes(question.id) && question.type === 'programming'
+                            }">
+                            <div class="flex justify-between items-start">
+                                <div class="flex items-start flex-1">
+                                    <div class="flex items-center h-5 mt-0.5">
+                                        <input type="checkbox" :id="`question-${question.id}`"
+                                            :checked="selectedQuestions.includes(question.id)"
+                                            @change="toggleQuestionSelection(question.id)"
+                                            class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                                    </div>
+                                    <div class="ml-3 flex-1">
+                                        <label :for="`question-${question.id}`"
+                                            class="font-medium text-gray-700 cursor-pointer">
+                                            {{ question.text }}
+                                        </label>
+                                        <div class="flex items-center mt-1">
+                                            <span class="px-2 py-0.5 text-xs rounded-full mr-2" :class="{
+                                                'bg-blue-200 text-blue-800': question.type === 'choice',
+                                                'bg-green-200 text-green-800': question.type === 'programming'
+                                            }">
+                                                {{ question.type === 'choice' ? '选择题' : '编程题' }}
+                                            </span>
+                                            <span class="px-2 py-0.5 text-xs rounded-full mr-2" :class="{
+                                                'bg-green-200 text-green-800': question.difficulty === 'easy',
+                                                'bg-yellow-200 text-yellow-800': question.difficulty === 'medium',
+                                                'bg-red-200 text-red-800': question.difficulty === 'hard'
+                                            }">
+                                                {{
+                                                    question.difficulty === 'easy' ? '简单' :
+                                                        question.difficulty === 'medium' ? '中等' : '困难'
+                                                }}
+                                            </span>
+                                            <span class="text-sm text-gray-500">{{ question.points }} 分</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button class="text-blue-500 hover:text-blue-700 text-sm"
+                                    @click="previewBankQuestion(question)">
+                                    预览
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-6 border-t bg-gray-50">
+                    <div class="flex justify-between items-center">
+                        <div class="text-sm text-gray-600">
+                            已选择 {{ selectedQuestions.length }} 道题目
+                        </div>
+                        <div class="flex space-x-3">
+                            <button class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg"
+                                @click="showQuestionBank = false">
+                                取消
+                            </button>
+                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
+                                @click="importSelectedQuestions" :disabled="selectedQuestions.length === 0"
+                                :class="{ 'opacity-50 cursor-not-allowed': selectedQuestions.length === 0 }">
+                                导入所选题目
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 题库题目预览模态框 -->
+        <div v-if="showQuestionPreview"
+            class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-bold">题目预览</h2>
+                        <button class="text-gray-400 hover:text-gray-600 focus:outline-none"
+                            @click="showQuestionPreview = false">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div v-if="previewQuestion">
+                        <div class="flex items-center mb-4">
+                            <span class="px-2 py-0.5 text-xs rounded-full mr-2" :class="{
+                                'bg-blue-200 text-blue-800': previewQuestion.type === 'choice',
+                                'bg-green-200 text-green-800': previewQuestion.type === 'programming'
+                            }">
+                                {{ previewQuestion.type === 'choice' ? '选择题' : '编程题' }}
+                            </span>
+                            <span class="px-2 py-0.5 text-xs rounded-full mr-2" :class="{
+                                'bg-green-200 text-green-800': previewQuestion.difficulty === 'easy',
+                                'bg-yellow-200 text-yellow-800': previewQuestion.difficulty === 'medium',
+                                'bg-red-200 text-red-800': previewQuestion.difficulty === 'hard'
+                            }">
+                                {{
+                                    previewQuestion.difficulty === 'easy' ? '简单' :
+                                        previewQuestion.difficulty === 'medium' ? '中等' : '困难'
+                                }}
+                            </span>
+                            <span class="text-sm text-gray-500">{{ previewQuestion.points }} 分</span>
+                        </div>
+
+                        <div class="font-medium mb-4">{{ previewQuestion.text }}</div>
+
+                        <!-- 选择题选项 -->
+                        <div v-if="previewQuestion.type === 'choice'" class="space-y-2 mb-6">
+                            <div v-for="(option, oIndex) in previewQuestion.options" :key="oIndex"
+                                class="flex items-center p-3 rounded-lg"
+                                :class="{ 'bg-green-50 border border-green-200': previewQuestion.correctAnswer === oIndex, 'border border-gray-200': previewQuestion.correctAnswer !== oIndex }">
+                                <div class="w-6 h-6 rounded-full flex items-center justify-center border mr-2"
+                                    :class="{ 'bg-green-500 border-green-500 text-white': previewQuestion.correctAnswer === oIndex, 'border-gray-300': previewQuestion.correctAnswer !== oIndex }">
+                                    {{ ['A', 'B', 'C', 'D'][oIndex] }}
+                                </div>
+                                <div>{{ option }}</div>
+                            </div>
+                        </div>
+
+                        <!-- 编程题详情 -->
+                        <div v-if="previewQuestion.type === 'programming'" class="mb-6">
+                            <div class="mb-4 text-sm text-gray-600">{{ previewQuestion.description }}</div>
+
+                            <!-- 代码示例 -->
+                            <div class="border rounded-lg overflow-hidden mb-4">
+                                <div class="bg-gray-100 px-4 py-2 border-b">
+                                    <span>{{ previewQuestion.language }}</span>
+                                </div>
+                                <pre
+                                    class="p-4 font-mono text-sm overflow-x-auto bg-gray-50">{{ previewQuestion.sampleAnswer }}</pre>
+                            </div>
+
+                            <!-- 测试用例 -->
+                            <div v-if="previewQuestion.testCases && previewQuestion.testCases.length > 0">
+                                <div class="text-sm font-medium text-gray-700 mb-2">测试用例:</div>
+                                <div class="space-y-2">
+                                    <div v-for="(test, tIndex) in previewQuestion.testCases" :key="tIndex"
+                                        class="border border-gray-200 rounded-lg p-3 text-sm">
+                                        <div class="font-medium mb-1">{{ test.name }}</div>
+                                        <div><span class="text-gray-600">输入:</span> {{ test.input }}</div>
+                                        <div><span class="text-gray-600">期望输出:</span> {{ test.expectedOutput }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 解析 -->
+                        <div class="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                            <div class="text-sm font-medium text-gray-700 mb-1">解析:</div>
+                            <div class="text-sm text-gray-600">{{ previewQuestion.explanation }}</div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 flex justify-end space-x-3">
+                        <button class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg"
+                            @click="showQuestionPreview = false">
+                            关闭
+                        </button>
+                        <button v-if="previewQuestion && !selectedQuestions.includes(previewQuestion.id)"
+                            class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
+                            @click="addToSelected(previewQuestion.id)">
+                            添加到所选
+                        </button>
+                        <button v-else-if="previewQuestion"
+                            class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg"
+                            @click="removeFromSelected(previewQuestion.id)">
+                            从所选中移除
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
-
+import { useRouter } from 'vue-router'
+const router = useRouter()
 // 用户信息 - 使用模拟数据进行预览
 const user = ref({
     id: 'teacher123',
@@ -511,18 +761,9 @@ const showMessage = (message) => {
     }, 2000);
 };
 
-// 课程列表 - 使用模拟数据进行预览
-const courses = ref([
-    { id: 'course-001', name: '数据结构与算法' },
-    { id: 'course-002', name: '计算机网络' },
-    { id: 'course-003', name: '操作系统' },
-    { id: 'course-004', name: '数据库系统' }
-]);
-
 // 任务数据
 const task = reactive({
     title: '',
-    courseId: '',
     type: 'choice',
     totalPoints: 100,
     openTime: '',
@@ -536,6 +777,311 @@ const task = reactive({
 
 // 预览模态框状态
 const showPreview = ref(false);
+
+// 题库模态框状态
+const showQuestionBank = ref(false);
+const loadingQuestionBank = ref(false);
+const questionBankFilter = reactive({
+    type: '',
+    difficulty: '',
+    keyword: ''
+});
+const selectedQuestions = ref([]);
+
+// 题库题目预览模态框状态
+const showQuestionPreview = ref(false);
+const previewQuestion = ref(null);
+
+// 题库数据 - 使用模拟数据进行预览
+const questionBank = ref([
+    {
+        id: 'qb-001',
+        text: '以下哪种数据结构支持常数时间的随机访问？',
+        type: 'choice',
+        difficulty: 'easy',
+        points: 10,
+        options: ['数组', '链表', '栈', '队列'],
+        correctAnswer: 0,
+        explanation: '数组支持常数时间O(1)的随机访问，因为可以通过索引直接计算内存地址。链表需要从头遍历，栈和队列只能按特定顺序访问元素。'
+    },
+    {
+        id: 'qb-002',
+        text: '链表的主要优点是什么？',
+        type: 'choice',
+        difficulty: 'easy',
+        points: 10,
+        options: ['快速的随机访问', '内存分配的灵活性', '缓存友好性', '节省内存空间'],
+        correctAnswer: 1,
+        explanation: '链表的主要优点是内存分配的灵活性，它可以动态地分配内存，不需要连续的内存空间。这使得插入和删除操作更加高效。'
+    },
+    {
+        id: 'qb-003',
+        text: '在最坏情况下，在数组中查找元素的时间复杂度是多少？',
+        type: 'choice',
+        difficulty: 'medium',
+        points: 15,
+        options: ['O(1)', 'O(log n)', 'O(n)', 'O(n²)'],
+        correctAnswer: 2,
+        explanation: '在未排序的数组中查找元素，最坏情况下需要遍历整个数组，时间复杂度为O(n)。如果数组已排序，可以使用二分查找，时间复杂度为O(log n)。'
+    },
+    {
+        id: 'qb-004',
+        text: '以下哪种操作在链表中比在数组中更高效？',
+        type: 'choice',
+        difficulty: 'medium',
+        points: 15,
+        options: ['随机访问元素', '在开头插入元素', '在末尾插入元素', '按索引查找元素'],
+        correctAnswer: 1,
+        explanation: '在链表开头插入元素的时间复杂度是O(1)，而在数组开头插入元素需要将所有元素向后移动，时间复杂度为O(n)。'
+    },
+    {
+        id: 'qb-005',
+        text: '实现一个栈（Stack）数据结构',
+        type: 'programming',
+        difficulty: 'medium',
+        points: 20,
+        language: 'JavaScript',
+        description: '请实现一个栈数据结构，包含push、pop、peek和isEmpty方法。',
+        sampleAnswer: `class Stack {
+    constructor() {
+      this.items = [];
+    }
+  
+    push(element) {
+      this.items.push(element);
+    }
+  
+    pop() {
+      if (this.isEmpty()) {
+        return "Underflow";
+      }
+      return this.items.pop();
+    }
+  
+    peek() {
+      if (this.isEmpty()) {
+        return "No elements in Stack";
+      }
+      return this.items[this.items.length - 1];
+    }
+  
+    isEmpty() {
+      return this.items.length === 0;
+    }
+  }`,
+        testCases: [
+            {
+                name: '基本操作测试',
+                input: 'push(1), push(2), peek()',
+                expectedOutput: '2'
+            },
+            {
+                name: 'pop操作测试',
+                input: 'push(1), push(2), pop(), pop()',
+                expectedOutput: '1'
+            },
+            {
+                name: '空栈测试',
+                input: 'isEmpty()',
+                expectedOutput: 'true'
+            }
+        ],
+        explanation: '栈是一种遵循后进先出(LIFO)原则的数据结构。上面的实现使用数组作为底层存储，提供了栈的基本操作：push(添加元素)、pop(移除顶部元素)、peek(查看顶部元素)和isEmpty(检查栈是否为空)。'
+    },
+    {
+        id: 'qb-006',
+        text: '实现一个队列（Queue）数据结构',
+        type: 'programming',
+        difficulty: 'medium',
+        points: 20,
+        language: 'JavaScript',
+        description: '请实现一个队列数据结构，包含enqueue、dequeue、peek和isEmpty方法。',
+        sampleAnswer: `class Queue {
+    constructor() {
+      this.items = [];
+    }
+  
+    enqueue(element) {
+      this.items.push(element);
+    }
+  
+    dequeue() {
+      if (this.isEmpty()) {
+        return "Underflow";
+      }
+      return this.items.shift();
+    }
+  
+    peek() {
+      if (this.isEmpty()) {
+        return "No elements in Queue";
+      }
+      return this.items[0];
+    }
+  
+    isEmpty() {
+      return this.items.length === 0;
+    }
+  }`,
+        testCases: [
+            {
+                name: '基本操作测试',
+                input: 'enqueue(1), enqueue(2), peek()',
+                expectedOutput: '1'
+            },
+            {
+                name: 'dequeue操作测试',
+                input: 'enqueue(1), enqueue(2), dequeue()',
+                expectedOutput: '1'
+            },
+            {
+                name: '空队列测试',
+                input: 'isEmpty()',
+                expectedOutput: 'true'
+            }
+        ],
+        explanation: '队列是一种遵循先进先出(FIFO)原则的数据结构。上面的实现使用数组作为底层存储，提供了队列的基本操作：enqueue(添加元素)、dequeue(移除队首元素)、peek(查看队首元素)和isEmpty(检查队列是否为空)。'
+    },
+    {
+        id: 'qb-007',
+        text: '实现快速排序算法',
+        type: 'programming',
+        difficulty: 'hard',
+        points: 30,
+        language: 'JavaScript',
+        description: '请实现快速排序算法，对给定的数组进行排序。',
+        sampleAnswer: `function quickSort(arr) {
+    if (arr.length <= 1) {
+      return arr;
+    }
+    
+    const pivot = arr[Math.floor(arr.length / 2)];
+    const left = [];
+    const right = [];
+    const equal = [];
+    
+    for (let val of arr) {
+      if (val < pivot) {
+        left.push(val);
+      } else if (val > pivot) {
+        right.push(val);
+      } else {
+        equal.push(val);
+      }
+    }
+    
+    return [...quickSort(left), ...equal, ...quickSort(right)];
+  }`,
+        testCases: [
+            {
+                name: '基本排序测试',
+                input: '[3, 1, 4, 1, 5, 9, 2, 6, 5]',
+                expectedOutput: '[1, 1, 2, 3, 4, 5, 5, 6, 9]'
+            },
+            {
+                name: '已排序数组测试',
+                input: '[1, 2, 3, 4, 5]',
+                expectedOutput: '[1, 2, 3, 4, 5]'
+            },
+            {
+                name: '逆序数组测试',
+                input: '[5, 4, 3, 2, 1]',
+                expectedOutput: '[1, 2, 3, 4, 5]'
+            }
+        ],
+        explanation: '快速排序是一种高效的排序算法，平均时间复杂度为O(n log n)。它的基本思想是选择一个"基准"元素，然后将数组分为两部分：小于基准的元素和大于基准的元素，然后递归地对这两部分进行排序。'
+    },
+    {
+        id: 'qb-008',
+        text: '二叉树的遍历方式有哪些？',
+        type: 'choice',
+        difficulty: 'medium',
+        points: 15,
+        options: ['前序、中序、后序', '前序、中序、后序、层序', '深度优先、广度优先', '先序、次序、末序'],
+        correctAnswer: 1,
+        explanation: '二叉树的遍历方式包括前序遍历（根-左-右）、中序遍历（左-根-右）、后序遍历（左-右-根）和层序遍历（逐层从左到右）。'
+    },
+    {
+        id: 'qb-009',
+        text: '哈希表的平均查找时间复杂度是多少？',
+        type: 'choice',
+        difficulty: 'medium',
+        points: 15,
+        options: ['O(1)', 'O(log n)', 'O(n)', 'O(n²)'],
+        correctAnswer: 0,
+        explanation: '哈希表的平均查找时间复杂度是O(1)，这是因为哈希函数可以直接计算出元素的存储位置。但在最坏情况下（所有元素都发生哈希冲突），时间复杂度可能退化为O(n)。'
+    },
+    {
+        id: 'qb-010',
+        text: '实现二分查找算法',
+        type: 'programming',
+        difficulty: 'medium',
+        points: 20,
+        language: 'JavaScript',
+        description: '请实现二分查找算法，在有序数组中查找目标值的索引，如果不存在则返回-1。',
+        sampleAnswer: `function binarySearch(arr, target) {
+    let left = 0;
+    let right = arr.length - 1;
+    
+    while (left <= right) {
+      const mid = Math.floor((left + right) / 2);
+      
+      if (arr[mid] === target) {
+        return mid;
+      } else if (arr[mid] < target) {
+        left = mid + 1;
+      } else {
+        right = mid - 1;
+      }
+    }
+    
+    return -1;
+  }`,
+        testCases: [
+            {
+                name: '基本查找测试',
+                input: 'arr = [1, 2, 3, 4, 5], target = 3',
+                expectedOutput: '2'
+            },
+            {
+                name: '目标不存在测试',
+                input: 'arr = [1, 2, 3, 4, 5], target = 6',
+                expectedOutput: '-1'
+            },
+            {
+                name: '边界值测试',
+                input: 'arr = [1, 2, 3, 4, 5], target = 1',
+                expectedOutput: '0'
+            }
+        ],
+        explanation: '二分查找是一种在有序数组中查找特定元素的高效算法，时间复杂度为O(log n)。它通过不断将搜索范围缩小一半来快速定位目标元素。'
+    }
+]);
+
+// 过滤后的题库
+const filteredQuestionBank = computed(() => {
+    return questionBank.value.filter(q => {
+        // 类型过滤
+        if (questionBankFilter.type && q.type !== questionBankFilter.type) {
+            return false;
+        }
+
+        // 难度过滤
+        if (questionBankFilter.difficulty && q.difficulty !== questionBankFilter.difficulty) {
+            return false;
+        }
+
+        // 关键词搜索
+        if (questionBankFilter.keyword) {
+            const keyword = questionBankFilter.keyword.toLowerCase();
+            return q.text.toLowerCase().includes(keyword) ||
+                (q.description && q.description.toLowerCase().includes(keyword)) ||
+                (q.explanation && q.explanation.toLowerCase().includes(keyword));
+        }
+
+        return true;
+    });
+});
 
 // 添加题目
 const addQuestion = (type) => {
@@ -620,16 +1166,85 @@ const formatDateTime = (dateTimeStr) => {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 };
 
+// 打开题库
+const openQuestionBank = () => {
+    showQuestionBank.value = true;
+    loadingQuestionBank.value = true;
+
+    // 模拟加载数据
+    setTimeout(() => {
+        loadingQuestionBank.value = false;
+    }, 500);
+};
+
+// 切换题目选择状态
+const toggleQuestionSelection = (questionId) => {
+    const index = selectedQuestions.value.indexOf(questionId);
+    if (index === -1) {
+        selectedQuestions.value.push(questionId);
+    } else {
+        selectedQuestions.value.splice(index, 1);
+    }
+};
+
+// 添加到所选
+const addToSelected = (questionId) => {
+    if (!selectedQuestions.value.includes(questionId)) {
+        selectedQuestions.value.push(questionId);
+    }
+};
+
+// 从所选中移除
+const removeFromSelected = (questionId) => {
+    const index = selectedQuestions.value.indexOf(questionId);
+    if (index !== -1) {
+        selectedQuestions.value.splice(index, 1);
+    }
+};
+
+// 预览题库题目
+const previewBankQuestion = (question) => {
+    previewQuestion.value = question;
+    showQuestionPreview.value = true;
+};
+
+// 导入所选题目
+const importSelectedQuestions = () => {
+    if (selectedQuestions.value.length === 0) {
+        return;
+    }
+
+    // 获取所选题目
+    const questionsToImport = questionBank.value.filter(q => selectedQuestions.value.includes(q.id));
+
+    // 添加到任务
+    questionsToImport.forEach(q => {
+        // 深拷贝题目，避免引用问题
+        const questionCopy = JSON.parse(JSON.stringify(q));
+
+        // 移除题库特有的字段
+        delete questionCopy.id;
+        delete questionCopy.difficulty;
+
+        // 添加到任务
+        task.questions.push(questionCopy);
+    });
+
+    // 关闭题库模态框
+    showQuestionBank.value = false;
+
+    // 清空选择
+    selectedQuestions.value = [];
+
+    // 显示提示
+    showMessage(`已导入 ${questionsToImport.length} 道题目`);
+};
+
 // 保存为草稿
 const saveAsDraft = () => {
     // 验证必填字段
     if (!task.title) {
         showMessage('请输入任务标题');
-        return;
-    }
-
-    if (!task.courseId) {
-        showMessage('请选择所属课程');
         return;
     }
 
@@ -661,11 +1276,6 @@ const publishTask = () => {
     // 验证必填字段
     if (!task.title) {
         showMessage('请输入任务标题');
-        return;
-    }
-
-    if (!task.courseId) {
-        showMessage('请选择所属课程');
         return;
     }
 
