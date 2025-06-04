@@ -28,6 +28,7 @@
           :key="index"
           class="course-card"
           :style="{ backgroundColor: course.bgColor }"
+          @click="navigateToCourseDetail(course)"
         >
           <div class="course-image" :style="{ backgroundImage: `url(${course.image})` }">
             <h3 class="course-title">{{ course.title }}</h3>
@@ -119,6 +120,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useUserStore } from '@/stores/user';
+import { useCourseStore } from '@/stores/course'
 import { useRouter } from 'vue-router';
 const router = useRouter();
 //api中封装的方法
@@ -133,13 +135,21 @@ import BaseWindow from '@/components/BaseWindow.vue';
 
 // 学生信息（初始为空，登录后获取）
 const userStore = useUserStore();
+const courseStore = useCourseStore()
 const studentInfo = ref({
   name: userStore.name,
   id: userStore.userId,
   avatar: userStore.avatar
 });
 
-
+// 课程详情页导航函数
+const navigateToCourseDetail = (course) => {
+  // 使用store保存课程ID而非路由参数
+  courseStore.setCurrentCourseId(course.id)
+  
+  // 跳转到简洁的URL，无需查询参数
+  router.push('/student/courses')
+};
 // function parseJwt(token) {
 //   if (!token) return null;
 //   const base64Url = token.split('.')[1];
@@ -185,6 +195,7 @@ const activeTab = ref(0);
 // 测试课程数据
 const testCourses = ref([
   {
+    id: 'test-os-001',
     title: '操作系统',
     teacher: '孙海龙',
     image: 'https://placeholder.svg?height=200&width=300',
@@ -367,11 +378,11 @@ const fetchStudentCourses = async () => {
 };
 
 onMounted(() => {
-if (!userStore.isLoggedIn) {
-    // 处理未登录状态...
-    router.push('/login');
-    return;
-  } 
+// if (!userStore.isLoggedIn) {
+//     // 处理未登录状态...
+//     router.push('/login');
+//     return;
+//   } 
   // 获取用户信息
   fetchStudentInfo();
   

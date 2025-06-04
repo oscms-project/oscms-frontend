@@ -23,3 +23,8 @@ export function assignExercise(classId, data) {
 export function getClassAssignments(classId) {
   return axios.get(`/classes/${classId}/assignments`)
 }
+
+// 获取指定学生在某课程中的班级信息
+export function getStudentClassInCourse(userId, courseId) {
+  return axios.get(`/users/${userId}/courses/${courseId}/class`)
+}
