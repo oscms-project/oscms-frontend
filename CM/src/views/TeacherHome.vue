@@ -93,6 +93,8 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { useUserStore } from '@/stores/user';
+import { useRouter } from 'vue-router';
 import { getUser } from '@/api/user'
 import { getCourses, createCourse as apiCreateCourse } from '@/api/course'
 import BaseCarousel from '@/components/BaseCarousel.vue'
@@ -101,24 +103,28 @@ import BaseFooter from '@/components/BaseFooter.vue'
 import BaseWindow from '@/components/BaseWindow.vue'
 
 ///JWT解码函数
-function parseJwt(token) {
-  if (!token) return null;
-  const base64Url = token.split('.')[1];
-  if (!base64Url) return null;
-  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-  const jsonPayload = decodeURIComponent(
-    atob(base64)
-      .split('')
-      .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-      .join('')
-  );
-  return JSON.parse(jsonPayload);
-}
+// function parseJwt(token) {
+//   if (!token) return null;
+//   const base64Url = token.split('.')[1];
+//   if (!base64Url) return null;
+//   const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+//   const jsonPayload = decodeURIComponent(
+//     atob(base64)
+//       .split('')
+//       .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+//       .join('')
+//   );
+//   return JSON.parse(jsonPayload);
+// }
 
+const userStore = useUserStore();
+const router = useRouter(); // 添加路由器
 const teacherInfo = ref({
-  name: '',
-  id: '',
-  avatar: ''
+  // 使用store中的信息初始化
+  name: userStore.name,
+  id: userStore.userId,
+  avatar: userStore.avatar,
+  role: userStore.role
 });
 
 
@@ -146,41 +152,48 @@ function getUserId() {
 }
 
 // 获取教师信息
-//const fetchTeacherInfo = async () => {
-//  try {
-//    const userId = getUserId();
-//    if (!userId) {
-//       teacherInfo.value.name = '未登录';
-//       teacherInfo.value.id = '';
-//       return;
-//     }
-//     const res = await getUser(userId);
-//     if (res.data && res.data.data) {
-//       teacherInfo.value.name = res.data.data.username || res.data.data.name || '';
-//       teacherInfo.value.id = res.data.data.id || '';
-//       teacherInfo.value.avatar = res.data.data.avatar || '';
-//     }
-//   } catch (e) {
-//     teacherInfo.value.name = '未登录';
-//     teacherInfo.value.id = '';
-//   }
-// };
+const fetchTeacherInfo = async () => {
+  try {
+    if (!userStore.userId) {
+      teacherInfo.value.name = '未登录';
+      return;
+    }
+    const res = await getUser(userStore.userId);
+    if (res.data && res.data.data) {
+      const userData = res.data.data;
+      teacherInfo.value.name = userData.username || userData.name || '';
+      teacherInfo.value.avatar = userData.avatar || '';
+      
+      // 更新store
+      userStore.updateUserInfo({
+        name: userData.username || userData.name,
+        avatar: userData.avatar
+      });
+    }
+  } catch (e) {
+    console.error('获取教师信息失败', e);
+  }
+};
 
 // 获取教师教授的所有课程
 const fetchTeacherCourses = async () => {
   try {
     // 只查自己教授的课程
-    const res = await getCourses({ teacherId: getUserId() });
+  const res = await getCourses({ teacherId: userStore.userId });
     if (res.data && res.data.data) {
-      allCourses.value = res.data.data.map(c => ({
-        name: c.name,
-        code: c.code,
-        completed: c.completed, // 只展示未结课
-        image: 'https://placeholder.svg?height=200&width=300',
-        bgColor: '#2196f3'
+      allCourses.value = res.data.data.map(course => ({
+        name: course.name,
+        code: course.code,
+        image: course.image || 'https://placeholder.svg?height=200&width=300',
+        bgColor: course.bgColor || '#0a4d8c',
+        completed: course.completed || false,
+        id: course.id
       }));
+    } else {
+      allCourses.value = [];
     }
   } catch (e) {
+    console.error('获取课程失败', e);
     allCourses.value = [];
   }
 };
@@ -192,7 +205,8 @@ const createCourse = async () => {
     !newCourse.value.code ||
     !newCourse.value.outline ||
     !newCourse.value.assessment ||
-    !newCourse.value.chapters 
+    !newCourse.value.chapters
+
   ) {
     alert('请填写完整课程信息');
     return;
@@ -201,8 +215,12 @@ const createCourse = async () => {
     // 处理章节为数组
     const chaptersArr = newCourse.value.chapters
       .split(',')
-      .map(s => s.trim())
-      .filter(Boolean);
+     .map((s, index) => ({
+        title: s.trim(), // 章节名称
+        order: index + 1, // 章节序号，从1开始
+        //completed: false  // 默认未完成状态
+      }))
+      .filter(chapter => chapter.title); 
 
     const res = await apiCreateCourse({
       name: newCourse.value.name,
@@ -210,7 +228,7 @@ const createCourse = async () => {
       outline: newCourse.value.outline,
       assessment: newCourse.value.assessment,
       chapters: chaptersArr,
-      teacherId: getUserId()
+      teacherId: userStore.userId // 使用userStore而不是localStorage
     });
     if (res.data && (res.data.code === 200 || res.data.success)) {
       alert('课程创建成功！');
@@ -232,19 +250,13 @@ const createCourse = async () => {
 };
 
 onMounted(() => {
-  const token = localStorage.getItem('token');
-  const payload = parseJwt(token);
-  if (payload) {
-    teacherInfo.value.name = payload.username || payload.name || '';
-    teacherInfo.value.id = payload.userId || payload.id || '';
-    teacherInfo.value.avatar = payload.avatar || '';
-    teacherInfo.value.role = payload.role || '';
-  } else {
-    teacherInfo.value.name = '未登录';
-    teacherInfo.value.id = '';
-    teacherInfo.value.avatar = '';
-    teacherInfo.value.role = '';
+  // 不再需要解析token，直接使用store中信息
+  if (!userStore.isLoggedIn) {
+    // 处理未登录状态
+    router.push('/login');
+    return;
   }
+  fetchTeacherInfo();
   fetchTeacherCourses();
 });
 

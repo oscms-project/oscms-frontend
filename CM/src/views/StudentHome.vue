@@ -28,6 +28,7 @@
           :key="index"
           class="course-card"
           :style="{ backgroundColor: course.bgColor }"
+          @click="navigateToCourseDetail(course)"
         >
           <div class="course-image" :style="{ backgroundImage: `url(${course.image})` }">
             <h3 class="course-title">{{ course.title }}</h3>
@@ -118,8 +119,10 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-
-
+import { useUserStore } from '@/stores/user';
+import { useCourseStore } from '@/stores/course'
+import { useRouter } from 'vue-router';
+const router = useRouter();
 //api中封装的方法
 import { getUser, getUserCourses } from '@/api/user'
 import { getCourseDetail } from '@/api/course'
@@ -131,13 +134,35 @@ import BaseFooter from '@/components/BaseFooter.vue'
 import BaseWindow from '@/components/BaseWindow.vue';
 
 // 学生信息（初始为空，登录后获取）
+const userStore = useUserStore();
+const courseStore = useCourseStore()
 const studentInfo = ref({
-  name: '',
-  id: '',
-  avatar: ''
+  name: userStore.name,
+  id: userStore.userId,
+  avatar: userStore.avatar
 });
 
-
+// 课程详情页导航函数
+const navigateToCourseDetail = (course) => {
+  // 使用store保存课程ID而非路由参数
+  courseStore.setCurrentCourseId(course.id)
+  
+  // 跳转到简洁的URL，无需查询参数
+  router.push('/student/courses')
+};
+// function parseJwt(token) {
+//   if (!token) return null;
+//   const base64Url = token.split('.')[1];
+//   if (!base64Url) return null;
+//   const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+//   const jsonPayload = decodeURIComponent(
+//     atob(base64)
+//       .split('')
+//       .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+//       .join('')
+//   );
+//   return JSON.parse(jsonPayload);
+// }
 // 加入课程弹窗状态
 const showJoinCourseModal = ref(false);
 const courseCode = ref('');
@@ -170,6 +195,7 @@ const activeTab = ref(0);
 // 测试课程数据
 const testCourses = ref([
   {
+    id: 'test-os-001',
     title: '操作系统',
     teacher: '孙海龙',
     image: 'https://placeholder.svg?height=200&width=300',
@@ -284,22 +310,24 @@ function getUserId() {
 // 获取当前登录学生信息
 const fetchStudentInfo = async () => {
   try {
-    const userId = getUserId();
-    if (!userId) {
+    if (!userStore.userId) {
       studentInfo.value.name = '未登录';
-      studentInfo.value.id = '';
       return;
     }
-   // 使用api封装方法
-    const res = await getUser(userId);
+    const res = await getUser(userStore.userId);
     if (res.data && res.data.data) {
-      studentInfo.value.name = res.data.data.username|| '';
-      studentInfo.value.id = res.data.data.id || '';
-      studentInfo.value.avatar = res.data.data.avatar || '';
+      const userData = res.data.data;
+      studentInfo.value.name = userData.username || userData.name || '';
+      studentInfo.value.avatar = userData.avatar || '';
+      
+      // 更新store
+      userStore.updateUserInfo({
+        name: userData.username || userData.name,
+        avatar: userData.avatar
+      });
     }
   } catch (e) {
-    studentInfo.value.name = '未登录';
-    studentInfo.value.id = '';
+    console.error('获取学生信息失败', e);
   }
 };
 
@@ -307,8 +335,7 @@ const fetchStudentInfo = async () => {
 const fetchStudentCourses = async () => {
   try {
     // 1. 获取学生课程
-    const userId = getUserId();
-     const res = await getUserCourses(userId);
+    const res = await getUserCourses(userStore.userId);
     if (res.data && res.data.data) {
       // 组装课程数据
       realCourses.value = res.data.data.map(c => ({
@@ -351,7 +378,15 @@ const fetchStudentCourses = async () => {
 };
 
 onMounted(() => {
+// if (!userStore.isLoggedIn) {
+//     // 处理未登录状态...
+//     router.push('/login');
+//     return;
+//   } 
+  // 获取用户信息
   fetchStudentInfo();
+  
+  // 获取课程数据
   fetchStudentCourses();
 });
 

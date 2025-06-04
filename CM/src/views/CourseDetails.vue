@@ -45,10 +45,6 @@
       <div class="panel-header">
         <h2 class="panel-title">课程大纲</h2>
         <div class="panel-actions">
-          <button class="btn btn-sm btn-outline" @click="showOutlineEditModal = true">
-            <i class="i-lucide-download mr-1"></i>
-            导出大纲
-          </button>
           <button class="btn btn-sm btn-primary" @click="openOutlineEditor">
             <i class="i-lucide-edit mr-1"></i>
             编辑大纲
@@ -187,7 +183,6 @@
             </div>
           </div>
           <div class="chapter-content" v-if="chapter.expanded">
-            <p class="chapter-description">{{ chapter.description }}</p>
             <div class="chapter-sections">
               <div class="section-item" v-for="section in chapter.sections" :key="section.id">
                 <div class="section-header">
@@ -385,10 +380,6 @@
           <label for="chapterTitle">章节标题</label>
           <input type="text" id="chapterTitle" v-model="newChapter.title" placeholder="输入章节标题">
         </div>
-        <div class="form-group">
-          <label for="chapterDescription">章节描述</label>
-          <textarea id="chapterDescription" v-model="newChapter.description" placeholder="输入章节描述" rows="4"></textarea>
-        </div>
         <div class="form-actions">
           <button class="btn btn-default" @click="closeAddChapterModal">取消</button>
           <button class="btn btn-primary" @click="saveChapter">{{ editingChapter ? '保存' : '添加' }}</button>
@@ -476,11 +467,6 @@
             </div>
           </div>
         </div>
-        <div class="form-group">
-          <label for="resourceDescription">资源描述 (可选)</label>
-          <textarea id="resourceDescription" v-model="newResource.description" placeholder="输入资源描述" rows="3"></textarea>
-        </div>
-
         <div v-if="editingResource" class="form-group version-group">
           <div class="version-header">
             <label for="versionDescription">版本更新说明</label>
@@ -567,9 +553,8 @@
                       type="checkbox"
                       :value="cls.id"
                       v-model="resourcePermissions.selectedClasses"
-                      class="class-checkbox"
                     >
-                    <span class="class-name">{{ cls.name }}</span>
+                    {{ cls.name }}
                   </label>
                 </div>
               </div>
@@ -579,7 +564,7 @@
 
         <div class="form-actions">
           <button class="btn btn-default" @click="closeUploadResourceModal">取消</button>
-          <button class="btn btn-primary" @click="saveResource" :disabled="!canUpload">
+          <button class="btn btn-primary" @click="uploadResource">
             {{ editingResource ? '保存' : '上传' }}
           </button>
         </div>
@@ -949,10 +934,6 @@
           <label for="editChapterTitle">章节标题</label>
           <input type="text" id="editChapterTitle" v-model="editingChapter.title" placeholder="输入章节标题">
         </div>
-        <div class="form-group">
-          <label for="editChapterDescription">章节描述</label>
-          <textarea id="editChapterDescription" v-model="editingChapter.description" placeholder="输入章节描述" rows="4"></textarea>
-        </div>
         <div class="form-actions">
           <button class="btn btn-default" @click="closeEditChapterModal">取消</button>
           <button class="btn btn-primary" @click="updateChapter">保存</button>
@@ -971,37 +952,16 @@
         </button>
       </div>
       <div class="modal-body">
-        <div class="outline-sections">
-          <div v-for="(section, sectionIndex) in editingOutline" :key="sectionIndex" class="outline-edit-section">
-            <div class="section-edit-header">
-              <div class="form-group mb-0 flex-grow">
-                <input type="text" v-model="section.title" placeholder="章节标题" class="section-title-input">
-              </div>
-              <button class="btn-icon danger" @click="removeOutlineSection(sectionIndex)">
-                <i class="i-lucide-trash-2"></i>
-              </button>
-            </div>
-            <div class="form-group">
-              <textarea v-model="section.description" placeholder="章节描述" rows="2"></textarea>
-            </div>
-            <div class="points-list">
-              <div v-for="(point, pointIndex) in section.points" :key="pointIndex" class="point-item">
-                <input type="text" v-model="section.points[pointIndex]" placeholder="知识点">
-                <button class="btn-icon small" @click="removeOutlinePoint(sectionIndex, pointIndex)">
-                  <i class="i-lucide-x"></i>
-                </button>
-              </div>
-              <button class="btn btn-sm btn-outline" @click="addOutlinePoint(sectionIndex)">
-                <i class="i-lucide-plus mr-1"></i>
-                添加知识点
-              </button>
-            </div>
-          </div>
+        <div class="form-group">
+          <label for="outlineContent">课程大纲内容</label>
+          <textarea
+            id="outlineContent"
+            v-model="editingOutline"
+            class="form-control"
+            rows="15"
+            placeholder="请输入课程大纲内容"
+          ></textarea>
         </div>
-        <button class="btn btn-outline add-section-btn" @click="addOutlineSection">
-          <i class="i-lucide-plus mr-1"></i>
-          添加章节
-        </button>
         <div class="form-actions">
           <button class="btn btn-default" @click="closeOutlineEditModal">取消</button>
           <button class="btn btn-primary" @click="saveOutlineChanges">保存更改</button>
@@ -1015,6 +975,20 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
+// 添加 API 导入
+import {
+  getCourseDetails,
+  getCourseOutline,
+  updateCourseOutline,
+  getCourseResources,
+  uploadCourseResource,
+  getResourceVersions,
+  getResourceVersion,
+  updateCourseChapters,
+  getCourseClasses,
+  getClassStudents,
+  getClassAssignments
+} from '@/api/courseDetails'
 
 const router = useRouter();
 const route = useRoute()
@@ -1039,10 +1013,14 @@ const navigateToClassManagement = () => {
 };
 
 // Course information
+/*
 const courseName = ref('JavaSE');
 const courseStudents = ref('1968');
 const courseDuration = ref('2班');
-
+*/
+const courseName = ref('');
+const courseStudents = ref('');
+const courseDuration = ref('');
 // Tabs
 const tabs = [
   { id: 'outline', name: '课程大纲', icon: 'i-lucide-file-text' },
@@ -1053,6 +1031,7 @@ const tabs = [
 const activeTab = ref('resources');  // 默认显示课程资源页面
 
 // 课程大纲数据
+/*
 const courseOutline = ref([
   {
     title: '课程介绍',
@@ -1085,8 +1064,11 @@ const courseOutline = ref([
     ]
   }
 ]);
+*/
+const courseOutline = ref([]);
 
 // 课程资源数据
+/*
 const courseResources = ref([
   {
     id: 1,
@@ -1181,8 +1163,11 @@ const courseResources = ref([
     url: null
   }
 ]);
+*/
+const courseResources = ref([]);
 
 // 课程章节数据
+/*
 const courseChapters = ref([
   {
     id: 1,
@@ -1240,8 +1225,11 @@ const courseChapters = ref([
     ]
   }
 ]);
+*/
+const courseChapters = ref([]);
 
 // Exercises data with chapter information
+/*
 const exercises = ref([
   {
     id: 1,
@@ -1277,6 +1265,8 @@ const exercises = ref([
     chapter: '第3章：异常处理'
   }
 ]);
+*/
+const exercises = ref([]);
 
 // 模态框状态
 const showAddChapterModal = ref(false);
@@ -1307,7 +1297,6 @@ const newChapter = ref({
   id: null,
   number: '',
   title: '',
-  description: '',
   sections: []
 });
 
@@ -1423,12 +1412,12 @@ const filteredExercises = computed(() => {
 // 过滤后的资源列表
 const filteredResources = computed(() => {
   let result = courseResources.value;
-
+  
   // 应用类型筛选
   if (resourceTypeFilter.value) {
     result = result.filter(resource => resource.type === resourceTypeFilter.value);
   }
-
+  
   // 应用搜索筛选
   if (resourceSearchQuery.value) {
     const query = resourceSearchQuery.value.toLowerCase();
@@ -1467,7 +1456,7 @@ const toggleChapter = (chapterId) => {
 };
 
 // 添加/编辑章节
-const saveChapter = () => {
+const saveChapter = async () => {
   if (newChapter.value.number && newChapter.value.title) {
     if (editingChapter.value) {
       // 更新现有章节
@@ -1494,7 +1483,6 @@ const saveChapter = () => {
         id: newId,
         number: newChapter.value.number,
         title: newChapter.value.title,
-        description: newChapter.value.description,
         date: new Date().toLocaleString(),
         expanded: false,
         sections: []
@@ -1502,6 +1490,12 @@ const saveChapter = () => {
     }
 
     closeAddChapterModal();
+    
+    try {
+      await updateCourseChapters(route.params.id, courseChapters.value);
+    } catch (error) {
+      console.error('保存章节失败:', error);
+    }
   }
 };
 
@@ -1684,56 +1678,63 @@ const getFileType = (filename) => {
 };
 
 // 上传资源
-const uploadResource = () => {
+const uploadResource = async () => {
   if (newResource.value.title && selectedFile.value) {
     const newId = courseResources.value.length > 0
       ? Math.max(...courseResources.value.map(r => r.id)) + 1
       : 1;
 
-    // 在实际应用中，这里应该调用API上传文件到服务器
-    // 这里模拟上传成功后的处理
+    // 调用 API 上传文件到服务器
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile.value);
+      formData.append('title', newResource.value.title);
+      formData.append('type', newResource.value.type);
+      
+      await uploadCourseResource(route.params.id, formData);
+      await loadApiData(); // 重新加载资源列表
+    } catch (error) {
+      console.error('上传资源失败:', error);
+      
+      // API 调用失败时，使用本地处理逻辑作为备份
+      const fileUrl = URL.createObjectURL(selectedFile.value);
 
-    // 创建一个模拟的URL，实际应用中应该是服务器返回的URL
-    const fileUrl = URL.createObjectURL(selectedFile.value);
+      // 如果是代码文件，读取内容
+      if (newResource.value.type === 'code') {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const code = e.target.result;
 
-    // 如果是代码文件，读取内容
-    if (newResource.value.type === 'code') {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const code = e.target.result;
-
+          courseResources.value.push({
+            id: newId,
+            title: newResource.value.title,
+            type: newResource.value.type,
+            size: selectedFile.value.size,
+            uploadDate: new Date().toLocaleString(),
+            language: getLanguageFromExtension(selectedFile.value.name.split('.').pop().toLowerCase()),
+            code: code,
+            url: fileUrl,
+            permissions: resourcePermissions.value
+          });
+        };
+        reader.readAsText(selectedFile.value);
+      } else {
         courseResources.value.push({
           id: newId,
           title: newResource.value.title,
           type: newResource.value.type,
           size: selectedFile.value.size,
           uploadDate: new Date().toLocaleString(),
-          description: newResource.value.description,
-          language: getLanguageFromExtension(selectedFile.value.name.split('.').pop().toLowerCase()),
-          code: code,
           url: fileUrl,
           permissions: resourcePermissions.value
         });
-      };
-      reader.readAsText(selectedFile.value);
-    } else {
-      courseResources.value.push({
-        id: newId,
-        title: newResource.value.title,
-        type: newResource.value.type,
-        size: selectedFile.value.size,
-        uploadDate: new Date().toLocaleString(),
-        description: newResource.value.description,
-        url: fileUrl,
-        permissions: resourcePermissions.value
-      });
+      }
     }
 
     // 重置表单
     newResource.value = {
       title: '',
       type: 'pdf',
-      description: '',
       language: 'java',
       code: '',
       url: null
@@ -2010,7 +2011,6 @@ const closeAddChapterModal = () => {
     id: null,
     number: '',
     title: '',
-    description: '',
     sections: []
   };
 };
@@ -2107,6 +2107,7 @@ const handleClickOutside = (event) => {
 // 生命周期钩子
 onMounted(() => {
   document.addEventListener('click', handleClickOutside);
+  loadApiData(); // 加载 API 数据
 });
 
 onBeforeUnmount(() => {
@@ -2115,13 +2116,18 @@ onBeforeUnmount(() => {
 
 // 在 script setup 部分添加以下方法
 const openOutlineEditor = () => {
-  editingOutline.value = JSON.parse(JSON.stringify(courseOutline.value));
+  editingOutline.value = courseOutline.value;
   showOutlineEditModal.value = true;
 };
 
-const saveOutlineChanges = () => {
-  courseOutline.value = editingOutline.value;
-  showOutlineEditModal.value = false;
+const saveOutlineChanges = async () => {
+  try {
+    await updateCourseOutline(route.params.id, editingOutline.value);
+    courseOutline.value = editingOutline.value;
+    showOutlineEditModal.value = false;
+  } catch (error) {
+    console.error('保存大纲失败:', error);
+  }
 };
 
 const addOutlinePoint = (sectionIndex) => {
@@ -2336,6 +2342,45 @@ const updateTotalScore = () => {
 
 const selectedQuestionType = ref(null);
 const questionSearchQuery = ref('');
+
+// 添加 API 数据加载函数
+const loadApiData = async () => {
+  try {
+    // 获取课程基本信息
+    const courseResponse = await getCourseDetails(route.params.id);
+    if (courseResponse.data) {
+      courseName.value = courseResponse.data.name;
+      courseStudents.value = courseResponse.data.studentCount;
+      courseDuration.value = courseResponse.data.duration;
+    }
+    
+    // 获取课程大纲
+    const outlineResponse = await getCourseOutline(route.params.id);
+    if (outlineResponse.data.outline) {
+      courseOutline.value = outlineResponse.data.outline;
+    }
+    
+    // 获取课程资源
+    const resourcesResponse = await getCourseResources(route.params.id);
+    if (resourcesResponse.data) {
+      courseResources.value = resourcesResponse.data;
+    }
+    
+    // 获取班级信息和作业
+    const classesResponse = await getCourseClasses(route.params.id);
+    if (classesResponse.data) {
+      const classes = classesResponse.data;
+      for (const classItem of classes) {
+        const assignmentsResponse = await getClassAssignments(classItem.id);
+        if (assignmentsResponse.data) {
+          exercises.value.push(...assignmentsResponse.data);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('加载数据失败:', error);
+  }
+};
 </script>
 
 <style scoped>
@@ -2344,6 +2389,7 @@ const questionSearchQuery = ref('');
   color: #333;
   background-color: #f8f9fa;
   min-height: 100vh;
+  overflow-y: auto;
 }
 
 .container {
@@ -3100,6 +3146,12 @@ const questionSearchQuery = ref('');
   max-width: 600px;
   max-height: 90vh;
   overflow-y: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+.modal-content::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
 }
 
 .modal-header {

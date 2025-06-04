@@ -5,9 +5,9 @@ export function getCourses(params) {
 }
 
 export function createCourse(data) {
-  return axios.post('/courses', data)
+  const { teacherId, ...courseData } = data;  // 分离teacherId和课程数据
+  return axios.post(`/courses?teacherId=${teacherId}`, courseData);  // teacherId作为查询参数
 }
-
 export function getCourseDetail(courseId) {
   return axios.get(`/courses/${courseId}`)
 }
