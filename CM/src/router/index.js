@@ -43,13 +43,6 @@ const routes = [
     name: 'TeacherProfile',
     component: () => import('@/views/TeacherProfile.vue')
   },
-  
-  {
-    path: '/exerciseList',
-    name: 'ExerciseList',
-    component: () => import('@/views/ExerciseList.vue'),
-    meta: { requiresAuth: true, role: 'student' }
-  },
   {
     path: '/exercise/:id',
     name: 'ExercisePage',

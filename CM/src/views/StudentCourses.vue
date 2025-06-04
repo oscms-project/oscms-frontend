@@ -110,20 +110,27 @@
         <div class="material-name">{{ material.filename }}</div>
         <div class="material-meta">
           <!-- 上传时间 -->
-          <span>上传时间：{{ material.updateAt }}</span>
+         <span>上传时间：{{ formatDate(material.updateAt) }}</span>
           <!-- 章节信息 -->
           <span v-if="material.chapterOrder">章节：{{ material.chapterOrder }}</span>
         </div>
       </div>
       <!-- 下载按钮链接到文件URL -->
-      <a 
+      <!-- <a 
         :href="material.url" 
         class="download-btn" 
         target="_blank" 
         :download="material.filename"
       >
         下载
-      </a>
+      </a> -->
+       <!-- 下载按钮链接到文件URL -->
+      <button 
+        class="download-btn" 
+        @click="downloadFile(material.url, material.filename)"
+      >
+        下载
+      </button>
     </div>
   </div>
 </div>
@@ -286,112 +293,79 @@ const fetchAllCourseInfo = async () => {
     loading.value = false;
   }
 };
+
+// 完善下载函数
+const downloadFile = (url, filename) => {
+  fetch(url)
+    .then(response => response.blob())
+    .then(blob => {
+      // 创建一个临时的URL对象
+      const fileURL = window.URL.createObjectURL(blob);
+      // 创建一个链接元素
+      const fileLink = document.createElement('a');
+      fileLink.href = fileURL;
+      fileLink.setAttribute('download', filename);
+      // 模拟点击下载
+      document.body.appendChild(fileLink);
+      fileLink.click();
+      // 清理
+      document.body.removeChild(fileLink);
+      window.URL.revokeObjectURL(fileURL);
+    })
+    .catch(error => {
+      console.error('下载文件失败:', error);
+      alert('下载文件失败，请稍后重试');
+    });
+};
+
+// 添加日期格式化函数
+const formatDate = (dateString) => {
+  console.log('格式化日期:', dateString);
+  if (!dateString) return '未知时间';
+  
+  try {
+    // 尝试解析日期字符串
+    const date = new Date(dateString);
+    
+    // 检查日期是否有效
+    if (isNaN(date.getTime())) {
+      return dateString; // 如果解析失败，返回原始字符串
+    }
+    
+    // 格式化为 YYYY-MM-DD HH:MM 格式
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  } catch (e) {
+    console.error('日期格式化失败:', e);
+    return dateString; // 出现异常时返回原始字符串
+  }
+};
+
+// 根据文件名确定图标
+const getFileIcon = (filename) => {
+  if (!filename) return '📁';
+  
+  const extension = filename.split('.').pop()?.toLowerCase();
+  switch (extension) {
+    case 'pdf': return '📄';
+    case 'doc':
+    case 'docx': return '📝';
+    case 'ppt':
+    case 'pptx': return '📊';
+    case 'xls':
+    case 'xlsx': return '📈';
+    case 'zip':
+    case 'rar': return '🗜️';
+    case 'jpg':
+    case 'jpeg':
+    case 'png':
+    case 'gif': return '🖼️';
+    default: return '📁';
+  }
+};
 onMounted(() => {
   fetchAllCourseInfo()
 })
-// const courseOutline = [
-//   {
-//     id: 1,
-//     chapter: '第一章',
-//     title: '操作系统概述',
-//     description: '介绍操作系统的基本概念、发展历史和主要功能',
-//     hours: '4学时',
-//     difficulty: '基础'
-//   },
-//   {
-//     id: 2,
-//     chapter: '第二章',
-//     title: '进程管理',
-//     description: '进程的概念、进程调度算法、进程同步与通信',
-//     hours: '8学时',
-//     difficulty: '中等'
-//   },
-//   {
-//     id: 3,
-//     chapter: '第三章',
-//     title: '内存管理',
-//     description: '内存分配策略、虚拟内存、页面置换算法',
-//     hours: '6学时',
-//     difficulty: '中等'
-//   }
-// ]
 
-// const courseChapters = [
-//   {
-//     id: 1,
-//     title: '第一章 操作系统概述',
-//     progress: 100,
-//     lessons: [
-//       { id: 1, title: '1.1 操作系统的概念', type: 'video', duration: '25分钟', completed: true },
-//       { id: 2, title: '1.2 操作系统的发展', type: 'video', duration: '30分钟', completed: true },
-//       { id: 3, title: '1.3 课后练习', type: 'document', duration: '15分钟', completed: true }
-//     ]
-//   },
-//   {
-//     id: 2,
-//     title: '第二章 进程管理',
-//     progress: 60,
-//     lessons: [
-//       { id: 4, title: '2.1 进程的概念', type: 'video', duration: '35分钟', completed: true },
-//       { id: 5, title: '2.2 进程调度', type: 'video', duration: '40分钟', completed: true },
-//       { id: 6, title: '2.3 进程同步', type: 'video', duration: '45分钟', completed: false }
-//     ]
-//   }
-// ]
-
-// const courseMaterials = [
-//   {
-//     id: 1,
-//     name: '操作系统概述.pdf',
-//     type: 'pdf',
-//     size: '2.5MB',
-//     uploadTime: '2024-01-15'
-//   },
-//   {
-//     id: 2,
-//     name: '进程管理课件.ppt',
-//     type: 'ppt',
-//     size: '5.2MB',
-//     uploadTime: '2024-01-20'
-//   },
-//   {
-//     id: 3,
-//     name: '实验指导书.pdf',
-//     type: 'pdf',
-//     size: '1.8MB',
-//     uploadTime: '2024-01-25'
-//   }
-// ]
-
-// const onlinePractices = [
-//   {
-//     id: 1,
-//     title: '第一章测试 - 操作系统基础概念',
-//     questionCount: 20,
-//     timeLimit: 30,
-//     bestScore: 85,
-//     attempts: 2,
-//     wrongCount: 3
-//   },
-//   {
-//     id: 2,
-//     title: '第二章测试 - 进程管理',
-//     questionCount: 25,
-//     timeLimit: 45,
-//     bestScore: 92,
-//     attempts: 1,
-//     wrongCount: 2
-//   },
-//   {
-//     id: 3,
-//     title: '综合练习 - 期中测试',
-//     questionCount: 50,
-//     timeLimit: 90,
-//     bestScore: 0,
-//     attempts: 0,
-//     wrongCount: 0
-//   }
-// ]
 </script>
 
 <style scoped>
@@ -868,5 +842,43 @@ onMounted(() => {
     flex: 1;
     min-width: auto;
   }
+}
+/* 添加到<style>部分 */
+.download-btn {
+  background-color: #1e88e5;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+  min-width: 70px;
+}
+
+.download-btn:hover {
+  background-color: #1565c0;
+}
+
+.material-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  background-color: #fff;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.material-info {
+  flex: 1;
+  margin: 0 15px;
+}
+
+.material-icon {
+  font-size: 24px;
+  width: 32px;
+  text-align: center;
 }
 </style>

@@ -526,7 +526,8 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
-
+import { useRouter } from 'vue-router'
+const router = useRouter()
 // 用户信息 - 使用模拟数据进行预览
 const user = ref({
     id: 'teacher123',
