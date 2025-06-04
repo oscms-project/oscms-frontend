@@ -152,7 +152,10 @@
         </div>
       </div>
       <div class="practice-actions">
-        <button class="action-btn primary">开始做题</button>
+        <button 
+          class="action-btn primary"
+          @click="startExercise(practice)"
+        >开始做题</button>
         <button class="action-btn secondary" :disabled="practice.wrongCount === 0">错题重做</button>
         <button class="action-btn tertiary" :disabled="practice.attempts === 0">查看上次记录</button>
       </div>
@@ -173,6 +176,9 @@ import { getMaterials } from '@/api/materials'
 import { getStudentClassInCourse } from '@/api/class'; // 新增
 // 添加这个导入
 import { getClassAssignments } from '@/api/class';
+import { useRouter } from 'vue-router';
+const router = useRouter();
+
 const userStore = useUserStore();
 const courseStore = useCourseStore() 
 const activeTab = ref('outline')
@@ -192,6 +198,14 @@ const tabs = [
   { key: 'materials', label: '课程资料' },
   { key: 'practice', label: '在线练习' }
 ]
+
+const startExercise = (practice) => {
+  // 使用store保存练习ID
+  courseStore.setCurrentExerciseId(practice.id);
+  
+  // 跳转到简洁的URL，无需查询参数
+  router.push('/exercise');
+};
 // 添加加载状态和错误处理
 const loading = ref(true);
 const error = ref('');
