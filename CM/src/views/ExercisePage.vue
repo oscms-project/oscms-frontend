@@ -47,8 +47,33 @@
       </div>
     </div>
 
+    <!-- 加载状态 -->
+    <div v-if="loading" class="flex items-center justify-center min-h-[60vh]">
+      <div class="text-center">
+        <svg class="animate-spin h-8 w-8 text-blue-500 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <p class="text-gray-600">正在加载练习内容...</p>
+      </div>
+    </div>
+
+    <!-- 错误状态 -->
+    <div v-else-if="error" class="flex items-center justify-center min-h-[60vh]">
+      <div class="text-center">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-red-500 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+        <p class="text-red-600 font-medium mb-2">加载失败</p>
+        <p class="text-gray-600">{{ error }}</p>
+        <button class="mt-4 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg" @click="fetchExerciseAndQuestions">
+          重试
+        </button>
+      </div>
+    </div>
+
     <!-- 练习内容 -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+    <div v-else class="bg-white rounded-lg shadow-md p-6 mb-6">
       <div class="flex justify-between items-center mb-6">
         <h1 class="text-2xl font-bold">{{ exercise.title }}</h1>
         <div class="text-sm text-gray-500">
@@ -70,9 +95,9 @@
       <!-- 选择题 -->
       <div v-if="exercise.type === 'choice'">
         <div v-for="(question, qIndex) in exercise.questions" :key="qIndex" class="mb-8">
-          <div class="mb-2 font-medium">{{ qIndex + 1 }}. {{ question.text }}</div>
+          <div class="mb-2 font-medium">{{ qIndex + 1 }}. {{ question.title }}</div>
           <div class="ml-4 space-y-2">
-            <div v-for="(option, oIndex) in question.options" :key="oIndex"
+            <div v-for="(option, oIndex) in question.choices" :key="oIndex"
               class="flex items-center p-3 rounded-lg cursor-pointer hover:bg-gray-50"
               :class="{ 'bg-green-50 border border-green-200': answers[qIndex] === oIndex }"
               @click="selectAnswer(qIndex, oIndex)">
@@ -89,13 +114,13 @@
       <!-- 编程题 -->
       <div v-if="exercise.type === 'programming'">
         <div v-for="(question, qIndex) in exercise.questions" :key="qIndex" class="mb-8">
-          <div class="mb-2 font-medium">{{ qIndex + 1 }}. {{ question.text }}</div>
+          <div class="mb-2 font-medium">{{ qIndex + 1 }}. {{ question.title }}</div>
           <div class="mb-2 text-sm text-gray-600">{{ question.description }}</div>
 
           <!-- 代码编辑器 -->
           <div class="border rounded-lg overflow-hidden">
             <div class="bg-gray-100 px-4 py-2 border-b flex justify-between items-center">
-              <span>{{ question.language }}</span>
+              <span>{{ question.language || 'JavaScript' }}</span>
               <div class="text-sm text-gray-500">请在此编写代码</div>
             </div>
             <textarea v-model="codeAnswers[qIndex]" class="w-full p-4 font-mono text-sm h-64 focus:outline-none"
@@ -126,100 +151,43 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
+import axios from 'axios';
 
-// 练习数据 - 使用模拟数据进行预览
+const router = useRouter();
+const route = useRoute();
+
+// 练习数据
 const exercise = ref({
-  id: 'ex-002',
-  title: '栈与队列实现',
-  type: 'programming',
-  totalPoints: 100,
-  timeLimit: 90, // 分钟
-  description: '本练习旨在测试您对栈和队列数据结构的理解和实现能力。请仔细阅读每个问题，并按照要求完成代码实现。',
-  questions: [
-    {
-      id: 'q1',
-      text: '实现一个栈（Stack）数据结构',
-      description: '请实现一个栈数据结构，包含push、pop、peek和isEmpty方法。',
-      language: 'JavaScript',
-      points: 50
-    },
-    {
-      id: 'q2',
-      text: '实现一个队列（Queue）数据结构',
-      description: '请实现一个队列数据结构，包含enqueue、dequeue、peek和isEmpty方法。',
-      language: 'JavaScript',
-      points: 50
-    }
-  ]
+  title: '',
+  type: '',
+  totalPoints: 0,
+  timeLimit: 0,
+  description: '',
+  questions: []
 });
 
-// 如果是选择题，则使用这个模拟数据
-if (window.location.search.includes('type=choice')) {
-  exercise.value = {
-    id: 'ex-001',
-    title: '数组与链表基础',
-    type: 'choice',
-    totalPoints: 100,
-    timeLimit: 60, // 分钟
-    description: '本练习测试您对数组和链表基础概念的理解。请选择每个问题的最佳答案。',
-    questions: [
-      {
-        id: 'q1',
-        text: '以下哪种数据结构支持常数时间的随机访问？',
-        options: ['数组', '链表', '栈', '队列'],
-        correctAnswer: 0,
-        points: 25
-      },
-      {
-        id: 'q2',
-        text: '链表的主要优点是什么？',
-        options: ['快速的随机访问', '内存分配的灵活性', '缓存友好性', '节省内存空间'],
-        correctAnswer: 1,
-        points: 25
-      },
-      {
-        id: 'q3',
-        text: '在最坏情况下，在数组中查找元素的时间复杂度是多少？',
-        options: ['O(1)', 'O(log n)', 'O(n)', 'O(n²)'],
-        correctAnswer: 2,
-        points: 25
-      },
-      {
-        id: 'q4',
-        text: '以下哪种操作在链表中比在数组中更高效？',
-        options: ['随机访问元素', '在开头插入元素', '在末尾插入元素', '按索引查找元素'],
-        correctAnswer: 1,
-        points: 25
-      }
-    ]
-  };
-}
+// 加载状态
+const loading = ref(true);
+const error = ref(null);
 
 // 答案状态
 const answers = ref([]);
 const codeAnswers = ref([]);
-import { useRouter } from 'vue-router'
-const router = useRouter();
-// 初始化答案数组
-if (exercise.value.type === 'choice') {
-  answers.value = new Array(exercise.value.questions.length).fill(null);
-} else if (exercise.value.type === 'programming') {
-  codeAnswers.value = new Array(exercise.value.questions.length).fill('');
-}
-
-// 选择答案
-const selectAnswer = (questionIndex, optionIndex) => {
-  answers.value[questionIndex] = optionIndex;
-};
 
 // 计时器相关
 const startTime = ref(Date.now());
 const elapsedTime = ref(0);
 const remainingTime = computed(() => {
-  if (!exercise.value.timeLimit) return 0;
+  if (!exercise.value?.timeLimit) return 0;
   const timeLimit = exercise.value.timeLimit * 60; // 转换为秒
   return Math.max(0, timeLimit - elapsedTime.value);
 });
+
+// 防作弊相关
+const showWarning = ref(false);
+const warningMessage = ref('');
+const warningCount = ref(0);
 
 // 格式化时间（秒 -> mm:ss）
 const formatTime = (seconds) => {
@@ -228,22 +196,62 @@ const formatTime = (seconds) => {
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
 
+// 获取练习数据和题目
+const fetchExerciseAndQuestions = async () => {
+  try {
+    loading.value = true;
+    const assignmentId = route.params.assignmentId;
+    
+    // 1. 获取练习基本信息
+    const exerciseResponse = await axios.get(`/api/assignments/${assignmentId}`);
+    if (exerciseResponse.data.code !== 200) {
+      throw new Error(exerciseResponse.data.message || '获取练习信息失败');
+    }
+    
+    // 2. 获取练习题目
+    const questionsResponse = await axios.get(`/api/assignments/${assignmentId}/questions`);
+    if (questionsResponse.data.code !== 200) {
+      throw new Error(questionsResponse.data.message || '获取题目失败');
+    }
+    
+    // 3. 合并数据
+    exercise.value = {
+      ...exerciseResponse.data.data,
+      questions: questionsResponse.data.data
+    };
+
+    // 4. 初始化答案数组
+    if (exercise.value.type === 'choice') {
+      answers.value = new Array(exercise.value.questions.length).fill(null);
+    } else if (exercise.value.type === 'programming') {
+      codeAnswers.value = new Array(exercise.value.questions.length).fill('');
+    }
+
+    error.value = null;
+  } catch (err) {
+    error.value = err.message || '加载练习数据失败';
+    console.error('Error fetching exercise:', err);
+  } finally {
+    loading.value = false;
+  }
+};
+
+// 选择答案
+const selectAnswer = (questionIndex, optionIndex) => {
+  answers.value[questionIndex] = optionIndex;
+};
+
 // 更新计时器
 let timerInterval;
 const updateTimer = () => {
   elapsedTime.value = Math.floor((Date.now() - startTime.value) / 1000);
 
   // 如果设置了时间限制且时间已到，自动提交
-  if (exercise.value.timeLimit && remainingTime.value <= 0) {
+  if (exercise.value?.timeLimit && remainingTime.value <= 0) {
     clearInterval(timerInterval);
     submitExercise();
   }
 };
-
-// 防作弊相关
-const showWarning = ref(false);
-const warningMessage = ref('');
-const warningCount = ref(0);
 
 // 检测页面失焦（切换标签页或窗口）
 const handleVisibilityChange = () => {
@@ -286,23 +294,34 @@ const dismissWarning = () => {
 // 确认退出
 const confirmExit = () => {
   if (confirm('确定要退出吗？未保存的进度将会丢失。')) {
-    router.push({ name: 'ExerciseList' })
-      .then(() => {
-        console.log('成功跳转到练习列表页面');
-      })
-      .catch(err => {
-        console.error('跳转失败:', err);
-      });
-  } else {
-    console.log('用户取消了退出操作');
+    router.push({ name: 'ExerciseList' });
   }
 };
 
 // 保存进度
-const saveProgress = () => {
-  // 在实际应用中，这里应该调用API保存进度
-  console.log('保存进度');
-  alert('进度已保存');
+const saveProgress = async () => {
+  try {
+    const assignmentId = route.params.assignmentId;
+    const classId = route.params.classId;
+    const submission = {
+      studentId: localStorage.getItem('userId'), // 假设用户ID存储在localStorage中
+      answers: exercise.value.questions.map((question, index) => ({
+        questionId: question.id,
+        response: exercise.value.type === 'choice' ? 
+          answers.value[index]?.toString() : 
+          codeAnswers.value[index]
+      }))
+    };
+    
+    const response = await axios.post(`/api/classes/${classId}/assignments/${assignmentId}/submissions`, submission);
+    if (response.data.code === 201) {
+      alert('进度已保存');
+    } else {
+      throw new Error(response.data.message);
+    }
+  } catch (err) {
+    alert('保存失败：' + (err.message || '未知错误'));
+  }
 };
 
 // 确认提交
@@ -313,16 +332,44 @@ const confirmSubmit = () => {
 };
 
 // 提交练习
-const submitExercise = () => {
-  // 在实际应用中，这里应该调用API提交答案
-  console.log('提交答案', exercise.value.type === 'choice' ? answers.value : codeAnswers.value);
-  alert('答案已提交');
-  router.push({ name: 'ExerciseFeedback', params: { id: exercise.id } })
-  
+const submitExercise = async () => {
+  try {
+    const assignmentId = route.params.assignmentId;
+    const classId = route.params.classId;
+    const submission = {
+      studentId: localStorage.getItem('userId'), // 假设用户ID存储在localStorage中
+      answers: exercise.value.questions.map((question, index) => ({
+        questionId: question.id,
+        response: exercise.value.type === 'choice' ? 
+          answers.value[index]?.toString() : 
+          codeAnswers.value[index]
+      }))
+    };
+    
+    const response = await axios.post(`/api/classes/${classId}/assignments/${assignmentId}/submissions`, submission);
+    if (response.data.code === 201) {
+      alert('答案已提交');
+      router.push({ 
+        name: 'ExerciseFeedback', 
+        params: { 
+          classId,
+          assignmentId,
+          submissionId: response.data.data.submissionId 
+        } 
+      });
+    } else {
+      throw new Error(response.data.message);
+    }
+  } catch (err) {
+    alert('提交失败：' + (err.message || '未知错误'));
+  }
 };
 
 // 组件挂载时
 onMounted(() => {
+  // 获取练习数据
+  fetchExerciseAndQuestions();
+  
   // 启动计时器
   timerInterval = setInterval(updateTimer, 1000);
 
