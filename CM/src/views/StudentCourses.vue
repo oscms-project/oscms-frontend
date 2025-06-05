@@ -327,31 +327,15 @@ const fetchAllCourseInfo = async () => {
 // 添加在script部分的ref引用列表中
 const selectedChapter = ref('all'); // 默认显示全部章节
 
-// 计算可用的章节列表，用于筛选器
-// 修改可用的章节列表，使用courseOutline中的chapter字段
+// 修改可用的章节列表，仅使用courseChapters中的章节
 const availableChapters = computed(() => {
-  // 从课程大纲中获取章节列表
-  const chaptersFromOutline = courseOutline.value.map(outline => ({
-    chapter: outline.chapter,
-    title: outline.title
-  }));
-
-  // 从资料中提取可能存在的其他章节
-  const chaptersFromMaterials = new Map();
-  courseMaterials.value.forEach(material => {
-    if (material.chapterOrder && !chaptersFromOutline.some(c => c.chapter === material.chapterOrder)) {
-      chaptersFromMaterials.set(material.chapterOrder, {
-        chapter: material.chapterOrder,
-        title: `第${material.chapterOrder}章`
-      });
-    }
-  });
-  
-  // 合并两个章节来源
-  return [
-    ...chaptersFromOutline,
-    ...Array.from(chaptersFromMaterials.values())
-  ].sort((a, b) => a.chapter - b.chapter); // 按章节序号排序
+  // 只从课程章节中获取章节列表
+  return courseChapters.value
+    .map(chapter => ({
+      chapter: chapter.order || chapter.chapterOrder, // 使用章节的序号
+      title: chapter.title
+    }))
+    .sort((a, b) => a.chapter - b.chapter); // 按章节序号排序
 });
 
 // 根据选中的章节过滤资料
