@@ -272,10 +272,12 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { getSubmissionDetail } from '@/api/assignment';
+import { getSubmissionDetail, getAssignmentQuestions } from '@/api/assignment';
+import { useCourseStore } from '@/stores/course';
 
 const route = useRoute();
 const router = useRouter();
+const courseStore = useCourseStore();
 
 const submissionId = route.params.id;
 const submission = ref(null);
@@ -305,10 +307,11 @@ const user = ref({
 });
 
 const exercise = computed(() => submission.value?.assignment || { questions: [] });
-
 onMounted(async () => {
     try {
         loading.value = true;
+        const assignmentId = courseStore.currentExerciseId;
+        const questions = await getAssignmentQuestions(assignmentId);
         const detail = await getSubmissionDetail(submissionId);
         submission.value = detail;
         // 可选：填充 user 信息
@@ -399,5 +402,10 @@ const formatDuration = (seconds) => {
 };
 const goBackToList = () => {
     router.push({ name: 'ExerciseList' });
+};
+
+const startExercise = (practice) => {
+    courseStore.setCurrentExerciseId(practice.id);
+    router.push('/exercise/:id');
 };
 </script>

@@ -243,7 +243,7 @@ const confirmSubmit = () => {
 // 提交练习
 const submitExercise = async () => {
   try {
-    const assignmentId = userStore.currentAssignmentId;
+    const assignmentId = userCourseStore.currentExerciseId;
     const classId = courseStore.currentClassId; // 假设班级id也在store里
     const studentId = userStore.userId;
 
@@ -276,7 +276,7 @@ onMounted(async () => {
   document.addEventListener('contextmenu', (e) => e.preventDefault());
 
   try{
-    const assignmentId = userStore.currentAssignmentId;
+    const assignmentId = useCourseStore.currentExerciseId;
     const questions = await getAssignmentQuestions(assignmentId);
     const exerciseId = courseStore.currentExerciseId;
     console.log('获取练习信息，ID:', exerciseId);
