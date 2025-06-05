@@ -52,7 +52,7 @@
       <div class="flex justify-between items-center mb-6">
         <h1 class="text-2xl font-bold">{{ exercise.title }}</h1>
         <div class="text-sm text-gray-500">
-          总分: {{ exercise.totalPoints }} 分
+          总分: {{ totalScore }} 分
         </div>
       </div>
 
@@ -67,40 +67,42 @@
         </div>
       </div>
 
-      <!-- 选择题 -->
-      <div v-if="exercise.type === 'choice'">
-        <div v-for="(question, qIndex) in exercise.questions" :key="qIndex" class="mb-8">
-          <div class="mb-2 font-medium">{{ qIndex + 1 }}. {{ question.text }}</div>
-          <div class="ml-4 space-y-2">
-            <div v-for="(option, oIndex) in question.options" :key="oIndex"
-              class="flex items-center p-3 rounded-lg cursor-pointer hover:bg-gray-50"
-              :class="{ 'bg-green-50 border border-green-200': answers[qIndex] === oIndex }"
-              @click="selectAnswer(qIndex, oIndex)">
-              <div class="w-6 h-6 rounded-full flex items-center justify-center border mr-2"
-                :class="{ 'bg-green-500 border-green-500 text-white': answers[qIndex] === oIndex, 'border-gray-300': answers[qIndex] !== oIndex }">
-                {{ ['A', 'B', 'C', 'D'][oIndex] }}
-              </div>
-              <div>{{ option }}</div>
-            </div>
+      <!-- 题目列表 -->
+      <div v-for="(question, qIndex) in exercise.questions" :key="question.id" class="mb-8">
+        <div class="flex justify-between items-start mb-2">
+          <div class="font-medium">
+            {{ qIndex + 1 }}. {{ question.title }}
+            <span class="text-sm text-gray-500 ml-2">({{ question.score }}分)</span>
+          </div>
+          <div class="text-sm text-gray-500">
+            {{ question.type === 'choice' ? '选择题' : '简答题' }}
           </div>
         </div>
-      </div>
 
-      <!-- 编程题 -->
-      <div v-if="exercise.type === 'programming'">
-        <div v-for="(question, qIndex) in exercise.questions" :key="qIndex" class="mb-8">
-          <div class="mb-2 font-medium">{{ qIndex + 1 }}. {{ question.text }}</div>
-          <div class="mb-2 text-sm text-gray-600">{{ question.description }}</div>
-
-          <!-- 代码编辑器 -->
-          <div class="border rounded-lg overflow-hidden">
-            <div class="bg-gray-100 px-4 py-2 border-b flex justify-between items-center">
-              <span>{{ question.language }}</span>
-              <div class="text-sm text-gray-500">请在此编写代码</div>
+        <!-- 选择题 -->
+        <div v-if="question.type === 'choice'" class="ml-4 space-y-2">
+          <div v-for="(choice, cIndex) in question.choices" :key="cIndex"
+            class="flex items-center p-3 rounded-lg cursor-pointer hover:bg-gray-50"
+            :class="{ 'bg-green-50 border border-green-200': answers[qIndex] === choice }"
+            @click="selectAnswer(qIndex, choice)">
+            <div class="w-6 h-6 rounded-full flex items-center justify-center border mr-2"
+              :class="{ 'bg-green-500 border-green-500 text-white': answers[qIndex] === choice, 'border-gray-300': answers[qIndex] !== choice }">
+              {{ choice }}
             </div>
-            <textarea v-model="codeAnswers[qIndex]" class="w-full p-4 font-mono text-sm h-64 focus:outline-none"
-              placeholder="在此编写代码..." @copy="detectCopy" @paste="detectPaste" @cut="detectCut"></textarea>
+            <div>{{ choice }}</div>
           </div>
+        </div>
+
+        <!-- 简答题 -->
+        <div v-if="question.type === 'short_answer'" class="mt-2">
+          <textarea
+            v-model="answers[qIndex]"
+            class="w-full p-4 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 min-h-[120px]"
+            :placeholder="'请在此输入答案...'"
+            @copy="detectCopy"
+            @paste="detectPaste"
+            @cut="detectCut"
+          ></textarea>
         </div>
       </div>
 
@@ -140,13 +142,21 @@ if (!userStore.token) {
 const exercise = ref({
     id: '',
     title: '',
-    type: '',
     questions: []
 });
 
 // 答案状态
 const answers = ref([]);
-const codeAnswers = ref([]);
+
+// 计算总分
+const totalScore = computed(() => {
+    return exercise.value.questions.reduce((total, q) => total + q.score, 0);
+});
+
+// 选择答案
+const selectAnswer = (questionIndex, choice) => {
+    answers.value[questionIndex] = choice;
+};
 
 // 加载练习数据
 const loadExerciseData = async () => {
@@ -168,26 +178,16 @@ const loadExerciseData = async () => {
         exercise.value = {
             id: exerciseId,
             questions,
-            type: questions[0]?.type || 'choice', // 根据第一题类型判断
-            title: '在线练习' // 可以从后端获取或设置默认值
+            title: '在线练习'
         };
 
         // 初始化答案数组
-        if (exercise.value.type === 'choice') {
-            answers.value = new Array(exercise.value.questions.length).fill(null);
-        } else if (exercise.value.type === 'programming') {
-            codeAnswers.value = new Array(exercise.value.questions.length).fill('');
-        }
+        answers.value = new Array(exercise.value.questions.length).fill('');
     } catch (error) {
         console.error('获取题目失败:', error.message);
         alert(error.message || '加载练习失败');
         router.push({ name: 'StudentCourses' });
     }
-};
-
-// 选择答案
-const selectAnswer = (questionIndex, optionIndex) => {
-  answers.value[questionIndex] = optionIndex;
 };
 
 // 计时器相关
@@ -287,12 +287,24 @@ const submitExercise = async () => {
             throw new Error('缺少必要的提交信息');
         }
 
+        // 检查是否所有题目都已作答
+        const unansweredQuestions = exercise.value.questions.reduce((acc, q, index) => {
+            if (!answers.value[index]) {
+                acc.push(index + 1);
+            }
+            return acc;
+        }, []);
+
+        if (unansweredQuestions.length > 0) {
+            if (!confirm(`第 ${unansweredQuestions.join(', ')} 题尚未作答，确定要提交吗？`)) {
+                return;
+            }
+        }
+
         // 构造 answers 数组
         const answersArr = exercise.value.questions.map((question, index) => ({
             questionId: question.id,
-            response: exercise.value.type === 'choice'
-                ? answers.value[index]?.toString()
-                : codeAnswers.value[index]
+            response: answers.value[index] || ''
         }));
 
         // 提交答案
