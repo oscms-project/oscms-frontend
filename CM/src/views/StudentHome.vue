@@ -235,7 +235,23 @@ const testCourses = ref([
 
 // 后端课程数据
 const realCourses = ref([]);
-
+const fetchStudentCoursesList = async () => {
+  try {
+    const res = await getUserCourses(userStore.userId);
+    if (res.data && res.data.data) {
+      realCourses.value = res.data.data.map(c => ({
+        id: c.id,
+        title: c.name,
+        teacher: c.teacherName || '未知教师',
+        image: c.image || 'https://placeholder.svg?height=200&width=300',
+        bgColor: '#2196f3',
+        type: c.completed ? 1 : 0 // 1: 已结课, 0: 进行中
+      }));
+    }
+  } catch (e) {
+    console.error('获取课程列表失败', e);
+  }
+};
 // 合并课程数据
 const courses = computed(() => [...testCourses.value, ...realCourses.value]);
 
@@ -344,7 +360,7 @@ const fetchStudentCourses = async () => {
     
     // 2. 清空之前的进度数据
     realStudentCourses.value = [];
-
+    
     // 3. 遍历每个班级，查作业完成情况
     for (const cls of studentClasses) {
       try {
@@ -375,7 +391,7 @@ onMounted(() => {
 //   } 
   // 获取用户信息
   fetchStudentInfo();
-  
+   fetchStudentCoursesList();
   // 获取课程数据
   fetchStudentCourses();
 });
