@@ -6,15 +6,18 @@ import axios from 'axios'
  * @returns {Promise<Array>} 题目数组
  */
 export function getAssignmentQuestions(assignmentId) {
+    if (!assignmentId) {
+        return Promise.reject(new Error('作业ID不能为空'));
+    }
     return axios
         .get(`/api/assignments/${assignmentId}/questions`)
         .then(res => {
             if (res.data && res.data.code === 200) {
-                return res.data.data
+                return res.data.data;
             } else {
-                throw new Error(res.data?.message || '获取题目失败')
+                throw new Error(res.data?.message || '获取题目失败');
             }
-        })
+        });
 }
 
 /**
@@ -42,15 +45,18 @@ export function submitAssignmentAnswers(classId, assignmentId, data) {
  * @returns {Promise<Object>} 提交详情对象
  */
 export function getSubmissionDetail(submissionId) {
+    if (!submissionId) {
+        return Promise.reject(new Error('提交ID不能为空'));
+    }
     return axios
-        .get(`/submissions/${submissionId}`)
+        .get(`/api/submissions/${submissionId}`)
         .then(res => {
             if (res.data && res.data.code === 200) {
-                return res.data.data
+                return res.data.data;
             } else {
-                throw new Error(res.data?.message || '获取提交详情失败')
+                throw new Error(res.data?.message || '获取提交详情失败');
             }
-        })
+        });
 }
 
 /**

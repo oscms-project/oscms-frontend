@@ -126,27 +126,64 @@ import { useRouter } from 'vue-router'
 import { getAssignmentQuestions, submitAssignmentAnswers } from '@/api/assignment'
 import { useCourseStore } from '@/stores/course';
 import { useUserStore } from '@/stores/user';
-const userStore = useUserStore();
-const courseStore = useCourseStore();
+
 const router = useRouter();
-// 练习数据 - 使用接口数据
+const courseStore = useCourseStore();
+const userStore = useUserStore();
+
+// 检查用户是否已登录
+if (!userStore.token) {
+    router.push({ name: 'Login' });
+}
+
+// 练习数据
 const exercise = ref({
-  id: 'ex-002',
-  title: '栈与队列实现',
-  type: 'programming',
-  questions: []
+    id: '',
+    title: '',
+    type: '',
+    questions: []
 });
 
 // 答案状态
 const answers = ref([]);
 const codeAnswers = ref([]);
 
-// 初始化答案数组
-if (exercise.value.type === 'choice') {
-  answers.value = new Array(exercise.value.questions.length).fill(null);
-} else if (exercise.value.type === 'programming') {
-  codeAnswers.value = new Array(exercise.value.questions.length).fill('');
-}
+// 加载练习数据
+const loadExerciseData = async () => {
+    try {
+        const exerciseId = courseStore.currentExerciseId;
+        console.log('获取练习信息，ID:', exerciseId);
+        
+        // 检查是否有有效的练习ID
+        if (!exerciseId) {
+            throw new Error('未找到练习信息');
+        }
+
+        const questions = await getAssignmentQuestions(exerciseId);
+        
+        if (!questions || !Array.isArray(questions)) {
+            throw new Error('获取题目失败');
+        }
+
+        exercise.value = {
+            id: exerciseId,
+            questions,
+            type: questions[0]?.type || 'choice', // 根据第一题类型判断
+            title: '在线练习' // 可以从后端获取或设置默认值
+        };
+
+        // 初始化答案数组
+        if (exercise.value.type === 'choice') {
+            answers.value = new Array(exercise.value.questions.length).fill(null);
+        } else if (exercise.value.type === 'programming') {
+            codeAnswers.value = new Array(exercise.value.questions.length).fill('');
+        }
+    } catch (error) {
+        console.error('获取题目失败:', error.message);
+        alert(error.message || '加载练习失败');
+        router.push({ name: 'StudentCourses' });
+    }
+};
 
 // 选择答案
 const selectAnswer = (questionIndex, optionIndex) => {
@@ -241,63 +278,55 @@ const confirmSubmit = () => {
 
 // 提交练习
 const submitExercise = async () => {
-  try {
-    const assignmentId = userCourseStore.currentExerciseId;
-    const classId = courseStore.currentClassId; // 假设班级id也在store里
-    const studentId = userStore.userId;
+    try {
+        const assignmentId = courseStore.currentExerciseId;
+        const classId = courseStore.currentClassId;
+        const studentId = userStore.userId;
 
-    // 构造 answers 数组
-    const answersArr = exercise.value.questions.map((question, index) => ({
-      questionId: question.id,
-      response: exercise.value.type === 'choice'
-        ? answers.value[index]?.toString()
-        : codeAnswers.value[index]
-    }))
+        if (!assignmentId || !classId || !studentId) {
+            throw new Error('缺少必要的提交信息');
+        }
 
-    // 提交答案，后端返回 submissionId
-    const result = await submitAssignmentAnswers(classId, assignmentId, { studentId, answers: answersArr })
-    const submissionId = result.submissionId 
-    courseStore.setCurrentSubmissionId(submissionId); // 存到 store
-    router.push({ name: 'ExerciseFeedback' }); // 跳转时不带 id
-  } catch (e) {
-    alert(e.message || '提交失败')
-  }
-}
+        // 构造 answers 数组
+        const answersArr = exercise.value.questions.map((question, index) => ({
+            questionId: question.id,
+            response: exercise.value.type === 'choice'
+                ? answers.value[index]?.toString()
+                : codeAnswers.value[index]
+        }));
+
+        // 提交答案
+        const result = await submitAssignmentAnswers(classId, assignmentId, {
+            studentId,
+            answers: answersArr
+        });
+
+        if (!result?.submissionId) {
+            throw new Error('提交失败：未获取到提交ID');
+        }
+
+        // 存储提交ID并跳转
+        courseStore.setCurrentSubmissionId(result.submissionId);
+        router.push({ name: 'ExerciseFeedback' });
+    } catch (error) {
+        console.error('提交失败:', error);
+        alert(error.message || '提交失败');
+    }
+};
 
 // 组件挂载时
 onMounted(async () => {
-  // 启动计时器
-  timerInterval = setInterval(updateTimer, 1000);
+    // 启动计时器
+    timerInterval = setInterval(updateTimer, 1000);
 
-  // 添加页面可见性变化事件监听
-  document.addEventListener('visibilitychange', handleVisibilityChange);
+    // 添加页面可见性变化事件监听
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
-  // 禁用右键菜单
-  document.addEventListener('contextmenu', (e) => e.preventDefault());
+    // 禁用右键菜单
+    document.addEventListener('contextmenu', (e) => e.preventDefault());
 
-  try{
-    const assignmentId = useCourseStore.currentExerciseId;
-    const questions = await getAssignmentQuestions(assignmentId);
-    const exerciseId = courseStore.currentExerciseId;
-    console.log('获取练习信息，ID:', exerciseId);
-    // 检查是否有有效的练习ID
-    if (!exerciseId) {
-      console.error('未找到练习ID');
-      alert('未找到练习信息');
-      router.push('/student/courses'); // 返回课程页面
-      return;
-    }
-    exercise.value = {
-      questions
-    }
-    if (exercise.value.type === 'choice') {
-      answers.value = new Array(exercise.value.questions.length).fill(null);
-    } else if (exercise.value.type === 'programming') {
-      codeAnswers.value = new Array(exercise.value.questions.length).fill('');
-    }
-  } catch (e) {
-    console.error('获取题目失败:', e.message || '请求失败')
-  }
+    // 加载练习数据
+    await loadExerciseData();
 });
 
 // 组件卸载时

@@ -285,10 +285,17 @@ import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { getSubmissionDetail, getAssignmentQuestions } from '@/api/assignment';
 import { useCourseStore } from '@/stores/course';
+import { useUserStore } from '@/stores/user';
 
 const route = useRoute();
 const router = useRouter();
 const courseStore = useCourseStore();
+const userStore = useUserStore();
+
+// 检查用户是否已登录
+if (!userStore.token) {
+    router.push({ name: 'Login' });
+}
 
 const submissionId = courseStore.currentSubmissionId;
 const submission = ref(null);
@@ -320,10 +327,25 @@ const user = ref({
 const exercise = computed( () => submission.value?.assignment || { questions: [] });
 onMounted(async () => {
     try {
+        if (!submissionId) {
+            throw new Error('提交ID不存在');
+        }
+
         loading.value = true;
         const assignmentId = courseStore.currentExerciseId;
-        const questions = await getAssignmentQuestions(assignmentId);
-        const detail = await getSubmissionDetail(submissionId);
+        if (!assignmentId) {
+            throw new Error('练习ID不存在');
+        }
+
+        const [questions, detail] = await Promise.all([
+            getAssignmentQuestions(assignmentId),
+            getSubmissionDetail(submissionId)
+        ]);
+
+        if (!detail || !detail.assignment) {
+            throw new Error('无法获取提交详情');
+        }
+
         submission.value = detail;
         // 可选：填充 user 信息
         if (detail.student) {
@@ -339,6 +361,7 @@ onMounted(async () => {
         }
     } catch (e) {
         showMessage(e.message || '加载失败');
+        router.push({ name: 'StudentCourses' });
     } finally {
         loading.value = false;
     }
@@ -399,6 +422,10 @@ const toggleBookmark = (questionIndex) => {
 };
 
 const retryIncorrectQuestions = () => {
+    if (!exercise.value?.id) {
+        showMessage('练习信息不完整');
+        return;
+    }
     showMessage('开始错题重做');
     courseStore.setRetryInfo(exercise.value.id, submissionId);
     router.push({ name: 'IncorrectQuestionsRetry' });

@@ -242,6 +242,11 @@ onMounted(async () => {
         // 从 store 获取练习ID和提交ID
         const exerciseId = courseStore.retryExerciseId;
         const submissionId = courseStore.retrySubmissionId;
+
+        // 验证ID是否存在
+        if (!exerciseId || !submissionId) {
+            throw new Error('练习信息不完整');
+        }
         
         // 获取练习详情和提交详情
         const [questions, submission] = await Promise.all([
@@ -249,6 +254,10 @@ onMounted(async () => {
             getSubmissionDetail(submissionId)
         ]);
         
+        if (!submission?.assignment) {
+            throw new Error('无法获取练习信息');
+        }
+
         exercise.value = {
             ...submission.assignment,
             questions
@@ -256,7 +265,7 @@ onMounted(async () => {
         previousSubmission.value = submission;
     } catch (error) {
         showMessage(error.message || '加载失败');
-        router.push({ name: 'studentCourse' });
+        router.push({ name: 'StudentCourses' });
     } finally {
         loading.value = false;
     }

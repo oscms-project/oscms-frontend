@@ -312,6 +312,7 @@ const fetchAllCourseInfo = async () => {
         title: '课程大纲',
         description: res.data.data.outline
       }
+      
     ];
   } else if (Array.isArray(res.data.data.outline)) {
     // 如果已经是数组，直接使用
