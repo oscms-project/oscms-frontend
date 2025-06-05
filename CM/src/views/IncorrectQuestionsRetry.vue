@@ -190,8 +190,13 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { useRouter } from 'vue-router'
-const router = useRouter()
+import { useRouter } from 'vue-router';
+import { useCourseStore } from '@/stores/course';
+import { getSubmissionDetail, getAssignmentQuestions } from '@/api/assignment';
+
+const router = useRouter();
+const courseStore = useCourseStore();
+
 // 用户信息 - 使用模拟数据进行预览
 const user = ref({
     id: '12345',
@@ -221,177 +226,45 @@ const showMessage = (message) => {
     }, 2000);
 };
 
-// 练习数据 - 使用模拟数据进行预览
-const exercise = ref({
-    id: 'ex-001',
-    title: '数组与链表基础',
-    type: 'choice',
-    totalPoints: 100,
-    questions: [
-        {
-            id: 'q1',
-            text: '以下哪种数据结构支持常数时间的随机访问？',
-            options: ['数组', '链表', '栈', '队列'],
-            correctAnswer: 0,
-            points: 25,
-            explanation: '数组支持常数时间O(1)的随机访问，因为可以通过索引直接计算内存地址。链表需要从头遍历，栈和队列只能按特定顺序访问元素。'
-        },
-        {
-            id: 'q2',
-            text: '链表的主要优点是什么？',
-            options: ['快速的随机访问', '内存分配的灵活性', '缓存友好性', '节省内存空间'],
-            correctAnswer: 1,
-            points: 25,
-            explanation: '链表的主要优点是内存分配的灵活性，它可以动态地分配内存，不需要连续的内存空间。这使得插入和删除操作更加高效。'
-        },
-        {
-            id: 'q3',
-            text: '在最坏情况下，在数组中查找元素的时间复杂度是多少？',
-            options: ['O(1)', 'O(log n)', 'O(n)', 'O(n²)'],
-            correctAnswer: 2,
-            points: 25,
-            explanation: '在未排序的数组中查找元素，最坏情况下需要遍历整个数组，时间复杂度为O(n)。如果数组已排序，可以使用二分查找，时间复杂度为O(log n)。'
-        },
-        {
-            id: 'q4',
-            text: '以下哪种操作在链表中比在数组中更高效？',
-            options: ['随机访问元素', '在开头插入元素', '在末尾插入元素', '按索引查找元素'],
-            correctAnswer: 1,
-            points: 25,
-            explanation: '在链表开头插入元素的时间复杂度是O(1)，而在数组开头插入元素需要将所有元素向后移动，时间复杂度为O(n)。'
-        }
-    ]
-});
-
-// 如果是编程题，则使用这个模拟数据
-if (window.location.search.includes('type=programming')) {
-    exercise.value = {
-        id: 'ex-002',
-        title: '栈与队列实现',
-        type: 'programming',
-        totalPoints: 100,
-        questions: [
-            {
-                id: 'q1',
-                text: '实现一个栈（Stack）数据结构',
-                description: '请实现一个栈数据结构，包含push、pop、peek和isEmpty方法。',
-                language: 'JavaScript',
-                points: 50,
-                testResults: [
-                    {
-                        name: '基本操作测试',
-                        input: 'push(1), push(2), peek()',
-                        expectedOutput: '2',
-                        actualOutput: '2',
-                        passed: true
-                    },
-                    {
-                        name: 'pop操作测试',
-                        input: 'push(1), push(2), pop(), pop()',
-                        expectedOutput: '1',
-                        actualOutput: '1',
-                        passed: true
-                    },
-                    {
-                        name: '空栈测试',
-                        input: 'isEmpty()',
-                        expectedOutput: 'true',
-                        actualOutput: 'true',
-                        passed: true
-                    }
-                ]
-            },
-            {
-                id: 'q2',
-                text: '实现一个队列（Queue）数据结构',
-                description: '请实现一个队列数据结构，包含enqueue、dequeue、peek和isEmpty方法。',
-                language: 'JavaScript',
-                points: 50,
-                testResults: [
-                    {
-                        name: '基本操作测试',
-                        input: 'enqueue(1), enqueue(2), peek()',
-                        expectedOutput: '1',
-                        actualOutput: '1',
-                        passed: true
-                    },
-                    {
-                        name: 'dequeue操作测试',
-                        input: 'enqueue(1), enqueue(2), dequeue()',
-                        expectedOutput: '1',
-                        actualOutput: '1',
-                        passed: true
-                    },
-                    {
-                        name: '空队列测试',
-                        input: 'isEmpty()',
-                        expectedOutput: 'true',
-                        actualOutput: 'false',
-                        passed: false
-                    }
-                ]
-            }
-        ]
-    };
+// 检查是否有重做信息
+if (!courseStore.retryExerciseId || !courseStore.retrySubmissionId) {
+    router.push({ name: 'StudentCourses' });
 }
 
-// 上次提交的答案 - 使用模拟数据进行预览
-const previousSubmission = ref({
-    answers: [0, 0, 3, 1], // 选择题答案，其中第2题和第3题是错的
-    codeAnswers: [
-        `class Stack {
-    constructor() {
-      this.items = [];
+// 获取练习和提交信息
+const exercise = ref({});
+const previousSubmission = ref({});
+const loading = ref(true);
+
+onMounted(async () => {
+    try {
+        loading.value = true;
+        // 从 store 获取练习ID和提交ID
+        const exerciseId = courseStore.retryExerciseId;
+        const submissionId = courseStore.retrySubmissionId;
+        
+        // 获取练习详情和提交详情
+        const [questions, submission] = await Promise.all([
+            getAssignmentQuestions(exerciseId),
+            getSubmissionDetail(submissionId)
+        ]);
+        
+        exercise.value = {
+            ...submission.assignment,
+            questions
+        };
+        previousSubmission.value = submission;
+    } catch (error) {
+        showMessage(error.message || '加载失败');
+        router.push({ name: 'studentCourse' });
+    } finally {
+        loading.value = false;
     }
-    
-    push(element) {
-      this.items.push(element);
-    }
-    
-    pop() {
-      if (this.isEmpty()) {
-        return "Underflow";
-      }
-      return this.items.pop();
-    }
-    
-    peek() {
-      if (this.isEmpty()) {
-        return "No elements in Stack";
-      }
-      return this.items[this.items.length - 1];
-    }
-    
-    isEmpty() {
-      return this.items.length === 0;
-    }
-  }`,
-        `class Queue {
-    constructor() {
-      this.items = [];
-    }
-    
-    enqueue(element) {
-      this.items.push(element);
-    }
-    
-    dequeue() {
-      if (this.isEmpty()) {
-        return "Underflow";
-      }
-      return this.items.shift();
-    }
-    
-    peek() {
-      if (this.isEmpty()) {
-        return "No elements in Queue";
-      }
-      return this.items[0];
-    }
-    
-    // 这里忘记实现isEmpty方法
-  }`
-    ] // 编程题答案，其中第2题是错的
+});
+
+// 组件卸载时清除重做信息
+onUnmounted(() => {
+    courseStore.clearRetryInfo();
 });
 
 // 错误题目索引
@@ -493,8 +366,7 @@ const submitAnswers = () => {
 
 // 返回反馈页面
 const goBackToFeedback = () => {
-    // 在实际应用中，这里应该跳转回练习反馈页面
-    router.push({ name: 'ExerciseFeedback', params: { id: exercise.id } })
+    router.push({ name: 'ExerciseFeedback' });
 };
 
 // 确认退出
@@ -582,7 +454,6 @@ onMounted(() => {
 onUnmounted(() => {
     // 清除计时器
     clearInterval(timerInterval);
-
     // 移除事件监听
     document.removeEventListener('visibilitychange', handleVisibilityChange);
     window.removeEventListener('blur', handleWindowBlur);

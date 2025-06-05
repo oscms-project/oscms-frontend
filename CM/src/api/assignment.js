@@ -43,7 +43,7 @@ export function submitAssignmentAnswers(classId, assignmentId, data) {
  */
 export function getSubmissionDetail(submissionId) {
     return axios
-        .get(`/api/submissions/${submissionId}`)
+        .get(`/submissions/${submissionId}`)
         .then(res => {
             if (res.data && res.data.code === 200) {
                 return res.data.data
@@ -60,7 +60,7 @@ export function getSubmissionDetail(submissionId) {
  */
 export function getQuestionBank(params = {}) {
     return axios
-        .get('/api/questions', { params })
+        .get('/questions', { params })
         .then(res => {
             if (res.data && res.data.code === 200) {
                 return res.data.data
@@ -78,7 +78,7 @@ export function getQuestionBank(params = {}) {
  */
 export function importQuestionsToAssignment(assignmentId, questionIds) {
     return axios
-        .post(`/api/assignments/${assignmentId}/questions`, { ids: questionIds })
+        .post(`/assignments/${assignmentId}/questions`, { ids: questionIds })
         .then(res => {
             if (res.data && res.data.code === 200) {
                 return res.data.data
@@ -96,7 +96,7 @@ export function importQuestionsToAssignment(assignmentId, questionIds) {
  */
 export function createAssignment(classId, assignmentData) {
     return axios
-        .post(`/api/classes/${classId}/assignments`, assignmentData)
+        .post(`/classes/${classId}/assignments`, assignmentData)
         .then(res => {
             if (res.data && res.data.code === 201) {
                 return res.data.data
@@ -114,7 +114,7 @@ export function createAssignment(classId, assignmentData) {
  */
 export function getAssignmentSubmissions(classId, assignmentId) {
     return axios
-        .get(`/api/classes/${classId}/assignments/${assignmentId}/submissions`)
+        .get(`/classes/${classId}/assignments/${assignmentId}/submissions`)
         .then(res => {
             if (res.data && res.data.code === 200) {
                 return res.data.data;
@@ -132,7 +132,7 @@ export function getAssignmentSubmissions(classId, assignmentId) {
  */
 export function gradeSubmission(submissionId, grades) {
     return axios
-        .put(`/api/submissions/${submissionId}/grade`, { grades })
+        .put(`/submissions/${submissionId}/grade`, { grades })
         .then(res => {
             if (res.data && res.data.code === 200) {
                 return res.data.data;

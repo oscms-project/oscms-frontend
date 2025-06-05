@@ -400,7 +400,8 @@ const toggleBookmark = (questionIndex) => {
 
 const retryIncorrectQuestions = () => {
     showMessage('开始错题重做');
-    router.push({ name: 'IncorrectQuestionsRetry', params: { id: exercise.value.id } });
+    courseStore.setRetryInfo(exercise.value.id, submissionId);
+    router.push({ name: 'IncorrectQuestionsRetry' });
 };
 
 const formatDateTime = (dateTimeStr) => {

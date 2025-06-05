@@ -56,7 +56,7 @@ const routes = [
     meta: { requiresAuth: true, role: 'student' }
   },
   {
-    path: '/retry/:id',
+    path: '/retry',
     name: 'IncorrectQuestionsRetry',
     component: () => import('@/views/IncorrectQuestionsRetry.vue'),
     meta: { requiresAuth: true, role: 'student' }
