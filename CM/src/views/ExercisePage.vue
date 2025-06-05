@@ -275,7 +275,7 @@ onMounted(async () => {
   // 禁用右键菜单
   document.addEventListener('contextmenu', (e) => e.preventDefault());
 
-  try {
+  try{
     const assignmentId = userStore.currentAssignmentId;
     const questions = await getAssignmentQuestions(assignmentId);
     const exerciseId = courseStore.currentExerciseId;
