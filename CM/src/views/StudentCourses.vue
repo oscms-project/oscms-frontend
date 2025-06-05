@@ -250,12 +250,7 @@ function setCurrentSubmissionId(id) {
   currentSubmissionId.value = id;
 }
 
-export const useCourseStore = () => {
-  return {
-    currentSubmissionId,
-    setCurrentSubmissionId,
-  };
-};
+
 // 假设班级ID可以从课程详情或其他API获得，这里先用courseId代替
 const tabs = [
   { key: 'outline', label: '课程大纲' },
