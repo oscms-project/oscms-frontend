@@ -218,7 +218,7 @@ const createCourse = async () => {
     // 处理章节为数组
     // 处理章节为数组 - 优化版本
 const chaptersArr = newCourse.value.chapters
-  .split(',')
+  .split(','||'，') // 支持英文和中文逗号分隔
   .map(s => s.trim()) // 先清除每个章节的前后空格
   .filter(title => title.length > 0) // 过滤掉空章节名
   .map((title, index) => ({

@@ -127,7 +127,7 @@
         <div class="material-name">{{ material.filename }}</div>
         <div class="material-meta">
           <!-- 上传时间 -->
-         <span>上传时间：{{ formatDate(material.updatedAt) }}</span>
+         <span>上传时间：{{ material.updatedAt }}</span>
           <!-- 章节信息 -->
           <span v-if="material.chapterOrder">章节：{{ material.chapterOrder }}</span>
         </div>
@@ -173,8 +173,16 @@
           class="action-btn primary"
           @click="startExercise(practice)"
         >开始做题</button>
-        <button class="action-btn secondary" :disabled="practice.wrongCount === 0">错题重做</button>
-        <button class="action-btn tertiary" :disabled="practice.attempts === 0">查看上次记录</button>
+        <button 
+          class="action-btn secondary" 
+          :disabled="practice.wrongCount === 0"
+          @click="retryWrongQuestions(practice)"
+        >错题重做</button>
+        <button 
+          class="action-btn tertiary" 
+          :disabled="practice.attempts === 0"
+          @click="viewLastRecord(practice)"
+  >查看上次练习记录</button>
       </div>
     </div>
   </div>
@@ -222,6 +230,26 @@ const startExercise = (practice) => {
   
   // 跳转到简洁的URL，无需查询参数
   router.push('/exercise/:id');
+};
+const retryWrongQuestions = (practice) => {
+  // 确保只有当有错题时才能点击
+  if (practice.wrongCount === 0) return;
+  
+  // 使用store保存练习ID
+  courseStore.setCurrentExerciseId(practice.id);
+  
+  // 跳转到错题重做页面，使用纯路径
+  router.push('/retry/:id');
+};
+const viewLastRecord = (practice) => {
+  // 确保只有当有练习记录时才能点击
+  if (practice.attempts === 0) return;
+  
+  // 使用store保存练习ID
+  courseStore.setCurrentExerciseId(practice.id);
+  
+  // 跳转到练习反馈页面，使用纯路径
+  router.push(`/feedback/:id`);
 };
 // 添加加载状态和错误处理
 const loading = ref(true);
@@ -332,7 +360,7 @@ const availableChapters = computed(() => {
   // 只从课程章节中获取章节列表
   return courseChapters.value
     .map(chapter => ({
-      chapter: chapter.order || chapter.chapterOrder, // 使用章节的序号
+      chapter: chapter.order , // 使用章节的序号
       title: chapter.title
     }))
     .sort((a, b) => a.chapter - b.chapter); // 按章节序号排序
