@@ -168,7 +168,6 @@ const formatTime = (seconds) => {
   const secs = Math.floor(seconds % 60);
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
-
 // 更新计时器
 let timerInterval;
 const updateTimer = () => {
@@ -255,10 +254,11 @@ const submitExercise = async () => {
         : codeAnswers.value[index]
     }))
 
-    await submitAssignmentAnswers(classId, assignmentId, { studentId, answers: answersArr })
-
-    alert('答案已提交')
-    router.push({ name: 'ExerciseFeedback', params: { id: exercise.value.id } })
+    // 提交答案，后端返回 submissionId
+    const result = await submitAssignmentAnswers(classId, assignmentId, { studentId, answers: answersArr })
+    const submissionId = result.submissionId 
+    courseStore.setCurrentSubmissionId(submissionId); // 存到 store
+    router.push({ name: 'ExerciseFeedback' }); // 跳转时不带 id
   } catch (e) {
     alert(e.message || '提交失败')
   }

@@ -216,6 +216,17 @@ const courseChapters = ref([])
 const courseMaterials = ref([])
 const onlinePractices = ref([])
 const classId = ref(null) 
+const currentSubmissionId = ref('');
+function setCurrentSubmissionId(id) {
+  currentSubmissionId.value = id;
+}
+
+export const useCourseStore = () => {
+  return {
+    currentSubmissionId,
+    setCurrentSubmissionId,
+  };
+};
 // 假设班级ID可以从课程详情或其他API获得，这里先用courseId代替
 const tabs = [
   { key: 'outline', label: '课程大纲' },
@@ -229,7 +240,7 @@ const startExercise = (practice) => {
   courseStore.setCurrentExerciseId(practice.id);
   
   // 跳转到简洁的URL，无需查询参数
-  router.push('/exercise/:id');
+  router.push('/exercise');
 };
 const retryWrongQuestions = (practice) => {
   // 确保只有当有错题时才能点击
@@ -249,7 +260,7 @@ const viewLastRecord = (practice) => {
   courseStore.setCurrentExerciseId(practice.id);
   
   // 跳转到练习反馈页面，使用纯路径
-  router.push(`/feedback/:id`);
+  router.push(`/feedback`);
 };
 // 添加加载状态和错误处理
 const loading = ref(true);
@@ -285,7 +296,6 @@ const fetchAllCourseInfo = async () => {
     // 默认为空数组
     courseOutline.value = [];
   }
-  
       courseChapters.value = res.data.data.chapters || [];
       console.log("课程基本信息处理完成:", courseData.value);
       console.log("大纲数据:", courseOutline.value);

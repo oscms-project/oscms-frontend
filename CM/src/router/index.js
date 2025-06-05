@@ -32,7 +32,7 @@ const routes = [
     name: 'TeacherCourses',
     component: () => import('@/views/CourseDetails.vue')
   },
- 
+
   {
     path: '/course/:id/management',
     name: 'CourseManagement',
@@ -44,13 +44,13 @@ const routes = [
     component: () => import('@/views/TeacherProfile.vue')
   },
   {
-    path: '/exercise/:id',
+    path: '/exercise',
     name: 'ExercisePage',
     component: () => import('@/views/ExercisePage.vue'),
     meta: { requiresAuth: true, role: 'student' }
   },
   {
-    path: '/feedback/:id',
+    path: '/feedback',
     name: 'ExerciseFeedback',
     component: () => import('@/views/ExerciseFeedback.vue'),
     meta: { requiresAuth: true, role: 'student' }

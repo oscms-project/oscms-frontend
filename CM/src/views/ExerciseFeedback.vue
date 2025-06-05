@@ -37,7 +37,6 @@
             <div class="flex justify-between items-center mb-4">
                 <h1 class="text-2xl font-bold">{{ exercise.title }} - 练习反馈</h1>
                 <div class="flex items-center">
-                    <span class="text-sm text-gray-500 mr-2">完成时间: {{ formatDateTime(submission.submittedAt) }}</span>
                 </div>
             </div>
 
@@ -45,8 +44,8 @@
                 <div class="bg-green-50 border border-green-200 rounded-lg p-4">
                     <div class="text-sm text-green-600 mb-1">总分</div>
                     <div class="flex items-end">
-                        <span class="text-3xl font-bold text-green-700">{{ submission.score }}</span>
-                        <span class="text-xl text-green-600 ml-1">/ {{ exercise.totalPoints }}</span>
+                        <span class="text-3xl font-bold text-green-700">{{ submission?.totalScore || 0 }}</span>
+                        <span class="text-xl text-green-600 ml-1">/ {{ exercise?.totalPoints || 0 }}</span>
                     </div>
                 </div>
 
@@ -54,14 +53,14 @@
                     <div class="text-sm text-blue-600 mb-1">正确率</div>
                     <div class="flex items-end">
                         <span class="text-3xl font-bold text-blue-700">{{ correctPercentage }}%</span>
-                        <span class="text-sm text-blue-600 ml-2 mb-1">{{ correctCount }} / {{ exercise.questions.length
+                        <span class="text-sm text-blue-600 ml-2 mb-1">{{ correctCount }} / {{ exercise?.questions?.length || 0
                             }} 题</span>
                     </div>
                 </div>
 
                 <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                    <div class="text-sm text-purple-600 mb-1">用时</div>
-                    <div class="text-3xl font-bold text-purple-700">{{ formatDuration(submission.duration) }}</div>
+                    <div class="text-sm text-purple-600 mb-1">提交时间</div>
+                    <div class="text-xl font-bold text-purple-700">{{ formatDateTime(submission?.submittedAt) }}</div>
                 </div>
             </div>
 
@@ -141,13 +140,13 @@
                         <div v-for="(option, oIndex) in question.options" :key="oIndex"
                             class="flex items-center p-3 rounded-lg" :class="{
                                 'bg-green-100 border border-green-300': question.correctAnswer === oIndex,
-                                'bg-red-100 border border-red-300': submission.answers[qIndex] === oIndex && question.correctAnswer !== oIndex,
-                                'bg-gray-50 border border-gray-200': submission.answers[qIndex] !== oIndex && question.correctAnswer !== oIndex
+                                'bg-red-100 border border-red-300': submission?.answers[qIndex]?.response === oIndex && question.correctAnswer !== oIndex,
+                                'bg-gray-50 border border-gray-200': submission?.answers[qIndex]?.response !== oIndex && question.correctAnswer !== oIndex
                             }">
                             <div class="w-6 h-6 rounded-full flex items-center justify-center border mr-2" :class="{
                                 'bg-green-500 border-green-500 text-white': question.correctAnswer === oIndex,
-                                'bg-red-500 border-red-500 text-white': submission.answers[qIndex] === oIndex && question.correctAnswer !== oIndex,
-                                'border-gray-300': submission.answers[qIndex] !== oIndex && question.correctAnswer !== oIndex
+                                'bg-red-500 border-red-500 text-white': submission?.answers[qIndex]?.response === oIndex && question.correctAnswer !== oIndex,
+                                'border-gray-300': submission?.answers[qIndex]?.response !== oIndex && question.correctAnswer !== oIndex
                             }">
                                 {{ ['A', 'B', 'C', 'D'][oIndex] }}
                             </div>
@@ -204,7 +203,7 @@
                                     </div>
                                 </div>
                                 <pre
-                                    class="p-4 font-mono text-sm overflow-x-auto bg-gray-50">{{ submission.codeAnswers[qIndex] }}</pre>
+                                    class="p-4 font-mono text-sm overflow-x-auto bg-gray-50">{{ submission?.answers[qIndex]?.response }}</pre>
                             </div>
                         </div>
 
@@ -225,6 +224,18 @@
                     <div class="mt-4 ml-6 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                         <div class="text-sm font-medium text-gray-700 mb-1">解析:</div>
                         <div class="text-sm text-gray-600">{{ question.explanation }}</div>
+                        <div v-if="submission?.answers[qIndex]?.feedback" class="mt-2 text-sm text-gray-600">
+                            <div class="font-medium mb-1">教师反馈:</div>
+                            {{ submission.answers[qIndex].feedback }}
+                        </div>
+                    </div>
+
+                    <!-- 得分 -->
+                    <div class="mt-4 ml-6 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                        <div class="text-sm font-medium text-gray-700 mb-1">得分:</div>
+                        <div class="text-sm text-gray-600">
+                            {{ submission?.answers[qIndex]?.score || 0 }} / {{ question.points }} 分
+                        </div>
                     </div>
 
                     <!-- 测试结果 -->
@@ -279,7 +290,7 @@ const route = useRoute();
 const router = useRouter();
 const courseStore = useCourseStore();
 
-const submissionId = route.params.id;
+const submissionId = courseStore.currentSubmissionId;
 const submission = ref(null);
 const loading = ref(true);
 const showAlert = ref(false);
@@ -306,7 +317,7 @@ const user = ref({
     avatar: ''
 });
 
-const exercise = computed(() => submission.value?.assignment || { questions: [] });
+const exercise = computed( () => submission.value?.assignment || { questions: [] });
 onMounted(async () => {
     try {
         loading.value = true;
@@ -337,19 +348,24 @@ const correctCount = computed(() => {
     if (!submission.value || !submission.value.answers) return 0;
     return submission.value.answers.filter(ans => ans.correct === true).length;
 });
+
 const incorrectCount = computed(() => {
     if (!submission.value || !submission.value.answers) return 0;
     return submission.value.answers.filter(ans => ans.correct === false).length;
 });
+
 const correctPercentage = computed(() => {
     if (!submission.value || !submission.value.answers) return 0;
     return Math.round((correctCount.value / submission.value.answers.length) * 100);
 });
+
 const bookmarkedCount = computed(() => bookmarkedQuestions.value.length);
+
 const incorrectQuestions = computed(() => {
     if (!submission.value || !submission.value.answers) return [];
-    return exercise.value.questions.filter((q, idx) => submission.value.answers[idx]?.correct === false);
+    return exercise.value.questions.filter((q, idx) => !submission.value.answers[idx]?.correct);
 });
+
 const filteredQuestions = computed(() => {
     if (!submission.value || !submission.value.answers) return [];
     if (filter.value === 'all') {
@@ -363,11 +379,14 @@ const filteredQuestions = computed(() => {
     }
     return [];
 });
+
 const isCorrect = (questionIndex) => {
     if (!submission.value || !submission.value.answers) return false;
     return submission.value.answers[questionIndex]?.correct === true;
 };
+
 const isBookmarked = (questionIndex) => bookmarkedQuestions.value.includes(questionIndex);
+
 const toggleBookmark = (questionIndex) => {
     const index = bookmarkedQuestions.value.indexOf(questionIndex);
     if (index === -1) {
@@ -378,15 +397,18 @@ const toggleBookmark = (questionIndex) => {
         showMessage('已取消收藏');
     }
 };
+
 const retryIncorrectQuestions = () => {
     showMessage('开始错题重做');
     router.push({ name: 'IncorrectQuestionsRetry', params: { id: exercise.value.id } });
 };
+
 const formatDateTime = (dateTimeStr) => {
     if (!dateTimeStr) return '';
     const date = new Date(dateTimeStr);
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 };
+
 const formatDuration = (seconds) => {
     if (!seconds) return '0秒';
     const hours = Math.floor(seconds / 3600);
@@ -400,6 +422,7 @@ const formatDuration = (seconds) => {
         return `${secs}秒`;
     }
 };
+
 const goBackToList = () => {
     router.push({ name: 'ExerciseList' });
 };
