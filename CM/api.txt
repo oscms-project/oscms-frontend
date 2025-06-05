@@ -1,0 +1,173 @@
+好的，根据我们刚刚讨论的需求（查询学生在某个班级中的作业完成统计，并包含课程名称），我为您整理出这个新接口的定义和请求方式。
+
+接口：获取学生在班级课程中的作业完成情况摘要
+
+功能描述:
+查询指定学生在特定班级（及其所属课程）中所有已布置作业的整体完成情况，包括总作业数、已完成作业数和未完成作业数，同时返回课程名称。
+
+HTTP 方法:
+GET
+
+接口路径:
+/classes/{classId}/students/{studentId}/assignment-summary
+
+路径参数:
+
+classId (Long): 班级的唯一标识符。
+
+示例: 1
+
+studentId (String): 学生的唯一标识符 (例如学号/工号)。
+
+示例: "student001"
+
+查询参数 (Query Parameters):
+
+无 (当前设计中没有为此接口定义查询参数，如果后续需要按作业状态等筛选，可以添加)
+
+请求头 (Request Headers):
+
+Authorization: Bearer <JWT_Token>
+
+此接口通常需要用户认证。Token 中应包含当前操作者的身份信息。
+
+权限逻辑会校验操作者是否有权查看指定 studentId 在该 classId 的作业摘要（例如，学生本人，或该班级的教师/助教，或管理员）。
+
+请求体 (Request Body):
+
+无 (因为是 GET 请求)
+
+成功响应 (HTTP 200 OK):
+
+Content-Type: application/json
+
+Body: ApiResponse<StudentAssignmentSummaryDto>
+
+ApiResponse 结构:
+
+{
+  "code": 200, // 或其他业务成功码
+  "message": "成功获取学生作业完成摘要", // 或 "success"
+  "data": {
+    // StudentAssignmentSummaryDto 结构
+  }
+}
+
+
+StudentAssignmentSummaryDto 结构:
+
+{
+  "classId": 1,
+  "studentId": "student001",
+  "courseName": "Java程序设计入门",
+  "totalAssignments": 5,
+  "completedAssignments": 3,
+  "pendingAssignments": 2
+}
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Json
+IGNORE_WHEN_COPYING_END
+
+其中：
+
+classId (Long): 路径参数中传入的班级ID。
+
+studentId (String): 路径参数中传入的学生ID。
+
+courseName (String): 该班级所属课程的名称。
+
+totalAssignments (int): 该班级总共布置的作业数量。
+
+completedAssignments (int): 该学生在此班级中已完成（我们定义为“已提交”）的作业数量。
+
+pendingAssignments (int): 该学生在此班级中未完成（我们定义为“未提交”）的作业数量。
+
+失败响应:
+
+HTTP 401 Unauthorized: 如果请求未携带有效 Token，或 Token 无效/过期。
+
+{
+  "code": 401, // 或业务错误码
+  "message": "用户未认证或认证失败",
+  "data": null
+}
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Json
+IGNORE_WHEN_COPYING_END
+
+HTTP 403 Forbidden: 如果当前认证用户没有权限查看指定 studentId 在该 classId 的作业摘要。
+
+{
+  "code": 403, // 或业务错误码
+  "message": "权限不足，您无权查看该学生的作业完成情况。",
+  "data": null
+}
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Json
+IGNORE_WHEN_COPYING_END
+
+HTTP 404 Not Found:
+
+如果 classId 对应的班级不存在。
+
+如果 studentId 对应的学生不存在。
+
+如果学生存在但未加入指定的 classId 对应的班级。
+
+如果班级存在但未关联到任何课程（导致无法获取 courseName）。
+
+{
+  "code": 404, // 或业务错误码
+  "message": "班级ID 'X' 不存在", // 或 "学生ID 'Y' 不存在", 或 "学生 'Y' 未加入班级 'X'" 等具体信息
+  "data": null
+}
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Json
+IGNORE_WHEN_COPYING_END
+
+HTTP 500 Internal Server Error: 如果后端发生未预期的内部错误。
+
+{
+  "code": 500, // 或业务错误码
+  "message": "服务器内部错误，请稍后再试或联系管理员",
+  "data": null
+}
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Json
+IGNORE_WHEN_COPYING_END
+
+请求示例 (使用 curl):
+
+假设您已登录并获取了 Token (YOUR_JWT_TOKEN)，要查询班级ID为 123，学生ID为 student007 的作业摘要：
+
+curl -X GET \
+  http://localhost:8080/classes/123/students/student007/assignment-summary \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json"
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Bash
+IGNORE_WHEN_COPYING_END
+
+总结：
+
+这个接口定义清晰地描述了如何通过 classId 和 studentId 来获取一个结构化的作业完成情况摘要。前端可以利用这个接口向学生展示他们在每个班级（课程）中的作业进度，或者教师/助教也可以用它来快速了解某个学生的作业完成概况。
+
+接下来的步骤就是按照我们之前讨论的，在 RecordController 中添加对应的方法，并在 RecordServiceImpl 中实现其业务逻辑。

@@ -28,3 +28,13 @@ export function getClassAssignments(classId) {
 export function getStudentClassInCourse(userId, courseId) {
   return axios.get(`/users/${userId}/courses/${courseId}/class`)
 }
+
+// 获取学生在特定班级中的作业完成情况摘要
+export function getStudentAssignmentSummary(classId, studentId) {
+  return axios.get(`/classes/${classId}/students/${studentId}/assignment-summary`);
+}
+
+// 获取学生加入的所有班级
+export function getStudentClasses(studentId) {
+  return axios.get(`/users/${studentId}/classes/info`);
+}

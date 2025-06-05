@@ -17,6 +17,7 @@ export const useCourseStore = defineStore('course', () => {
     currentCourseId,
     setCurrentCourseId,
      currentExerciseId,
-    setCurrentExerciseId
+    setCurrentExerciseId,
+    
   }
 })

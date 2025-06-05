@@ -173,7 +173,7 @@
           class="action-btn primary"
           @click="startExercise(practice)"
         >开始做题</button>
-        <button 
+        <button
           class="action-btn secondary" 
           :disabled="practice.wrongCount === 0"
           @click="retryWrongQuestions(practice)"
