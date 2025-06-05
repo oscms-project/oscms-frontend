@@ -10,7 +10,7 @@ export function getAssignmentQuestions(assignmentId) {
         return Promise.reject(new Error('作业ID不能为空'));
     }
     return axios
-        .get(`/api/assignments/${assignmentId}/questions`)
+        .get(`/assignments/${assignmentId}/questions`)
         .then(res => {
             if (res.data && res.data.code === 200) {
                 return res.data.data;
@@ -29,7 +29,7 @@ export function getAssignmentQuestions(assignmentId) {
  */
 export function submitAssignmentAnswers(classId, assignmentId, data) {
     return axios
-        .post(`/api/classes/${classId}/assignments/${assignmentId}/submissions`, data)
+        .post(`/classes/${classId}/assignments/${assignmentId}/submissions`, data)
         .then(res => {
             if (res.data && res.data.code === 201) {
                 return res.data.data
@@ -49,7 +49,7 @@ export function getSubmissionDetail(submissionId) {
         return Promise.reject(new Error('提交ID不能为空'));
     }
     return axios
-        .get(`/api/submissions/${submissionId}`)
+        .get(`/submissions/${submissionId}`)
         .then(res => {
             if (res.data && res.data.code === 200) {
                 return res.data.data;
