@@ -274,7 +274,7 @@ const retryWrongQuestions = (practice) => {
   courseStore.setCurrentExerciseId(practice.id);
   
   // 跳转到错题重做页面，使用纯路径
-  router.push('/retry/:id');
+  router.push('/retry');
 };
 const viewLastRecord = (practice) => {
   // 确保只有当有练习记录时才能点击
