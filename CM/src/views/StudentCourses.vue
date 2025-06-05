@@ -150,6 +150,35 @@
       </button>
     </div>
   </div>
+  <!-- filepath: e:\test\git_test\CM\src\views\StudentCourses.vue -->
+<div class="filter-container">
+  <label for="chapter-filter">按章节筛选：</label>
+  <select 
+    id="chapter-filter" 
+    v-model="selectedChapter" 
+    class="chapter-filter"
+  >
+    <option value="all">全部章节</option>
+    <option 
+      v-for="outline in availableChapters" 
+      :key="outline.chapter"
+      :value="outline.chapter"
+    >
+      第{{ outline.chapter }}章
+    </option>
+  </select>
+  <label for="type-filter" style="margin-left: 24px;">按类型筛选：</label>
+  <select 
+    id="type-filter" 
+    v-model="selectedType" 
+    class="chapter-filter"
+  >
+    <option value="all">全部类型</option>
+    <option v-for="type in availableTypes" :key="type" :value="type">
+      {{ type.toUpperCase() }}
+    </option>
+  </select>
+</div>
 </div>
 
       <!-- Online Practice -->
@@ -194,10 +223,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useUserStore } from '@/stores/user';
-import { useCourseStore } from '@/stores/course'
+import { useCourseStore } from '@/stores/course';
 import { useRoute } from 'vue-router'; 
 import { getCourseDetail } from '@/api/course'; // 确保导入API
-import { getMaterials } from '@/api/materials'
+import { getMaterials } from '@/api/materials';
 import { getStudentClassInCourse } from '@/api/class'; // 新增
 // 添加这个导入
 import { getClassAssignments } from '@/api/class';
@@ -205,8 +234,8 @@ import { useRouter } from 'vue-router';
 const router = useRouter();
 
 const userStore = useUserStore();
-const courseStore = useCourseStore() 
-const activeTab = ref('outline')
+const courseStore = useCourseStore();
+const activeTab = ref('outline');
 // 从路由参数中获取课程信息
 const route = useRoute()
 const courseId = computed(() => courseStore.currentCourseId) // 修改为从store获取
@@ -364,7 +393,7 @@ const fetchAllCourseInfo = async () => {
 };
 // 添加在script部分的ref引用列表中
 const selectedChapter = ref('all'); // 默认显示全部章节
-
+const selectedType = ref('all'); // 默认显示全部类型
 // 修改可用的章节列表，仅使用courseChapters中的章节
 const availableChapters = computed(() => {
   // 只从课程章节中获取章节列表
@@ -375,9 +404,17 @@ const availableChapters = computed(() => {
     }))
     .sort((a, b) => a.chapter - b.chapter); // 按章节序号排序
 });
-
+// 计算所有出现过的资料类型
+const availableTypes = computed(() => {
+  const types = new Set();
+  courseMaterials.value.forEach(material => {
+    const ext = material.filename?.split('.').pop()?.toLowerCase();
+    if (ext) types.add(ext);
+  });
+  return Array.from(types);
+});
 // 根据选中的章节过滤资料
-const filteredMaterials = computed(() => {
+const filteredMaterials_c = computed(() => {
   if (selectedChapter.value === 'all') {
     return courseMaterials.value; // 返回所有资料
   } else {
@@ -386,6 +423,20 @@ const filteredMaterials = computed(() => {
       material.chapterOrder === selectedChapter.value
     );
   }
+});
+//根据资料类型筛选资料
+const filteredMaterials = computed(() => {
+  let filtered = courseMaterials.value;
+  if (selectedChapter.value !== 'all') {
+    filtered = filtered.filter(material => material.chapterOrder === selectedChapter.value);
+  }
+  if (selectedType.value !== 'all') {
+    filtered = filtered.filter(material => {
+      const ext = material.filename?.split('.').pop()?.toLowerCase();
+      return ext === selectedType.value;
+    });
+  }
+  return filtered;
 });
 // 完善下载函数
 const downloadFile = (url, filename) => {
