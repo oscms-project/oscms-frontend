@@ -5,7 +5,7 @@
       <div class="header-content">
         <div class="logo-section">
           <div class="logo-circle"></div>
-          <span class="university-name">北京航空航天大学 | 智学北航</span>
+          <span class="university-name">北京航空航天大学 | 智慧教育</span>
         </div>
         <div class="user-info">
           <div class="avatar"></div>
@@ -102,56 +102,6 @@
     <h3>📁 课程资料</h3>
   </div>
   <div class="filter-container">
-    <label for="chapter-filter">按章节筛选：</label>
-    <select 
-      id="chapter-filter" 
-      v-model="selectedChapter" 
-      class="chapter-filter"
-    >
-      <option value="all">全部章节</option>
-      <option 
-        v-for="outline in availableChapters" 
-        :key="outline.chapter"
-          :value="outline.chapter"
-      >
-        第{{ outline.chapter }}章
-      </option>
-    </select>
-  </div>
-  <div class="materials-list">
-    <div class="material-item" v-for="material in filteredMaterials" :key="material.id">
-      <!-- 文件类型图标 -->
-      <div class="material-icon">{{ getFileIcon(material.filename) }}</div>
-      <div class="material-info">
-        <!-- 资料标题 -->
-        <div class="material-name">{{ material.filename }}</div>
-        <div class="material-meta">
-          <!-- 上传时间 -->
-         <span>上传时间：{{ material.updatedAt }}</span>
-          <!-- 章节信息 -->
-          <span v-if="material.chapterOrder">章节：{{ material.chapterOrder }}</span>
-        </div>
-      </div>
-      <!-- 下载按钮链接到文件URL -->
-      <!-- <a 
-        :href="material.url" 
-        class="download-btn" 
-        target="_blank" 
-        :download="material.filename"
-      >
-        下载
-      </a> -->
-       <!-- 下载按钮链接到文件URL -->
-      <button 
-        class="download-btn" 
-        @click="downloadFile(material.url, material.filename)"
-      >
-        下载
-      </button>
-    </div>
-  </div>
-  <!-- filepath: e:\test\git_test\CM\src\views\StudentCourses.vue -->
-<div class="filter-container">
   <label for="chapter-filter">按章节筛选：</label>
   <select 
     id="chapter-filter" 
@@ -179,6 +129,47 @@
     </option>
   </select>
 </div>
+  <div class="materials-list">
+    <div class="material-item" v-for="material in filteredMaterials" :key="material.id">
+      <!-- 文件类型图标 -->
+      <div class="material-icon">{{ getFileIcon(material.filename) }}</div>
+      <div class="material-info">
+        <!-- 资料标题 -->
+        <div class="material-name">{{ material.filename }}</div>
+        <div class="material-meta">
+          <!-- 上传时间 -->
+         <span>上传时间：{{ material.updatedAt }}</span>
+          <!-- 章节信息 -->
+          <span v-if="material.chapterOrder">章节：{{ material.chapterOrder }}</span>
+        </div>
+      </div>
+      <!-- 在每个 material-item 内添加预览按钮 -->
+      <button 
+        class="preview-btn"
+        @click="previewFile(material.url, material.filename)"
+      >
+        在线预览
+      </button>
+      <!-- 下载按钮链接到文件URL -->
+      <!-- <a 
+        :href="material.url" 
+        class="download-btn" 
+        target="_blank" 
+        :download="material.filename"
+      >
+        下载
+      </a> -->
+       <!-- 下载按钮链接到文件URL -->
+      <button 
+        class="download-btn" 
+        @click="downloadFile(material.url, material.filename)"
+      >
+        下载
+      </button>
+    </div>
+  </div>
+  <!-- filepath: e:\test\git_test\CM\src\views\StudentCourses.vue -->
+
 </div>
 
       <!-- Online Practice -->
@@ -258,7 +249,10 @@ const tabs = [
   { key: 'materials', label: '课程资料' },
   { key: 'practice', label: '在线练习' }
 ]
-
+const previewFile = (url, filename) => {
+  // 直接新窗口打开，浏览器支持的格式会自动预览
+  window.open(url, '_blank');
+};
 const startExercise = (practice) => {
   // 使用store保存练习ID
   courseStore.setCurrentExerciseId(practice.id);
@@ -544,7 +538,21 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
 }
-
+.preview-btn {
+  background-color: #43a047;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  margin-left: 10px;
+  min-width: 70px;
+  transition: background-color 0.2s;
+}
+.preview-btn:hover {
+  background-color: #2e7031;
+}
 .university-name {
   font-size: 18px;
   font-weight: 500;
