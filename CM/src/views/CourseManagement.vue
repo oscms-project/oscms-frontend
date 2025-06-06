@@ -7,20 +7,20 @@
           <button class="btn-back" @click="goBack" title="返回课程详情">
             <ArrowLeftIcon class="icon" />
           </button>
-          <h1 class="course-title">{{ courseName }} <span class="icon"><i class="i-lucide-external-link"></i></span></h1>
+          <h1 class="course-title">{{ localCourseName }} <span class="icon"><i class="i-lucide-external-link"></i></span></h1>
           <p class="course-meta">{{ courseStudents }}人 | {{ courseDuration }}</p>
         </div>
         <div class="course-stats">
           <div class="stat-item">
-            <div class="stat-value">{{ stats.assignments }}</div>
+            <div class="stat-value">{{ currentClassTotalAssignments }}</div>
             <div class="stat-label">作业数量</div>
           </div>
           <div class="stat-item highlight">
-            <div class="stat-value">{{ stats.submissions }}</div>
+            <div class="stat-value">{{ currentClassTotalSubmissions }}</div>
             <div class="stat-label">提交数</div>
           </div>
           <div class="stat-item">
-            <div class="stat-value">{{ stats.pending }}</div>
+            <div class="stat-value">{{ currentClassTotalPendingReviews }}</div>
             <div class="stat-label">待批改</div>
           </div>
         </div>
@@ -28,7 +28,7 @@
     </header>
 
     <!-- Action buttons -->
-    <div class="action-bar container">
+    <div class="action-bar container" :class="{ 'has-invitation-code': selectedClass }">
       <div class="action-buttons">
         <button class="btn btn-default" @click="showClassSelector = true">
           <i class="i-lucide-users mr-1"></i>
@@ -40,17 +40,12 @@
           发布作业
         </button>
         <button class="btn btn-default">
-          <i class="i-lucide-upload mr-1"></i>
-          导入学生
-        </button>
-        <button class="btn btn-default">
           <i class="i-lucide-download mr-1"></i>
           导出成绩
         </button>
-        <button class="btn btn-success">
-          <i class="i-lucide-bar-chart-2 mr-1"></i>
-          统计
-        </button>
+      </div>
+      <div v-if="selectedClass" class="class-invitation-code">
+        班级邀请码: <span class="invitation-code-value">{{ selectedClass.id }}</span>
       </div>
     </div>
 
@@ -74,14 +69,11 @@
         <div class="panel-header">
           <h2 class="panel-title">班级成员管理</h2>
           <div class="panel-actions">
-            <button class="btn btn-sm btn-outline">
+            <button class="btn btn-sm btn-outline" @click="openImportStudentsModal">
               <i class="i-lucide-upload mr-1"></i>
               导入学生信息
             </button>
-            <button class="btn btn-sm btn-outline">
-              <i class="i-lucide-user-plus mr-1"></i>
-              批量添加学生
-            </button>
+
             <div class="search-box">
               <i class="i-lucide-search search-icon"></i>
               <input type="text" placeholder="搜索学生" v-model="searchQuery">
@@ -98,29 +90,22 @@
                 <th>班级</th>
                 <th>提交数</th>
                 <th>未提交数</th>
-                <th>正确率</th>
                 <th>学习进度</th>
                 <th>操作</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="student in paginatedStudents" :key="student.id">
-                <td>{{ student.studentId }}</td>
-                <td>{{ student.name }}</td>
+                <td>{{ student.id }}</td>
+                <td>{{ student.username }}</td>
                 <td>
-                  <span class="badge">{{ student.className }}</span>
+                  <span class="badge">{{ displayClassNameForStudentList }}</span>
                 </td>
                 <td>{{ student.submissions }}</td>
                 <td>
                   <span class="unsubmitted-count" :class="getUnsubmittedClass(student.unsubmitted)">
                     {{ student.unsubmitted }}
                   </span>
-                </td>
-                <td>
-                  <div class="progress-wrapper">
-                    <div class="progress-bar" :style="{ width: student.accuracy + '%' }"></div>
-                    <span>{{ student.accuracy }}%</span>
-                  </div>
                 </td>
                 <td>
                   <div class="progress-container">
@@ -146,14 +131,9 @@
                 </td>
                 <td>
                   <div class="action-buttons">
-                    <button class="btn-icon" title="查看详情">
-                      <i class="i-lucide-eye"></i>
-                    </button>
-                    <button class="btn-icon" title="编辑信息">
-                      <i class="i-lucide-edit"></i>
-                    </button>
-                    <button class="btn-icon danger" title="删除">
+                    <button class="btn-icon btn-delete" @click="handleDeleteStudent(student)" title="从班级移除学生">
                       <i class="i-lucide-trash-2"></i>
+                      <span>删除</span>
                     </button>
                   </div>
                 </td>
@@ -189,31 +169,6 @@
         <div class="panel-header">
           <h2 class="panel-title">练习查看及批改</h2>
           <div class="panel-actions">
-            <div class="filter-dropdown" ref="chapterFilterDropdown">
-              <button class="btn btn-sm btn-outline" @click="toggleChapterFilter">
-                <i class="i-lucide-book mr-1"></i>
-                章节：{{ chapterFilterLabel }}
-                <i class="i-lucide-chevron-down ml-1"></i>
-              </button>
-              <div class="dropdown-menu" v-if="showChapterFilter">
-                <div
-                  class="dropdown-item"
-                  :class="{ active: chapterFilter === null }"
-                  @click="setChapterFilter(null)"
-                >
-                  全部章节
-                </div>
-                <div
-                  v-for="chapter in uniqueChapters"
-                  :key="chapter"
-                  class="dropdown-item"
-                  :class="{ active: chapterFilter === chapter }"
-                  @click="setChapterFilter(chapter)"
-                >
-                  {{ chapter }}
-                </div>
-              </div>
-            </div>
             <div class="filter-dropdown" ref="statusFilterDropdown">
               <button class="btn btn-sm btn-outline" @click="toggleStatusFilter">
                 <i class="i-lucide-filter mr-1"></i>
@@ -267,10 +222,6 @@
 
         <div v-else class="exercise-list">
           <div v-for="exercise in filteredExercises" :key="exercise.id" class="exercise-card">
-            <div class="chapter-badge">
-              <i class="i-lucide-book mr-1"></i>
-              {{ exercise.chapter }}
-            </div>
             <div class="exercise-header">
               <div class="exercise-title-area">
                 <h3>{{ exercise.title }}</h3>
@@ -286,17 +237,17 @@
             <div class="exercise-description">{{ exercise.description }}</div>
             <div class="exercise-stats">
               <div class="stat">
-                <div class="stat-value">{{ exercise.submissions }}</div>
+                <div class="stat-value">
+                  <template v-if="exercise.isLoadingSubmissions">
+                    <i class="i-lucide-loader-2 animate-spin"></i>
+                  </template>
+                  <template v-else>
+                    {{ exercise.submissionCount }}
+                  </template>
+                </div>
                 <div class="stat-label">提交</div>
               </div>
-              <div class="stat">
-                <div class="stat-value">
-                  <div class="accuracy-indicator" :class="getAccuracyClass(exercise.accuracy)">
-                    {{ exercise.accuracy }}%
-                  </div>
-                </div>
-                <div class="stat-label">正确率</div>
-              </div>
+
               <div class="stat">
                 <div class="stat-value">{{ exercise.pending }}</div>
                 <div class="stat-label">待批改</div>
@@ -310,10 +261,6 @@
               <button class="btn btn-sm btn-default" @click="openExerciseStats(exercise)">
                 <i class="i-lucide-bar-chart mr-1"></i>
                 统计
-              </button>
-              <button class="btn btn-sm btn-outline">
-                <i class="i-lucide-edit mr-1"></i>
-                编辑
               </button>
             </div>
           </div>
@@ -477,8 +424,8 @@
                   </thead>
                   <tbody>
                     <tr v-for="student in filteredSubmittedStudents" :key="student.id">
-                      <td>{{ student.studentId }}</td>
-                      <td>{{ student.name }}</td>
+                      <td>{{ student.id }}</td>
+                      <td>{{ student.username }}</td>
                       <td>
                         <span class="badge">{{ student.className }}</span>
                       </td>
@@ -542,8 +489,8 @@
                       <td>
                         <input type="checkbox" v-model="student.selected">
                       </td>
-                      <td>{{ student.studentId }}</td>
-                      <td>{{ student.name }}</td>
+                      <td>{{ student.id }}</td>
+                      <td>{{ student.username }}</td>
                       <td>
                         <span class="badge">{{ student.className }}</span>
                       </td>
@@ -567,32 +514,105 @@
         </div>
       </div>
     </div>
+
+      <!-- Import Students Modal -->
+    <div v-if="showImportStudentsModal" class="modal-overlay" @click="closeImportStudentsModal">
+      <div class="modal-content import-students-modal" @click.stop>
+        <div class="modal-header">
+          <h3><i class="i-lucide-user-plus mr-2"></i>导入学生信息</h3>
+          <button class="btn-close" @click="closeImportStudentsModal" title="关闭">
+            <i class="i-lucide-x"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div v-if="!selectedClass">
+            <p class="text-danger">请先在页面上方选择一个班级后再导入学生。</p>
+          </div>
+          <div v-else>
+            <p class="mb-2">将学生导入到班级: <strong>{{ selectedClass.name }}</strong></p>
+            <div class="import-method-tabs">
+              <button :class="['tab-button', { active: importMethod === 'file' }]" @click="importMethod = 'file'">
+                <i class="i-lucide-file-up mr-1"></i> 文件上传
+              </button>
+              <button :class="['tab-button', { active: importMethod === 'manual' }]" @click="importMethod = 'manual'">
+                <i class="i-lucide-edit-3 mr-1"></i> 手动输入
+              </button>
+            </div>
+
+            <div v-if="importMethod === 'file'" class="import-section">
+              <label for="student-file-upload" class="file-upload-label btn btn-outline">
+                <i class="i-lucide-upload-cloud mr-1"></i> 选择文件...
+              </label>
+              <input type="file" id="student-file-upload" @change="handleFileChange" accept=".txt,.csv" class="file-input">
+              <p v-if="selectedFile" class="mt-2">已选择文件: {{ selectedFile.name }}</p>
+              <p v-else class="mt-2 text-muted">支持 .txt 或 .csv 文件，每行一个学号。</p>
+            </div>
+
+            <div v-if="importMethod === 'manual'" class="import-section">
+              <textarea v-model="manualStudentIdsInput" rows="8" placeholder="请输入学号，每行一个，或用逗号、空格分隔"></textarea>
+            </div>
+
+            <div v-if="importError" class="alert alert-danger mt-3">
+              {{ importError }}
+            </div>
+            <div v-if="importSuccessMessage" class="alert alert-success mt-3">
+              {{ importSuccessMessage }}
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-default" @click="closeImportStudentsModal">取消</button>
+          <button class="btn btn-primary" @click="confirmImportStudents" :disabled="isLoadingImport || !selectedClass || (importMethod === 'file' && !selectedFile && !uploadedFileContent) || (importMethod === 'manual' && !manualStudentIdsInput.trim())">
+            <i v-if="isLoadingImport" class="i-lucide-loader-2 animate-spin mr-1"></i>
+            {{ isLoadingImport ? '导入中...' : '确认导入' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { useRouter, useRoute } from 'vue-router';
+import { removeStudentFromClass } from '@/api/courseManagement';
 import { ArrowLeftIcon } from 'lucide-vue-next'
-import { getCourseDetail, getCourseClasses } from '@/api/course'
+import { getCourseClasses, getCourseDetail } from '@/api/course'
+import { useCourseStore } from '@/stores/course' // Import the course store
 import {
   getCourseStats,
   getClassStudents,
   importStudents,
   getClassAssignments,
+  getAssignmentSubmissions, // Added for fetching submission counts
   exportCourseGrades,
   sendAssignmentReminder,
   getStudentsProgress,
   getAssignmentChapters,
   getBatchAssignmentStats,
-  getStudentDetails
+  getStudentDetails,
+  getStudentAssignmentSummary
 } from '@/api/courseManagement'
 
 const router = useRouter()
 const route = useRoute()
 
-// 课程信息 - 动态数据
-const courseName = ref('')
+// Initialize the course store
+const courseStore = useCourseStore()
+
+// Computed property to determine the effective course ID
+const effectiveCourseId = computed(() => {
+  const idFromRoute = route.params.id;
+  // Check if idFromRoute is valid and not the placeholder ':id' or 'undefined'
+  if (idFromRoute && idFromRoute !== ':id' && idFromRoute !== 'undefined' && String(idFromRoute).trim() !== '') {
+    return idFromRoute;
+  }
+  return courseStore.currentCourseId; // Fallback to store's currentCourseId
+});
+
+// Course information - courseName will now be a computed property from the store
+const courseName = computed(() => courseStore.currentCourseName)
 const courseStudents = ref('')
 const courseDuration = ref('')
 const stats = ref({
@@ -601,21 +621,17 @@ const stats = ref({
   pending: 0
 })
 
-// 加载课程信息
-const loadCourseInfo = async () => {
-  try {
-    const courseId = route.params.id
-    const courseDetail = await getCourseDetail(courseId)
-    courseName.value = courseDetail.data.name
-  } catch (error) {
-    console.error('Failed to load course info:', error)
-  }
-}
-
 // 加载课程统计信息
-const loadCourseStats = async () => {
+const loadCourseStats = async (courseIdToLoad) => {
   try {
-    const courseId = route.params.id
+    const courseId = courseIdToLoad; // Use passed-in courseId
+    if (!courseId) {
+      console.error('Course ID is not available for loading stats.');
+      // Reset stats or handle appropriately
+      stats.value = { assignments: 0, submissions: 0, pending: 0 };
+      courseStudents.value = '0';
+      return;
+    }
     const classId = selectedClass.value?.id
     const courseStats = await getCourseStats(courseId, classId)
     
@@ -631,11 +647,16 @@ const loadCourseStats = async () => {
 }
 
 // 加载班级列表
-const loadClasses = async () => {
+const loadClasses = async (courseIdToLoad) => {
   try {
-    const courseId = route.params.id
+    const courseId = courseIdToLoad; // Use passed-in courseId
+    if (!courseId) {
+      console.error('Course ID is not available for loading classes.');
+      classes.value = [];
+      return;
+    }
     const response = await getCourseClasses(courseId)
-    classes.value = response.data
+    classes.value = response.data?.data || []; // Correctly access nested data and provide fallback
   } catch (error) {
     console.error('Failed to load classes:', error)
     // 加载失败时使用静态数据
@@ -656,65 +677,231 @@ const selectedClass = ref(null)
 const showClassSelector = ref(false)
 const classSearchQuery = ref('')
 const students = ref([])
+
+const displayClassNameForStudentList = computed(() => {
+  if (selectedClass.value) {
+    // Check if name is a non-empty string after trimming
+    if (selectedClass.value.name && String(selectedClass.value.name).trim() !== '') {
+      return selectedClass.value.name;
+    } else if (selectedClass.value.id) {
+      // If name is empty or whitespace, but ID exists, show ID
+      return `班级 (ID: ${selectedClass.value.id})`;
+    }
+  }
+  // Fallback if no class selected or if selected class has no name and no ID
+  return '未分配班级';
+});
+
+// 计算属性，用于动态显示当前选定班级的统计数据
+const currentClassTotalAssignments = computed(() => {
+  return exercises.value ? exercises.value.length : 0;
+});
+
+const currentClassTotalSubmissions = computed(() => {
+  if (!exercises.value) return 0;
+  return exercises.value.reduce((total, exercise) => total + (exercise.submissionCount || 0), 0);
+});
+
+const currentClassTotalPendingReviews = computed(() => {
+  if (!exercises.value) return 0;
+  return exercises.value.reduce((total, exercise) => total + (exercise.pending || 0), 0);
+});
 const exercises = ref([])
+
+// Refs for Import Students Modal
+const showImportStudentsModal = ref(false)
+const importMethod = ref('file') // 'file' or 'manual'
+const selectedFile = ref(null)
+const uploadedFileContent = ref('') // Store content from uploaded file
+const manualStudentIdsInput = ref('')
+const isLoadingImport = ref(false)
+const importError = ref('')
+const importSuccessMessage = ref('')
+
+// Function to open the import students modal
+const openImportStudentsModal = () => {
+  showImportStudentsModal.value = true;
+  importMethod.value = 'file'; // Default to file import
+  selectedFile.value = null;
+  uploadedFileContent.value = '';
+  manualStudentIdsInput.value = ''; // Clear previous manual input
+  importError.value = '';
+  importSuccessMessage.value = '';
+  isLoadingImport.value = false;
+  // The check for selectedClass is now handled within the modal's display logic 
+  // or by disabling the button if no class is selected.
+};
+
+// Function to close the import students modal
+const closeImportStudentsModal = () => {
+  showImportStudentsModal.value = false;
+};
+
+const handleFileChange = async (event) => {
+  const file = event.target.files[0];
+  if (file) {
+    selectedFile.value = file;
+    importError.value = '';
+    importSuccessMessage.value = '';
+    try {
+      uploadedFileContent.value = await readFileContent(file);
+    } catch (err) {
+      importError.value = '读取文件失败: ' + err.message;
+      selectedFile.value = null;
+      uploadedFileContent.value = '';
+    }
+  } else {
+    selectedFile.value = null;
+    uploadedFileContent.value = '';
+  }
+};
+
+const readFileContent = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target.result);
+    reader.onerror = (e) => reject(new Error('文件读取错误'));
+    reader.readAsText(file);
+  });
+};
+
+// Function to confirm and process student import
+const confirmImportStudents = async () => {
+  if (!selectedClass.value || !selectedClass.value.id) {
+    importError.value = '请先选择一个班级进行导入操作。';
+    return;
+  }
+
+  isLoadingImport.value = true;
+  importError.value = '';
+  importSuccessMessage.value = '';
+  let studentIds = [];
+
+  try {
+    if (importMethod.value === 'file') {
+      let contentToParse = uploadedFileContent.value;
+      if (!selectedFile.value && !contentToParse) {
+        importError.value = '请选择一个文件进行上传。';
+        isLoadingImport.value = false;
+        return;
+      }
+      // If content wasn't pre-read or selectedFile changed, read it now.
+      if (selectedFile.value && !uploadedFileContent.value) { 
+          contentToParse = await readFileContent(selectedFile.value);
+      }
+
+      if (!contentToParse) {
+        importError.value = '文件内容为空或读取失败。';
+        isLoadingImport.value = false;
+        return;
+      }
+      studentIds = contentToParse.split(/[\r\n,;\s]+/).map(id => id.trim()).filter(id => id);
+    } else { // manual input
+      if (!manualStudentIdsInput.value.trim()) {
+        importError.value = '请输入学生学号。';
+        isLoadingImport.value = false;
+        return;
+      }
+      studentIds = manualStudentIdsInput.value.split(/[\r\n,;\s]+/).map(id => id.trim()).filter(id => id);
+    }
+
+    if (studentIds.length === 0) {
+      importError.value = '未能解析到有效的学号，请检查输入内容或文件格式。';
+      isLoadingImport.value = false;
+      return;
+    }
+
+    await importStudents(selectedClass.value.id, studentIds); // API call
+    importSuccessMessage.value = `成功导入 ${studentIds.length} 名学生！`;
+    await loadStudents(); // Refresh student list
+    
+    setTimeout(() => {
+        if (importSuccessMessage.value && showImportStudentsModal.value) { 
+            closeImportStudentsModal();
+        }
+    }, 2000);
+
+  } catch (error) {
+    console.error('Error importing students:', error);
+    const apiErrorMessage = error.response?.data?.message || error.message || '未知错误';
+    importError.value = `导入失败: ${apiErrorMessage}`;
+  } finally {
+    isLoadingImport.value = false;
+  }
+};
 
 // 加载学生列表
 const loadStudents = async () => {
   try {
-    if (!selectedClass.value) return
-    const response = await getClassStudents(selectedClass.value.id)
-    const students = response.data
+    const courseId = effectiveCourseId.value;
+    if (!selectedClass.value || !selectedClass.value.id) {
+      console.log('未选择班级，跳过学生加载。');
+      students.value = [];
+      return;
+    }
 
-    // 获取每个学生的详细信息
-    const studentsWithDetails = await Promise.all(
-      students.map(async student => {
-        try {
-          const details = await getStudentDetails(student.studentId)
-          return {
-            ...student,
-            contact: details.data.contact
+    const response = await getClassStudents(selectedClass.value.id);
+    // 确保 API 返回的是数组
+    const studentList = Array.isArray(response.data) ? response.data : (Array.isArray(response.data?.data) ? response.data.data : null);
+
+    if (!studentList) {
+      console.error('学生API未返回有效的数组数据:', response.data);
+      students.value = 静态学生数据; // 使用已定义的静态数据
+      return;
+    }
+
+    // Initialize students with basic data and default submission counts
+    students.value = studentList.map(student => ({
+      ...student,
+      submissions: 0, // Will hold completedAssignments
+      unsubmitted: 0  // Will hold pendingAssignments
+    }));
+
+    // Asynchronously fetch and update submission counts for each student
+    students.value.forEach(async (student) => {
+      try {
+        if (selectedClass.value && selectedClass.value.id && student.id) {
+          const summaryResponse = await getStudentAssignmentSummary(selectedClass.value.id, student.id);
+          // The actual DTO is nested under response.data.data as per ApiResponse<StudentAssignmentSummaryDto>
+          if (summaryResponse && summaryResponse.data && summaryResponse.data.data) {
+            const studentToUpdate = students.value.find(s => s.id === student.id);
+            if (studentToUpdate) {
+              studentToUpdate.submissions = summaryResponse.data.data.completedAssignments || 0;
+              studentToUpdate.unsubmitted = summaryResponse.data.data.pendingAssignments || 0;
+              // Optionally, you could also store studentToUpdate.courseName = summaryResponse.data.data.courseName; if needed elsewhere
+            }
+          } else {
+            console.warn(`No summary data or malformed response for student ${student.id} in class ${selectedClass.value.id}:`, summaryResponse);
           }
-        } catch (error) {
-          console.error(`Failed to load details for student ${student.studentId}:`, error)
-          return student
+        } else {
+           console.warn('Missing classId or studentId for fetching assignment summary for student:', student);
         }
-      })
-    )
-
-    students.value = studentsWithDetails
+      } catch (err) {
+        console.error(`Failed to load assignment summary for student ${student.id}:`, err);
+        // Keep default 0 counts if API fails
+      }
+    });
     
-    // 加载学生进度信息
-    await loadStudentsProgress()
+    // 暂时注释掉，因为 /students/progress API 报错 500
+    // await loadStudentsProgress();
   } catch (error) {
-    console.error('Failed to load students:', error)
-    // 加载失败时使用静态数据
-    students.value = [
-      {
-        id: 1,
-        studentId: '2021001',
-        name: '张三',
-        className: '软件工程1班',
-        submissions: 3,
-        unsubmitted: 0,
-        accuracy: 80,
-        totalExercises: 3,
-        contact: '13800138001',
-        submissionTime: '2023-10-05 14:30:22',
-        score: 92
-      },
-      // ... 其他静态数据 ...
-    ]
+    console.error('加载学生列表失败:', error);
+    students.value = 静态学生数据; // 确保 静态学生数据 已定义
   }
 }
 
 // 加载学生进度
 const loadStudentsProgress = async () => {
   try {
-    const courseId = route.params.id
+    const courseId = effectiveCourseId.value; // Use effectiveCourseId
+    if (!courseId) {
+      console.error('Course ID is not available for loading student progress.');
+      return;
+    }
     const response = await getStudentsProgress(courseId)
     // 更新学生进度信息
     students.value = students.value.map(student => {
-      const progress = response.data.find(p => p.studentId === student.studentId)
+      const progress = response.data.find(p => p.id === student.id)
       if (progress) {
         return {
           ...student,
@@ -734,7 +921,15 @@ const loadStudentsProgress = async () => {
 // 导入学生
 const handleImportStudents = async (studentIds) => {
   try {
-    if (!selectedClass.value) return
+    const courseId = effectiveCourseId.value; // For context if needed
+    if (!selectedClass.value || !selectedClass.value.id) {
+        alert('请先选择一个班级。');
+        return;
+    }
+    if (!courseId) {
+        console.error('Course ID not available for importing students.');
+        return;
+    }
     await importStudents(selectedClass.value.id, studentIds)
     // 重新加载学生列表
     await loadStudents()
@@ -746,7 +941,12 @@ const handleImportStudents = async (studentIds) => {
 // 导出成绩
 const handleExportGrades = async () => {
   try {
-    const courseId = route.params.id
+    const courseId = effectiveCourseId.value; // Use effectiveCourseId
+    if (!courseId) {
+      console.error('Course ID is not available for exporting grades.');
+      alert('无法导出成绩，课程信息不完整。');
+      return;
+    }
     const response = await exportCourseGrades(courseId)
     // 处理文件下载
     const url = window.URL.createObjectURL(new Blob([response.data]))
@@ -764,6 +964,11 @@ const handleExportGrades = async () => {
 // 发送提醒
 const handleSendReminder = async (assignmentId, studentIds) => {
   try {
+    // This function primarily uses assignmentId, courseId context might be useful for logging or future enhancements
+    const courseId = effectiveCourseId.value;
+    if (!courseId) {
+        console.warn('Course ID not available while sending reminder, but proceeding as it might not be strictly required by the API.');
+    }
     await sendAssignmentReminder(assignmentId, studentIds)
     // 可以添加提示信息
   } catch (error) {
@@ -772,53 +977,83 @@ const handleSendReminder = async (assignmentId, studentIds) => {
 }
 
 // 加载作业列表
+const fetchAllExerciseSubmissionCounts = async () => {
+  if (!selectedClass.value || !selectedClass.value.id || !exercises.value || exercises.value.length === 0) {
+    console.log('Skipping submission count fetch: No class selected or no exercises.');
+    return;
+  }
+  // Create a new array of promises
+  const submissionPromises = exercises.value.map(async (exercise) => {
+    exercise.isLoadingSubmissions = true;
+    console.log(`Fetching submissions for exercise ID: ${exercise.id}, Title: ${exercise.title}`);
+    try {
+      const response = await getAssignmentSubmissions(selectedClass.value.id, exercise.id);
+      console.log(`Response for exercise ID ${exercise.id}:`, response);
+      const submissionsData = response.data.data;
+      console.log(`Submissions data for exercise ID ${exercise.id}:`, submissionsData);
+      const submissions = Array.isArray(submissionsData) ? submissionsData : [];
+      console.log(`Submissions array for exercise ID ${exercise.id}:`, submissions);
+      exercise.submissionCount = submissions.length;
+      exercise.pending = submissions.filter(submission => submission.status === 'graded_auto').length;
+      console.log(`Calculated for exercise ID ${exercise.id} - SubmissionCount: ${exercise.submissionCount}, Pending: ${exercise.pending}`);
+    } catch (error) {
+      console.error(`Failed to load submission count for exercise ID ${exercise.id} (title: ${exercise.title}):`, error);
+      exercise.submissionCount = 0; // Default to 0 or an error indicator on failure
+      exercise.pending = 0; // Reset pending count on failure as well
+    } finally {
+      exercise.isLoadingSubmissions = false;
+    }
+  });
+  // Wait for all submission count fetches to complete
+  await Promise.all(submissionPromises);
+};
+
 const loadAssignments = async () => {
   try {
-    if (!selectedClass.value) return
-    const courseId = route.params.id
-    const [assignments, chapters] = await Promise.all([
-      getClassAssignments(selectedClass.value.id),
-      getAssignmentChapters(courseId)
-    ])
+    const courseId = effectiveCourseId.value;
+    if (!selectedClass.value || !selectedClass.value.id) {
+        console.log('No class selected, skipping assignment load.');
+        exercises.value = [];
+        return;
+    }
+    if (!courseId) {
+      console.error('Course ID is not available for loading assignments.');
+      exercises.value = [];
+      return;
+    }
+    const assignmentsResponse = await getClassAssignments(selectedClass.value.id);
+    const assignmentList = Array.isArray(assignmentsResponse.data) ? assignmentsResponse.data : (Array.isArray(assignmentsResponse.data?.data) ? assignmentsResponse.data.data : null);
 
-    // 批量获取作业统计信息
-    const assignmentIds = assignments.data.map(a => a.id)
-    const statsResponse = await getBatchAssignmentStats(assignmentIds)
-    const statsMap = new Map(statsResponse.data.map(stat => [stat.assignmentId, stat]))
+    if (!assignmentList) {
+      console.error('作业API未返回有效的数组数据:', assignmentsResponse.data);
+      // exercises.value = 静态作业数据; // Consider defining or removing if not used
+      exercises.value = []; 
+      return;
+    }
 
-    exercises.value = assignments.data.map(assignment => {
-      const stats = statsMap.get(assignment.id) || { submissionCount: 0, accuracyRate: 0, pendingCount: 0 }
+    exercises.value = assignmentList.map(assignment => {
       return {
         id: assignment.id,
         title: assignment.title,
         description: assignment.description,
         date: new Date(assignment.openTime).toLocaleString(),
-        submissions: stats.submissionCount,
-        accuracy: stats.accuracyRate,
-        pending: stats.pendingCount,
+        deadline: new Date(assignment.dueDate).toLocaleString(),
+        submissionCount: 0, // Initialize submission count
+        isLoadingSubmissions: false, // Initialize loading state
+        accuracy: 0, // Default as batch stats were removed
+        pending: 0,  // Default as batch stats were removed
         status: new Date(assignment.dueDate) < new Date() ? '已结束' : '进行中',
-        chapter: chapters.data.find(c => c.id === assignment.chapterId)?.name || '未分类'
-      }
-    })
+        chapter: '未分类'
+      };
+    });
+    // After initial mapping, fetch all submission counts
+    await fetchAllExerciseSubmissionCounts();
   } catch (error) {
-    console.error('Failed to load assignments:', error)
-    // 加载失败时使用静态数据
-    exercises.value = [
-      {
-        id: 1,
-        title: '面向对象编程基础',
-        date: '2023-09-18 09:00:24',
-        description: '掌握面向对象的基本概念和Java中的实现方式，包括类、对象、继承、多态等核心概念。',
-        submissions: 4,
-        accuracy: 85,
-        pending: 1,
-        status: '进行中',
-        chapter: '第1章：Java基础'
-      },
-      // ... 其他静态数据 ...
-    ]
+    console.error('Failed to load assignments:', error);
+    // exercises.value = 静态作业数据; // Consider defining or removing if not used
+    exercises.value = [];
   }
-}
+};
 
 // 监听班级选择变化
 watch(() => selectedClass.value, async (newClass) => {
@@ -826,9 +1061,9 @@ watch(() => selectedClass.value, async (newClass) => {
     await Promise.all([
       loadStudents(),
       loadAssignments(),
-      loadCourseStats()
+      // loadCourseStats() // Temporarily disabled
     ])
-    await loadStudentsProgress()
+    // await loadStudentsProgress(); // Temporarily disabled due to API errors
   } else {
     // 当未选择班级时，清空相关数据
     students.value = []
@@ -842,14 +1077,6 @@ watch(() => selectedClass.value, async (newClass) => {
   }
 })
 
-// 页面加载时初始化数据
-onMounted(async () => {
-  await Promise.all([
-    loadCourseInfo(),
-    loadClasses()
-  ])
-})
-
 // 导航到个人中心页面
 const navigateToProfile = () => {
   router.push('/teacher/profile')
@@ -859,9 +1086,6 @@ const navigateToProfile = () => {
 const tabs = [
   { id: 'members', name: '班级成员', icon: 'i-lucide-users' },
   { id: 'exercises', name: '练习查看及批改', icon: 'i-lucide-clipboard-check' },
-  { id: 'stats', name: '统计', icon: 'i-lucide-bar-chart-3' },
-  { id: 'settings', name: '设置', icon: 'i-lucide-settings' },
-  { id: 'more', name: '更多', icon: 'i-lucide-more-horizontal' },
 ];
 const activeTab = ref('exercises');  // 默认显示练习查看页面
 
@@ -1125,14 +1349,9 @@ const statusFilter = ref(null);
 const showStatusFilter = ref(false);
 const statusFilterDropdown = ref(null);
 
-// Chapter filter for exercises
-const chapterFilter = ref(null);
-const showChapterFilter = ref(false);
-const chapterFilterDropdown = ref(null);
-
 // Exercise statistics modal
-const showExerciseStats = ref(false);
 const currentExercise = ref(null);
+const showExerciseStats = ref(false);
 const activeStatsTab = ref('submitted');
 const selectAllUnsubmitted = ref(false);
 
@@ -1143,20 +1362,6 @@ const itemsPerPage = ref(5);
 // Computed property for status filter label
 const statusFilterLabel = computed(() => {
   return statusFilter.value || '全部';
-});
-
-// Computed property for chapter filter label
-const chapterFilterLabel = computed(() => {
-  return chapterFilter.value ? chapterFilter.value.replace(/第\d+章：/, '') : '全部章节';
-});
-
-// 获取所有唯一的章节
-const uniqueChapters = computed(() => {
-  const chapters = new Set();
-  exercises.value.forEach(exercise => {
-    chapters.add(exercise.chapter);
-  });
-  return Array.from(chapters);
 });
 
 // Methods
@@ -1189,8 +1394,19 @@ const getUnsubmittedClass = (count) => {
 
 // 计算学习进度百分比
 const calculateProgress = (student) => {
-  if (student.totalExercises === 0) return 0;
-  return Math.round((student.submissions / student.totalExercises) * 100);
+  // 使用 student.submissions (提交数) 和 student.unsubmitted (未提交数)
+  const submissions = Number(student.submissions) || 0;
+  const unsubmitted = Number(student.unsubmitted) || 0;
+
+  const totalRelevantAssignments = submissions + unsubmitted;
+
+  if (totalRelevantAssignments === 0) {
+    // 如果提交数和未提交数之和为0，则进度为0
+    // 这可能表示没有相关作业或学生尚未开始
+    return 0;
+  }
+
+  return Math.round((submissions / totalRelevantAssignments) * 100);
 };
 
 // 计算进度圆环的周长
@@ -1198,23 +1414,35 @@ const calculateProgressCircumference = (student) => {
   const progress = calculateProgress(student);
   const radius = 16;
   const circumference = 2 * Math.PI * radius;
-  return (progress / 100) * circumference;
+  const offset = circumference - (progress / 100) * circumference;
+  return offset;
+};
+
+// 删除学生
+const handleDeleteStudent = async (student) => {
+  if (!selectedClass.value || !selectedClass.value.id) {
+    alert('错误：未选择班级，无法执行删除操作。');
+    return;
+  }
+  if (confirm(`确定要从班级 "${selectedClass.value.name}" 中移除学生 "${student.username}" 吗？该学生在此班级的所有作业提交记录也将被删除。`)) {
+    try {
+      await removeStudentFromClass(selectedClass.value.id, student.id);
+      // 从本地学生列表中移除学生
+      students.value = students.value.filter(s => s.id !== student.id);
+      // 可选：重新加载学生列表和班级统计数据，以确保数据一致性
+      // await loadStudents(); 
+      // await loadCourseStats(effectiveCourseId.value);
+      alert(`学生 "${student.username}" 已成功从班级移除。`);
+    } catch (error) {
+      console.error('删除学生失败:', error);
+      alert(`删除学生 "${student.username}" 失败，请稍后重试。错误详情: ${error.message || '未知错误'}`);
+    }
+  }
 };
 
 // 切换状态筛选下拉菜单
 const toggleStatusFilter = () => {
   showStatusFilter.value = !showStatusFilter.value;
-  if (showStatusFilter.value) {
-    showChapterFilter.value = false;
-  }
-};
-
-// 切换章节筛选下拉菜单
-const toggleChapterFilter = () => {
-  showChapterFilter.value = !showChapterFilter.value;
-  if (showChapterFilter.value) {
-    showStatusFilter.value = false;
-  }
 };
 
 // 设置状态筛选
@@ -1223,16 +1451,10 @@ const setStatusFilter = (status) => {
   showStatusFilter.value = false;
 };
 
-// 设置章节筛选
-const setChapterFilter = (chapter) => {
-  chapterFilter.value = chapter;
-  showChapterFilter.value = false;
-};
-
 // 重置所有筛选条件
 const resetFilters = () => {
   statusFilter.value = null;
-  chapterFilter.value = null;
+
   exerciseSearchQuery.value = '';
 };
 
@@ -1254,18 +1476,51 @@ const nextPage = () => {
 };
 
 // 打开练习统计弹窗
-const openExerciseStats = (exercise) => {
+const openExerciseStats = async (exercise) => {
   currentExercise.value = exercise;
   showExerciseStats.value = true;
-  activeStatsTab.value = 'submitted';
-  statsSearchQuery.value = '';
+  activeStatsTab.value = 'submitted'; // Default to submitted tab
+  statsSearchQuery.value = ''; // Reset search query
+  submittedStudentsForExercise.value = []; // Clear previous data
+  unsubmittedStudentsForExercise.value = []; // Clear previous data
+  selectAllUnsubmitted.value = false; // Reset bulk selection for unsubmitted students
 
-  // 为未提交学生添加selected属性用于批量选择
-  unsubmittedStudentsForExercise.value.forEach(student => {
-    student.selected = false;
-  });
+  if (!selectedClass.value || !selectedClass.value.id || !currentExercise.value || !currentExercise.value.id) {
+    console.error('打开练习统计失败：缺少班级ID或练习ID。');
+    // Optionally, display an error message to the user in the modal
+    return;
+  }
 
-  selectAllUnsubmitted.value = false;
+  try {
+    console.log(`正在为练习ID ${currentExercise.value.id} 和班级ID ${selectedClass.value.id} 获取提交记录...`);
+    const response = await getAssignmentSubmissions(selectedClass.value.id, currentExercise.value.id);
+    console.log('获取到的提交记录响应:', response);
+
+    if (response && response.data && Array.isArray(response.data.data)) {
+      const submissionRecords = response.data.data;
+      const submittedStudentIds = new Set(submissionRecords.map(sub => String(sub.studentId)));
+      console.log('已提交学生ID集合:', submittedStudentIds);
+
+      // Populate submittedStudentsForExercise
+      submittedStudentsForExercise.value = students.value.filter(student => 
+        submittedStudentIds.has(String(student.id))
+      );
+      console.log('已提交学生列表 (从班级学生中筛选):', submittedStudentsForExercise.value);
+
+      // Populate unsubmittedStudentsForExercise
+      unsubmittedStudentsForExercise.value = students.value
+        .filter(student => !submittedStudentIds.has(String(student.id)))
+        .map(s => ({ ...s, selected: false })); // Add selected property for bulk operations
+      console.log('未提交学生列表 (从班级学生中筛选):', unsubmittedStudentsForExercise.value);
+
+    } else {
+      console.error('从 getAssignmentSubmissions 获取的数据格式无效:', response);
+      // Handle empty or invalid data, perhaps show a message in the modal
+    }
+  } catch (error) {
+    console.error('获取作业提交记录时出错:', error);
+    // Handle API error, perhaps show a message in the modal
+  }
 };
 
 // 切换全选/取消全选
@@ -1280,13 +1535,90 @@ const handleClickOutside = (event) => {
   if (statusFilterDropdown.value && !statusFilterDropdown.value.contains(event.target)) {
     showStatusFilter.value = false;
   }
-  if (chapterFilterDropdown.value && !chapterFilterDropdown.value.contains(event.target)) {
-    showChapterFilter.value = false;
-  }
+
 };
 
+// 本地存储课程名称
+const localCourseName = ref('');
+
 // 生命周期钩子
-onMounted(() => {
+onMounted(async () => {
+  // 1. Load course data from storage into Pinia store
+  if (typeof courseStore.loadCourseFromStorage === 'function') {
+    courseStore.loadCourseFromStorage();
+  }
+
+  const storeCourseId = courseStore.currentCourseId;
+
+  if (storeCourseId && String(storeCourseId).trim() !== '') {
+    console.log(`从 Store 获取到课程ID: ${storeCourseId}，将从API获取完整课程详情。`);
+    try {
+      const response = await getCourseDetail(storeCourseId);
+      if (response && response.data && response.data.data) {
+        const apiCourseDetails = response.data.data;
+        const courseId = apiCourseDetails.id; // Use ID from API response as source of truth
+        const courseName = apiCourseDetails.name;
+
+        console.log(`API获取成功: ID=${courseId}, 名称=${courseName}`);
+        
+        // Update Pinia store with fresh data from API
+        courseStore.setCurrentCourseId(courseId);
+        console.log(`课程ID已更新到Store: ID=${courseId}`);
+        
+        // Update local reactive variable for display
+        localCourseName.value = courseName;
+
+        // Load dependent data
+        console.log(`准备加载课程相关数据 (ID: ${courseId})`);
+        await nextTick(); // Ensure UI/store updates propagate
+        // if (typeof loadCourseStats === 'function') loadCourseStats(courseId); // Temporarily disabled
+        if (typeof loadClasses === 'function') {
+          await loadClasses(courseId); // Ensure loadClasses is awaited
+
+          if (classes.value && classes.value.length > 0) {
+            // Automatically select the first class.
+            // The selectClass function will update selectedClass.value,
+            // which in turn will trigger the watcher to load students and assignments.
+            selectClass(classes.value[0]);
+            console.log(`已自动选择第一个班级: ${classes.value[0].name} (ID: ${classes.value[0].id})。将加载该班级的数据。`);
+          } else {
+            // No classes available for this course.
+            console.log('该课程下没有班级。清空班级相关数据。');
+            if (selectedClass.value !== null) { 
+              selectClass(null); // This will trigger watcher to clear students/assignments
+            } else {
+              // If selectedClass was already null, watcher won't fire, so clear manually.
+              students.value = [];
+              exercises.value = [];
+            }
+          }
+        } else {
+          console.error('loadClasses 函数未定义。无法加载班级列表。');
+          // Ensure student/exercise data is cleared if classes can't be loaded.
+          students.value = [];
+          exercises.value = [];
+        }
+
+      } else {
+        console.error('获取课程详细信息失败：无效的API响应结构', response);
+        localCourseName.value = '未知课程 (API响应无效)';
+        // Optionally clear store or handle error state if API response is invalid
+        // courseStore.setCurrentCourse(null, null); 
+      }
+    } catch (error) {
+      console.error(`获取课程详细信息时出错 (ID: ${storeCourseId}):`, error);
+      localCourseName.value = '加载课程失败 (API请求错误)';
+      // Optionally clear store or handle error state if API call fails
+      // courseStore.setCurrentCourse(null, null);
+    }
+  } else {
+    console.warn('无法从Store获取有效课程ID。无法加载课程数据。');
+    localCourseName.value = '请选择或指定课程';
+    // Optionally, ensure dependent data loaders are reset or reflect no course state
+    // if (typeof loadCourseStats === 'function') loadCourseStats(null);
+    // if (typeof loadClasses === 'function') loadClasses(null);
+  }
+
   document.addEventListener('click', handleClickOutside);
 });
 
@@ -1295,28 +1627,9 @@ onBeforeUnmount(() => {
 });
 
 // 模拟当前练习的已提交和未提交学生
-const submittedStudentsForExercise = computed(() => {
-  if (!currentExercise.value) return [];
+const submittedStudentsForExercise = ref([]);
 
-  // 这里模拟数据，实际应用中应该根据练习ID和学生提交记录来筛选
-  return students.value.filter(student => {
-    // 假设学生ID为1-4的已提交当前练习
-    return student.id <= 4;
-  });
-});
-
-const unsubmittedStudentsForExercise = computed(() => {
-  if (!currentExercise.value) return [];
-
-  // 这里模拟数据，实际应用中应该根据练习ID和学生提交记录来筛选
-  return students.value.filter(student => {
-    // 假设学生ID为5-6的未提交当前练习
-    return student.id > 4;
-  }).map(student => ({
-    ...student,
-    selected: false // 添加selected属性用于批量选择
-  }));
-});
+const unsubmittedStudentsForExercise = ref([]);
 
 // 提交统计数据
 const submissionStats = computed(() => {
@@ -1335,13 +1648,13 @@ const submissionStats = computed(() => {
 
 // 搜索过滤后的已提交学生
 const filteredSubmittedStudents = computed(() => {
-  if (!statsSearchQuery.value) return submittedStudentsForExercise.value;
-
+  if (!statsSearchQuery.value) {
+    return submittedStudentsForExercise.value;
+  }
   const query = statsSearchQuery.value.toLowerCase();
   return submittedStudentsForExercise.value.filter(student =>
-    student.name.toLowerCase().includes(query) ||
-    student.studentId.toLowerCase().includes(query) ||
-    student.className.toLowerCase().includes(query)
+    (student.username && student.username.toLowerCase().includes(query)) ||
+    (student.id && String(student.id).toLowerCase().includes(query)) // Ensure ID is treated as string for search
   );
 });
 
@@ -1351,8 +1664,8 @@ const filteredUnsubmittedStudents = computed(() => {
 
   const query = statsSearchQuery.value.toLowerCase();
   return unsubmittedStudentsForExercise.value.filter(student =>
-    student.name.toLowerCase().includes(query) ||
-    student.studentId.toLowerCase().includes(query) ||
+    student.username.toLowerCase().includes(query) ||
+    student.id.toLowerCase().includes(query) ||
     student.className.toLowerCase().includes(query)
   );
 });
@@ -1362,15 +1675,24 @@ const filteredStudents = computed(() => {
   let result = students.value;
 
   if (selectedClass.value) {
-    result = result.filter(student => student.className.includes(selectedClass.value.name.split('级')[1]));
+    result = result.filter(student => {
+      const studentClassName = String(student.className || '').toLowerCase();
+      const selectedClassName = String(selectedClass.value.name.split('级')[1] || '').toLowerCase();
+      return studentClassName.includes(selectedClassName);
+    });
   }
 
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase();
-    result = result.filter(student =>
-      student.name.toLowerCase().includes(query) ||
-      student.studentId.toLowerCase().includes(query)
-    );
+    result = result.filter(student => {
+      const studentName = String(student.username || '').toLowerCase();
+      const studentId = String(student.id || '').toLowerCase(); // student.id is likely a number, convert to string
+      const studentClassName = String(student.className || '').toLowerCase();
+
+      return studentName.includes(query) ||
+             studentId.includes(query) ||
+             studentClassName.includes(query);
+    });
   }
 
   return result;
@@ -1402,11 +1724,6 @@ const paginationInfo = computed(() => {
 const filteredExercises = computed(() => {
   let result = exercises.value;
 
-  // 应用章节筛选
-  if (chapterFilter.value) {
-    result = result.filter(exercise => exercise.chapter === chapterFilter.value);
-  }
-
   // 应用状态筛选
   if (statusFilter.value) {
     result = result.filter(exercise => exercise.status === statusFilter.value);
@@ -1435,7 +1752,14 @@ const filteredClasses = computed(() => {
 });
 
 const goBack = () => {
-  router.push(`/course/${route.params.id}`)
+  const courseId = effectiveCourseId.value; // Use effectiveCourseId
+  if (courseId) {
+    router.push(`/course/${courseId}`);
+  } else {
+    console.error("Cannot go back, course ID not found.");
+    // Fallback navigation if courseId is somehow not available
+    router.push('/teacher/home'); 
+  }
 }
 </script>
 
@@ -1499,6 +1823,31 @@ const goBack = () => {
   margin: 0;
   font-size: 14px;
   opacity: 0.9;
+}
+
+/* Action bar styles */
+.action-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e0e0e0;
+  background-color: #fff;
+}
+
+.class-invitation-code {
+  font-size: 14px;
+  color: #555;
+  background-color: #f0f0f0;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.invitation-code-value {
+  font-weight: 600;
+  color: #333;
 }
 
 .course-stats {
@@ -1746,6 +2095,187 @@ const goBack = () => {
   margin: 0;
   color: #333;
   font-weight: 600;
+}
+
+/* Import Students Modal Styles */
+.import-students-modal .modal-content {
+  width: 550px;
+  max-width: 90vw;
+}
+
+.import-students-modal .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 1.25rem; /* Increased */
+  border-bottom: 1px solid #eee;
+}
+
+.import-students-modal .modal-header h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+  display: flex;
+  align-items: center;
+}
+
+.import-students-modal .btn-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #888;
+}
+.import-students-modal .btn-close:hover {
+  color: #333;
+}
+
+.import-students-modal .modal-body {
+  padding-top: 1.75rem; /* Increased */
+  padding-bottom: 1.75rem; /* Increased */
+}
+
+.import-method-tabs {
+  display: flex;
+  margin-bottom: 1.75rem; /* Increased */
+  border-bottom: 1px solid #ddd;
+}
+
+.import-method-tabs .tab-button {
+  padding: 0.75rem 1rem;
+  border: none;
+  background-color: transparent;
+  cursor: pointer;
+  font-size: 1rem;
+  color: #555;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px; /* Align with parent border */
+  display: flex;
+  align-items: center;
+}
+
+.import-method-tabs .tab-button.active {
+  color: var(--el-color-primary, #409eff);
+  border-bottom-color: var(--el-color-primary, #409eff);
+  font-weight: 600;
+}
+
+.import-method-tabs .tab-button:hover:not(.active) {
+  color: #333;
+}
+
+.import-section {
+  padding: 1rem 0;
+  margin-bottom: 1rem; /* Added margin for spacing below sections */
+}
+
+.file-upload-label {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  /* border: 1px solid #ccc; */
+  /* border-radius: 4px; */
+  cursor: pointer;
+  /* background-color: #f9f9f9; */
+  transition: background-color 0.2s;
+}
+
+/* .file-upload-label:hover {
+  background-color: #f0f0f0;
+} */
+
+.file-input {
+  display: none; /* Hide the default file input */
+}
+
+.import-section textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  resize: vertical;
+  min-height: 120px;
+}
+
+.import-section textarea:focus {
+  outline: none;
+  border-color: var(--el-color-primary, #409eff);
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
+}
+
+.import-students-modal .modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 1.25rem; /* Increased */
+  padding-right: 0.25rem; /* Slight padding for right edge if needed */
+  padding-bottom: 0.25rem; /* Slight padding for bottom edge */
+  border-top: 1px solid #eee;
+}
+
+.import-students-modal .modal-actions .btn {
+  margin-left: 0.75rem; /* Increased */
+}
+
+.alert {
+  padding: 0.85rem 1.35rem; /* Slightly increased padding */
+  margin-top: 1.25rem; /* Ensure space above alerts */
+  margin-bottom: 1rem;
+  border: 1px solid transparent;
+  border-radius: .25rem;
+}
+
+.alert-danger {
+  color: #721c24;
+  background-color: #f8d7da;
+  border-color: #f5c6cb;
+}
+
+.alert-success {
+  color: #155724;
+  background-color: #d4edda;
+  border-color: #c3e6cb;
+}
+
+.text-danger {
+  color: #dc3545 !important;
+}
+
+.text-muted {
+  color: #6c757d !important;
+}
+
+.mb-2 {
+  margin-bottom: 0.5rem !important;
+}
+
+.mt-2 {
+  margin-top: 0.5rem !important;
+}
+
+.mt-3 {
+  margin-top: 1rem !important;
+}
+
+.mr-1 {
+  margin-right: 0.25rem !important;
+}
+
+.mr-2 {
+  margin-right: 0.5rem !important;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .panel-actions {
@@ -2149,6 +2679,68 @@ tr:hover td {
 .exercise-actions {
   display: flex;
   gap: 10px;
+}
+
+.btn-icon.btn-delete {
+  background-color: #f44336; /* Vivid red background */
+  color: white; /* White icon/text color */
+  border: 1px solid #d32f2f; /* Slightly darker red border */
+  padding: 6px 12px; /* Adjusted padding for text */
+  border-radius: 4px; /* Standard border radius */
+  transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  display: flex; /* For aligning icon and text */
+  align-items: center; /* Vertically center icon and text */
+  gap: 6px; /* Space between icon and text */
+  font-weight: 500; /* Make text slightly bolder */
+  line-height: 1; /* Ensure icon is vertically centered if padding affects it */
+}
+
+.btn-icon.btn-delete:hover {
+  background-color: #d32f2f; /* Darker red on hover */
+  border-color: #c62828;
+  transform: translateY(-1px); /* Slight lift effect */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn-icon.btn-delete:active {
+  background-color: #b71c1c; /* Even darker red on active/click */
+  transform: translateY(0px);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Ensure the icon itself is styled correctly */
+.btn-icon.btn-delete .i-lucide-trash-2 {
+  color: white !important; /* Ensure icon color is white */
+  vertical-align: middle; /* Better alignment for icon */
+}
+
+.actions-cell {
+  text-align: center; /* 让按钮在单元格内居中 */
+}
+
+.btn-delete {
+  color: #e53e3e; /* 醒目的红色文字 */
+  background-color: transparent; /* 透明背景 */
+  border: 1px solid transparent; /* 可选：透明边框，悬停时改变 */
+  padding: 6px 8px; /* 调整内边距使按钮更易点击 */
+  border-radius: 4px; /* 圆角 */
+  cursor: pointer; /* 手型光标 */
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease; /* 平滑过渡效果 */
+  display: inline-flex; /* 使图标和文字对齐 */
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-delete:hover {
+  background-color: #fed7d7; /* 鼠标悬停时的浅红色背景 */
+  color: #c53030; /* 鼠标悬停时的深红色文字 */
+  border-color: #f56565; /* 可选：悬停时边框颜色 */
+}
+
+.btn-delete .i-lucide-trash-2 {
+  font-size: 1.1rem; /* 调整图标大小 */
+  line-height: 1; /* 确保图标垂直居中 */
 }
 
 /* Empty state */

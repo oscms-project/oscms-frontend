@@ -147,4 +147,31 @@ export const getCourseChapters = (courseId) => {
   return getCourseDetail(courseId).then(response => {
     return response.data.chapters || []
   })
-} 
+}
+
+// 获取学生在特定班级的作业完成摘要
+export const getStudentAssignmentSummary = (classId, studentId) => {
+  return request({
+    url: `/classes/${classId}/students/${studentId}/assignment-summary`,
+    method: 'get'
+  });
+};
+
+// 创建新班级
+export const createClass = (data) => {
+  return request({
+    url: '/classes',
+    method: 'post',
+    data
+  });
+};
+
+// 从班级移除学生
+export const removeStudentFromClass = (classId, studentId) => {
+  return request({
+    url: `/classes/${classId}/students/${studentId}`,
+    method: 'delete'
+  });
+};
+
+// 获取学生在特定班级的作业完成摘要

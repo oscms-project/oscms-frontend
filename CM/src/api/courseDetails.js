@@ -11,10 +11,8 @@ export function getCourseOutline(courseId) {
 }
 
 // 更新课程大纲
-export function updateCourseOutline(courseId, outline) {
-  return axios.put(`/courses/${courseId}`, {
-    outline
-  })
+export function updateCourseOutline(courseId, courseObject) {
+  return axios.put(`/courses/${courseId}`, courseObject);
 }
 
 // 获取课程资源列表
@@ -42,25 +40,22 @@ export function getResourceVersion(materialId, version) {
 }
 
 // 更新课程章节
-export function updateCourseChapters(courseId, chapters) {
-  // 将 chapters 数组转换为 JSON 字符串，并通过 outline 字段发送
-  const outlineString = JSON.stringify(chapters);
-  return axios.put(`/courses/${courseId}`, {
-    outline: outlineString // 使用 outline 字段
-  });
+export function updateCourseChapters(courseId, courseObject) {
+  // No longer stringifies chapters into outline; sends the whole courseObject
+  return axios.put(`/courses/${courseId}`, courseObject);
 }
 
 // 获取课程下的所有班级
 export function getCourseClasses(courseId) {
-  return axios.get(`/courses/${courseId}/classes`)
+  return axios.get(`/courses/${courseId}/classes`);
 }
 
 // 获取班级学生列表
 export function getClassStudents(classId) {
-  return axios.get(`/classes/${classId}/students`)
+  return axios.get(`/classes/${classId}/students`);
 }
 
 // 获取班级作业列表
 export function getClassAssignments(classId) {
-  return axios.get(`/classes/${classId}/assignments`)
-} 
+  return axios.get(`/classes/${classId}/assignments`);
+}

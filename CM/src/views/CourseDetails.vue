@@ -8,13 +8,17 @@
         <p class="course-meta">{{ courseStudents }}{{ courseDuration }}</p>
       </div>
       <div class="action-buttons">
-        <button class="btn btn-primary" @click="showPublishExerciseModal">
+        <button class="btn btn-light-blue" @click="showPublishExerciseModal">
           <i class="i-lucide-file-plus mr-1"></i>
           发布练习
         </button>
+        <button class="btn btn-light-blue" @click="openCreateClassModal">
+          <i class="i-lucide-plus-circle mr-1"></i>
+          创建班级
+        </button>
         <button class="btn btn-default" @click="navigateToClassManagement">
           <i class="i-lucide-users mr-1"></i>
-          班级管理
+          班级和练习管理
         </button>
         <div class="user-avatar" @click="navigateToProfile">
           <img :src="userInfo.avatar" alt="用户头像" />
@@ -151,6 +155,10 @@
               {{ resource.updatedAt}}
             </p>
             <p class="resource-description" v-if="resource.description">{{ resource.description }}</p>
+            <p class="resource-visibility" v-if="resource.hasOwnProperty('visibleForClasses')">
+              <i class="i-lucide-users mr-1"></i>
+              可见范围: {{ getVisibleClassNames(resource) }}
+            </p>
           </div>
         </div>
       </div>
@@ -201,16 +209,10 @@
                 </div>
                 <p class="section-description">{{ section.description }}</p>
               </div>
-              <button class="btn btn-sm btn-outline add-section-btn" @click="showAddSectionModal(chapter.id)">
-                <i class="i-lucide-plus mr-1"></i>
-                添加小节
-              </button>
+
             </div>
             <div class="chapter-actions">
-              <button class="btn btn-sm btn-outline" @click="editChapter(chapter.id)">
-                <i class="i-lucide-edit mr-1"></i>
-                编辑章节
-              </button>
+
               <button class="btn btn-sm btn-outline danger" @click="confirmDeleteChapter(chapter.id)">
                 <i class="i-lucide-trash-2 mr-1"></i>
                 删除章节
@@ -377,8 +379,8 @@
       </div>
       <div class="modal-body">
         <div class="form-group">
-          <label for="chapterNumber">章节编号</label>
-          <input type="text" id="chapterNumber" v-model="newChapter.number" placeholder="例如：第1章">
+          <label for="chapterNumber">章节序号</label>
+          <input type="number" id="chapterNumber" v-model.number="newChapter.order" placeholder="例如：1 (纯数字)">
         </div>
         <div class="form-group">
           <label for="chapterTitle">章节标题</label>
@@ -386,7 +388,7 @@
         </div>
         <div class="form-actions">
           <button class="btn btn-default" @click="closeAddChapterModal">取消</button>
-          <button class="btn btn-primary" @click="saveChapter">{{ editingChapter ? '保存' : '添加' }}</button>
+          <button class="btn btn-primary" @click="saveChapter">{{ editingChapter ? '更新章节' : '添加章节' }}</button>
         </div>
       </div>
     </div>
@@ -956,7 +958,7 @@
         </button>
       </div>
       <div class="modal-body">
-        <div class="form-group">
+            <div class="form-group">
           <label for="outlineContent">课程大纲内容</label>
           <textarea
             id="outlineContent"
@@ -965,7 +967,7 @@
             rows="15"
             placeholder="请输入课程大纲内容"
           ></textarea>
-        </div>
+            </div>
         <div class="form-actions">
           <button class="btn btn-default" @click="closeOutlineEditModal">取消</button>
           <button class="btn btn-primary" @click="saveOutlineChanges">保存更改</button>
@@ -974,10 +976,37 @@
     </div>
   </div>
 </div>
+
+  <!-- Create Class Modal -->
+  <div v-if="showCreateClassModal" class="modal-overlay" @click="closeCreateClassModal">
+    <div class="modal-content" @click.stop>
+      <div class="modal-header">
+        <h3>创建新班级</h3>
+        <button class="btn-close" @click="closeCreateClassModal">
+          <i class="i-lucide-x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="newClassName">班级名称</label>
+          <input type="text" id="newClassName" v-model="newClassName" placeholder="请输入班级名称">
+        </div>
+        <div class="form-group">
+          <label for="newClassCode">班级邀请码</label>
+          <input type="text" id="newClassCode" v-model="newClassCode" placeholder="请输入班级邀请码">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-default" @click="closeCreateClassModal">取消</button>
+        <button class="btn btn-primary" @click="handleCreateClass">创建</button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
+import { createClass } from '@/api/courseManagement.js'; // 确保路径正确
 import { useUserStore } from '@/stores/user';
 import { useCourseStore } from '@/stores/course';
 import { useRouter, useRoute } from 'vue-router';
@@ -985,7 +1014,7 @@ import { getCourseDetail } from '@/api/course';
 import { getMaterials, getCourseMaterials, uploadCourseMaterialFile } from '@/api/materials';
 import { getClassAssignments } from '@/api/class';
 import { getCourseClasses } from '@/api/course';
-import { updateCourseOutline } from '@/api/courseDetails'; // Added for outline update
+import { updateCourseOutline, updateCourseChapters } from '@/api/courseDetails'; // Added updateCourseChapters
 
 const userStore = useUserStore();
 const courseStore = useCourseStore();
@@ -996,6 +1025,8 @@ const route = useRoute();
 const loading = ref(false);
 const error = ref('');
 const availableClassesForPermissions = ref([]); // New ref for dynamic class list
+const rawOutlineFromApi = ref(''); // Stores the raw outline string from API
+const currentFullCourseData = ref(null); // Stores the full course object from API load
 
 // 从 store 获取课程ID
 const courseId = computed(() => courseStore.currentCourseId);
@@ -1016,7 +1047,7 @@ const navigateToProfile = () => {
 
 // 导航到班级管理页面
 const navigateToClassManagement = () => {
-  router.push(`/course/${courseId.value}/management`)
+  router.push(`/course/:id/management`);
 };
 
 // Course information
@@ -1033,7 +1064,6 @@ const tabs = [
   { id: 'outline', name: '课程大纲', icon: 'i-lucide-file-text' },
   { id: 'resources', name: '课程资源', icon: 'i-lucide-folder' },
   { id: 'chapters', name: '课程章节', icon: 'i-lucide-book' },
-  { id: 'exercises', name: '课程练习', icon: 'i-lucide-clipboard-check' },
 ];
 const activeTab = ref('resources');  // 默认显示课程资源页面
 
@@ -1290,7 +1320,9 @@ const showOutlineEditModal = ref(false);
 const editingChapter = ref(null);
 const editingSection = ref(false);
 const editingResource = ref(false);
-const chapterToDelete = ref(null);
+// const chapterToDelete = ref(null); // Replaced by chapterIdMarkedForDelete and chapterOrderToFilterBy
+const chapterIdMarkedForDelete = ref(null);
+const chapterOrderToFilterBy = ref(null);
 const sectionToDelete = ref(null);
 const resourceToDelete = ref(null);
 const currentChapterId = ref(null);
@@ -1301,10 +1333,10 @@ const editingOutline = ref(null);
 
 // 新章节、小节和资源数据
 const newChapter = ref({
-  id: null,
-  number: '',
-  title: '',
-  sections: []
+  // id: null, // ID will be assigned by backend or implicitly by array index if not sent
+  order: null, // Chapter order/number
+  title: ''
+  // sections: [] // Sections are not managed when adding a new chapter title/order initially
 });
 
 const newSection = ref({
@@ -1420,12 +1452,12 @@ const filteredExercises = computed(() => {
 // 过滤后的资源列表
 const filteredResources = computed(() => {
   let result = courseResources.value;
-  
+
   // 应用类型筛选
   if (resourceTypeFilter.value) {
     result = result.filter(resource => resource.type === resourceTypeFilter.value);
   }
-  
+
   // 应用搜索筛选
   if (resourceSearchQuery.value) {
     const query = resourceSearchQuery.value.toLowerCase();
@@ -1465,45 +1497,126 @@ const toggleChapter = (chapterId) => {
 
 // 添加/编辑章节
 const saveChapter = async () => {
-  if (newChapter.value.number && newChapter.value.title) {
-    if (editingChapter.value) {
-      // 更新现有章节
-      const index = courseChapters.value.findIndex(ch => ch.id === newChapter.value.id);
-      if (index !== -1) {
-        // 保留原有的sections和expanded状态
-        const sections = courseChapters.value[index].sections;
-        const expanded = courseChapters.value[index].expanded;
+  // Validate input for adding a new chapter
+  if (!editingChapter.value) { // This block is for ADDING a new chapter
+    if (!newChapter.value.title || newChapter.value.title.trim() === '') {
+      alert('章节标题不能为空。');
+      return;
+    }
+    if (newChapter.value.order === null || newChapter.value.order === undefined || newChapter.value.order <= 0) {
+      alert('章节序号必须是一个正数。');
+      return;
+    }
+    if (!currentFullCourseData.value) {
+      alert('课程基础数据未加载，无法添加章节。');
+      console.error("Error in saveChapter (add mode): currentFullCourseData.value is null or undefined.");
+      return;
+    }
 
-        courseChapters.value[index] = {
-          ...newChapter.value,
-          sections,
-          expanded,
-          date: new Date().toLocaleString()
-        };
-      }
+    try {
+      loading.value = true;
+      error.value = '';
+
+      const existingChapters = Array.isArray(currentFullCourseData.value.chapters) ? [...currentFullCourseData.value.chapters] : [];
+      
+      const newChapterToAdd = {
+        // id: null, // Backend should generate ID for new chapter
+        title: newChapter.value.title.trim(),
+        order: newChapter.value.order,
+        // Add any other default fields for a new chapter if necessary, e.g., description, sections, expanded
+        description: '', 
+        sections: [],
+        expanded: true 
+      };
+      
+      const updatedChaptersArray = [...existingChapters, newChapterToAdd];
+      // Optional: Sort chapters by order again if necessary, though adding to end and relying on backend sort might be fine.
+      // updatedChaptersArray.sort((a, b) => a.order - b.order);
+
+      const courseObjectToSend = { ...currentFullCourseData.value }; // Create a copy of the full course data
+      courseObjectToSend.chapters = updatedChaptersArray; // Set the updated chapters array
+      
+      // If the backend still expects chapters as a JSON string in the outline field of the FULL object:
+      // courseObjectToSend.outline = JSON.stringify(updatedChaptersArray);
+      // And potentially delete courseObjectToSend.chapters if the backend gets confused by having both.
+      // For now, assuming backend handles 'chapters' array in the full course object directly.
+
+      const response = await updateCourseChapters(courseId.value, courseObjectToSend);
+
+      if (response && response.data && response.data.data) {
+        const updatedCourseFromResponse = response.data.data;
+        currentFullCourseData.value = updatedCourseFromResponse; // Update the stored full course data
+
+        // Re-populate local display refs from the new full course data
+        courseName.value = currentFullCourseData.value.name || '';
+        courseStudents.value = currentFullCourseData.value.studentCount?.toString() || '0';
+        courseDuration.value = currentFullCourseData.value.duration || '';
+        rawOutlineFromApi.value = currentFullCourseData.value.outline || '';
+
+        // Parse outline for courseOutline.value
+        const outlineStringToParse = rawOutlineFromApi.value;
+        if (typeof outlineStringToParse === 'string' && outlineStringToParse.trim().startsWith('[')) {
+          try {
+            const parsed = JSON.parse(outlineStringToParse);
+            courseOutline.value = Array.isArray(parsed) ? parsed : [{ title: "课程大纲", description: outlineStringToParse, points: [] }];
+          } catch (e) {
+            courseOutline.value = [{ title: "课程大纲 (解析失败)", description: outlineStringToParse, points: [] }];
+          }
+        } else if (typeof outlineStringToParse === 'string') {
+          courseOutline.value = [{ title: "课程大纲", description: outlineStringToParse, points: [] }];
     } else {
-      // 添加新章节
-      const newId = courseChapters.value.length > 0
-        ? Math.max(...courseChapters.value.map(ch => ch.id)) + 1
-        : 1;
+          courseOutline.value = [];
+        }
 
-      courseChapters.value.push({
-        id: newId,
-        number: newChapter.value.number,
-        title: newChapter.value.title,
-        date: new Date().toLocaleString(),
-        expanded: false,
-        sections: []
-      });
+        // Update courseChapters.value from the definitive chapters field in the response
+        if (currentFullCourseData.value.chapters && Array.isArray(currentFullCourseData.value.chapters)) {
+            courseChapters.value = currentFullCourseData.value.chapters.map((chapter, index) => ({
+                id: chapter.id || 'ch-' + index + '-' + Date.now(), // Ensure IDs if backend doesn't return them for new chapters
+                title: chapter.title || '章节 ' + (index + 1),
+                order: chapter.order || index + 1,
+                description: chapter.description || '',
+                sections: chapter.sections || [],
+                expanded: chapter.expanded === undefined ? true : chapter.expanded,
+            }));
+        } else {
+            // Fallback if chapters are not directly in the response, try parsing from outline (less likely now)
+            console.warn("No direct 'chapters' array in response, attempting to parse from outline as fallback.");
+            if (typeof outlineStringToParse === 'string' && outlineStringToParse.trim().startsWith('[')) {
+                 try {
+                    const parsedChapters = JSON.parse(outlineStringToParse);
+                    if(Array.isArray(parsedChapters)) {
+                         courseChapters.value = parsedChapters.map((chapter, index) => ({
+                            id: chapter.id || 'ch-' + index + '-' + Date.now(),
+                            title: chapter.title || '章节 ' + (index + 1),
+                            order: chapter.order || index + 1,
+                            description: chapter.description || '',
+                            sections: chapter.sections || [],
+                            expanded: chapter.expanded === undefined ? true : chapter.expanded,
+                        }));
+                    } else { courseChapters.value = []; }
+                 } catch (e) { courseChapters.value = []; }
+            } else { courseChapters.value = []; }
     }
 
     closeAddChapterModal();
-    
-    try {
-      await updateCourseChapters(route.params.id, courseChapters.value);
-    } catch (error) {
-      console.error('保存章节失败:', error);
+      } else {
+        console.error("添加章节后API未返回有效数据或数据格式不正确", response);
+        error.value = "添加成功，但未能正确刷新数据显示。请检查API响应。";
+        alert(error.value);
+      }
+    } catch (err) {
+      console.error('添加章节失败:', err);
+      error.value = err.response?.data?.message || err.message || '添加章节失败，请重试';
+      alert(`添加章节失败: ${error.value}`);
+    } finally {
+      loading.value = false;
     }
+
+  } else { // Logic for EDITING an existing chapter
+    // This part calls updateChapter, which likely needs similar changes if it also needs to send the full course object.
+    // For now, focusing on ADDING a chapter.
+    console.log("Editing existing chapter - calling updateChapter(). Review updateChapter() logic if necessary.");
+    updateChapter(); 
   }
 };
 
@@ -1537,8 +1650,17 @@ const updateChapter = () => {
 };
 
 // 确认删除章节
-const confirmDeleteChapter = (chapterId) => {
-  chapterToDelete.value = chapterId;
+const confirmDeleteChapter = (idOfChapterToMark) => {
+  const chapterObj = courseChapters.value.find(ch => String(ch.id) === String(idOfChapterToMark));
+  
+  if (!chapterObj || typeof chapterObj.order !== 'number') {
+    console.error('Chapter not found in courseChapters or has invalid order for deletion:', idOfChapterToMark, chapterObj);
+    alert('无法准备删除章节：未在当前章节列表中找到该章节，或章节信息不完整。');
+    return;
+  }
+  
+  chapterIdMarkedForDelete.value = idOfChapterToMark;
+  chapterOrderToFilterBy.value = chapterObj.order;
   deleteType.value = 'chapter';
   showDeleteConfirmation.value = true;
 };
@@ -1559,10 +1681,125 @@ const confirmDeleteResource = (resource) => {
 };
 
 // 执行删除操作
-const confirmDelete = () => {
-  if (deleteType.value === 'chapter' && chapterToDelete.value) {
-    courseChapters.value = courseChapters.value.filter(ch => ch.id !== chapterToDelete.value);
-    chapterToDelete.value = null;
+const confirmDelete = async () => {
+  if (deleteType.value === 'chapter' && chapterOrderToFilterBy.value !== null && chapterOrderToFilterBy.value !== undefined) {
+    if (!currentFullCourseData.value) {
+      alert("课程基础数据未加载，无法删除章节。");
+      console.error("Error in confirmDelete (chapter): currentFullCourseData.value is null or undefined.");
+      chapterIdMarkedForDelete.value = null; // Reset specific refs for chapter deletion
+      chapterOrderToFilterBy.value = null;
+      closeDeleteConfirmation();
+      return;
+    }
+
+    try {
+      loading.value = true;
+      error.value = '';
+
+      const courseObjectCopy = JSON.parse(JSON.stringify(currentFullCourseData.value));
+      const orderToDelete = chapterOrderToFilterBy.value;
+      
+      const initialChapterCount = courseObjectCopy.chapters ? courseObjectCopy.chapters.length : 0;
+      
+      // Filter courseObjectCopy.chapters by order. API chapters should have 'order'.
+      courseObjectCopy.chapters = courseObjectCopy.chapters
+        ? courseObjectCopy.chapters.filter(apiChapter => {
+            // Ensure apiChapter.order exists and is a number before comparing
+            return typeof apiChapter.order === 'number' && apiChapter.order !== orderToDelete;
+          })
+        : [];
+      
+      if (courseObjectCopy.chapters.length === initialChapterCount && initialChapterCount > 0) {
+          console.warn("Chapter with ORDER:", orderToDelete, "not found for deletion in API data copy or list was already filtered. Current API chapters:", courseObjectCopy.chapters);
+          // This might happen if the chapter was already deleted by another means or if order matching failed.
+          // For safety, you might want to alert the user or re-fetch data if this state is unexpected.
+      } else if (initialChapterCount === 0 && courseObjectCopy.chapters.length === 0) {
+          console.log("Attempted to delete from an already empty chapter list.");
+      }
+
+      const response = await updateCourseChapters(courseId.value, courseObjectCopy);
+
+      if (response && response.data && response.data.data) {
+        const updatedCourseFromResponse = response.data.data;
+        currentFullCourseData.value = updatedCourseFromResponse; // Update the stored full course data
+
+        // Re-populate local display refs from the new full course data
+        courseName.value = currentFullCourseData.value.name || '';
+        courseStudents.value = currentFullCourseData.value.studentCount?.toString() || '0'; 
+        courseDuration.value = currentFullCourseData.value.duration || '';
+        rawOutlineFromApi.value = currentFullCourseData.value.outline || '';
+
+        // Re-parse outline for courseOutline.value
+        const outlineStringToParse = rawOutlineFromApi.value;
+        if (typeof outlineStringToParse === 'string' && outlineStringToParse.trim().startsWith('[')) {
+          try {
+            const parsed = JSON.parse(outlineStringToParse);
+            courseOutline.value = Array.isArray(parsed) ? parsed : [{ title: "课程大纲", description: outlineStringToParse, points: [] }];
+          } catch (e) {
+            console.warn("Failed to parse updated outline as JSON array for 'courseOutline' tab after chapter delete, treating as plain description:", e);
+            courseOutline.value = [{ title: "课程大纲 (解析失败)", description: outlineStringToParse, points: [] }];
+          }
+        } else if (typeof outlineStringToParse === 'string') {
+          courseOutline.value = [{ title: "课程大纲", description: outlineStringToParse, points: [] }];
+        } else {
+          courseOutline.value = [];
+        }
+
+        // Re-populate courseChapters.value from the definitive chapters field in the response
+        if (currentFullCourseData.value.chapters && Array.isArray(currentFullCourseData.value.chapters)) {
+            courseChapters.value = currentFullCourseData.value.chapters.map((chapter, index) => ({
+                id: chapter.id || 'ch-' + index + '-' + Date.now(),
+                title: chapter.title || '章节 ' + (index + 1),
+                order: chapter.order || index + 1,
+                description: chapter.description || '',
+                sections: chapter.sections || [],
+                expanded: chapter.expanded === undefined ? true : chapter.expanded,
+            }));
+        } else {
+            console.warn("No direct 'chapters' array in response after chapter delete, attempting to parse from outline as fallback.");
+             if (typeof outlineStringToParse === 'string' && outlineStringToParse.trim().startsWith('[')) {
+                 try {
+                    const parsedChapters = JSON.parse(outlineStringToParse);
+                    if(Array.isArray(parsedChapters)) {
+                         courseChapters.value = parsedChapters.map((chapter, index) => ({
+                            id: chapter.id || 'ch-' + index + '-' + Date.now(),
+                            title: chapter.title || '章节 ' + (index + 1),
+                            order: chapter.order || index + 1,
+                            description: chapter.description || '',
+                            sections: chapter.sections || [],
+                            expanded: chapter.expanded === undefined ? true : chapter.expanded,
+                        }));
+                    } else { courseChapters.value = []; }
+                 } catch (e) { courseChapters.value = []; }
+            } else { courseChapters.value = []; }
+        }
+        
+        console.log('章节删除成功，数据已刷新。');
+      } else {
+        console.error("删除章节后API未返回有效数据或数据格式不正确", response);
+        error.value = "删除成功，但未能正确刷新数据显示。请检查API响应。";
+        alert(error.value);
+        // Optionally, could attempt to re-fetch all course info as a fallback
+        // await fetchAllCourseInfo(); 
+      }
+    } catch (err) {
+      console.error('删除章节失败:', err);
+      const apiErrorMessage = err.response?.data?.message || err.message || '未知错误';
+      error.value = '删除章节失败: ' + apiErrorMessage;
+      alert(error.value);
+    } finally {
+      loading.value = false;
+      chapterIdMarkedForDelete.value = null; 
+      chapterOrderToFilterBy.value = null;
+      closeDeleteConfirmation();
+    }
+
+  } else if (deleteType.value === 'chapter' && (chapterOrderToFilterBy.value === null || chapterOrderToFilterBy.value === undefined)) {
+    console.error("Attempted to delete chapter, but chapter order for filtering was not properly set.");
+    alert("删除操作失败：未能准备好要删除的章节信息，请重试。");
+    chapterIdMarkedForDelete.value = null; // Reset related refs
+    chapterOrderToFilterBy.value = null;
+    closeDeleteConfirmation(); 
   } else if (deleteType.value === 'section' && sectionToDelete.value && currentChapterId.value) {
     const chapterIndex = courseChapters.value.findIndex(ch => ch.id === currentChapterId.value);
     if (chapterIndex !== -1) {
@@ -1572,12 +1809,15 @@ const confirmDelete = () => {
     }
     sectionToDelete.value = null;
     currentChapterId.value = null;
+    closeDeleteConfirmation(); // Ensure modal closes for section deletion too
   } else if (deleteType.value === 'resource' && resourceToDelete.value) {
     courseResources.value = courseResources.value.filter(resource => resource.id !== resourceToDelete.value);
     resourceToDelete.value = null;
+    closeDeleteConfirmation(); // Ensure modal closes for resource deletion too
+  } else {
+    // If deleteType is not recognized or target is null, just close.
+    closeDeleteConfirmation();
   }
-
-  closeDeleteConfirmation();
 };
 
 // 显示添加小节模态框
@@ -1717,7 +1957,7 @@ const uploadResource = async () => {
     });
   } else if (resourcePermissions.value.visibility === 'all') {
     // If visibility is 'all', OpenAPI suggests not sending 'visibleForClasses' implies all classes.
-  } else {
+    } else {
     // If 'specific' but no classes selected, OpenAPI says "若为空列表则均不可见".
     // How to send an "empty list" for a multi-value field in FormData can be backend-specific.
     // Often, not sending the field or sending a specific marker is how this is handled.
@@ -2027,12 +2267,10 @@ const getAccuracyClass = (accuracy) => {
 // 关闭模态框
 const closeAddChapterModal = () => {
   showAddChapterModal.value = false;
-  editingChapter.value = null;
+  editingChapter.value = null; // Clear editing state
   newChapter.value = {
-    id: null,
-    number: '',
-    title: '',
-    sections: []
+    order: null, // Reset for next add
+    title: ''
   };
 };
 
@@ -2083,7 +2321,8 @@ const closePublishExerciseModal = () => {
 
 const closeDeleteConfirmation = () => {
   showDeleteConfirmation.value = false;
-  chapterToDelete.value = null;
+  chapterIdMarkedForDelete.value = null;
+  chapterOrderToFilterBy.value = null;
   sectionToDelete.value = null;
   resourceToDelete.value = null;
   currentChapterId.value = null;
@@ -2137,46 +2376,104 @@ onBeforeUnmount(() => {
 });
 // 在 script setup 部分添加以下方法
 const openOutlineEditor = () => {
-  try {
-    editingOutline.value = JSON.stringify(courseOutline.value, null, 2); // Pretty-print JSON for textarea
-  } catch (e) {
-    console.error("Error stringifying course outline for editor:", e);
-    editingOutline.value = "无法加载大纲内容进行编辑。"; // Fallback
-  }
+  editingOutline.value = rawOutlineFromApi.value; // Display raw outline string in textarea
   showOutlineEditModal.value = true;
 };
 
 const saveOutlineChanges = async () => {
-  if (!editingOutline.value) {
+  if (!editingOutline.value && editingOutline.value !== '') { // Allow empty string
     alert("大纲内容不能为空。");
     return;
   }
-
-  let parsedOutlineForDisplay;
-  try {
-    parsedOutlineForDisplay = JSON.parse(editingOutline.value);
-  } catch (e) {
-    alert("大纲内容格式不正确 (非法的JSON格式)。请检查并修正。");
-    console.error("Error parsing outline from textarea:", e);
+  if (!currentFullCourseData.value) {
+    alert("课程基础数据未加载，无法保存大纲。");
+    console.error("Error in saveOutlineChanges: currentFullCourseData.value is null or undefined.");
     return;
   }
 
-  // Add a loading state for this specific action if needed, e.g., const isSavingOutline = ref(false);
-  // isSavingOutline.value = true;
   try {
-    loading.value = true; // Use global loading or a specific one
+    loading.value = true;
     error.value = '';
-    await updateCourseOutline(courseId.value, editingOutline.value); // Send the string directly
-    courseOutline.value = parsedOutlineForDisplay; // Update main display with parsed structure
-    showOutlineEditModal.value = false;
-    // alert('课程大纲更新成功！'); // Optional success message
+
+    const courseObjectToSend = { ...currentFullCourseData.value };
+    courseObjectToSend.outline = editingOutline.value;
+
+    const response = await updateCourseOutline(courseId.value, courseObjectToSend);
+
+    if (response && response.data && response.data.data) {
+      const updatedCourseFromResponse = response.data.data;
+      currentFullCourseData.value = updatedCourseFromResponse; // Update the stored full course data
+
+      // Re-populate local display refs from the new full course data
+      courseName.value = currentFullCourseData.value.name || '';
+      // Ensure studentCount and duration are handled correctly (e.g., string or number as needed by UI)
+      courseStudents.value = currentFullCourseData.value.studentCount?.toString() || '0'; 
+      courseDuration.value = currentFullCourseData.value.duration || '';
+      rawOutlineFromApi.value = currentFullCourseData.value.outline || '';
+
+      // Re-parse for courseOutline.value (intended for "课程大纲" tab)
+      const newOutlineStringForOutlineTab = rawOutlineFromApi.value;
+      if (typeof newOutlineStringForOutlineTab === 'string' && newOutlineStringForOutlineTab.trim().startsWith('[')) {
+        try {
+          const parsedForOutlineTab = JSON.parse(newOutlineStringForOutlineTab);
+          courseOutline.value = Array.isArray(parsedForOutlineTab) ? parsedForOutlineTab : [{ title: "课程大纲", description: newOutlineStringForOutlineTab, points: [] }];
+        } catch (e) {
+          console.warn("Failed to parse updated outline as JSON array for 'courseOutline' tab, treating as plain description:", e);
+          courseOutline.value = [{ title: "课程大纲 (解析失败)", description: newOutlineStringForOutlineTab, points: [] }];
+        }
+      } else if (typeof newOutlineStringForOutlineTab === 'string') {
+        courseOutline.value = [{ title: "课程大纲", description: newOutlineStringForOutlineTab, points: [] }];
+      } else {
+        console.warn("Updated outline is not a string, cannot populate 'courseOutline' tab.", newOutlineStringForOutlineTab);
+        courseOutline.value = [];
+      }
+
+      // Re-parse for courseChapters.value (intended for "课程章节" tab)
+      // This logic might need to be more sophisticated if outline and chapters are distinct fields in currentFullCourseData.value
+      // For now, assuming the outline field from backend might contain chapter JSON string as per previous logic.
+      const outlineForChaptersParse = currentFullCourseData.value.outline; 
+      if (typeof outlineForChaptersParse === 'string' && outlineForChaptersParse.trim().startsWith('[')) {
+          try {
+              const parsedChapters = JSON.parse(outlineForChaptersParse);
+              if (Array.isArray(parsedChapters)) {
+                  courseChapters.value = parsedChapters.map((chapter, index) => ({
+                      id: chapter.id || 'ch-' + index + '-' + Date.now(),
+                      title: chapter.title || '章节 ' + (index + 1),
+                      order: chapter.order || index + 1,
+                      description: chapter.description || '',
+                      sections: chapter.sections || [],
+                      expanded: chapter.expanded === undefined ? true : chapter.expanded,
+                  }));
+              } else {
+                   console.warn("Parsed outline for 'courseChapters' tab is JSON but not an array.");
+                   courseChapters.value = currentFullCourseData.value.chapters || []; // Fallback to a dedicated chapters field if available
+              }
+          } catch (e) {
+              console.error('Failed to parse updated outline as JSON for courseChapters:', e);
+              courseChapters.value = currentFullCourseData.value.chapters || []; // Fallback to a dedicated chapters field
+          }
+      } else if (currentFullCourseData.value.chapters && Array.isArray(currentFullCourseData.value.chapters)) {
+          // If outline is not chapter JSON, but there's a direct chapters array, use that.
+          courseChapters.value = currentFullCourseData.value.chapters;
+      } else {
+          console.warn("Cannot derive chapters: outline is not a JSON array string, and no direct chapters field found.");
+          courseChapters.value = [];
+      }
+
+  showOutlineEditModal.value = false;
+    } else {
+      console.error("保存大纲后API未返回有效数据或数据格式不正确", response);
+      error.value = "保存成功，但未能正确刷新数据显示。请检查API响应。";
+      alert(error.value);
+    }
+
   } catch (err) {
     console.error('保存大纲失败:', err);
-    error.value = err.response?.data?.message || err.message || '保存大纲失败，请重试';
-    alert(`保存大纲失败: ${error.value}`);
+    const apiErrorMessage = err.response?.data?.message || err.message || '未知错误';
+    error.value = '保存大纲失败: ' + apiErrorMessage;
+    alert(error.value);
   } finally {
     loading.value = false;
-    // isSavingOutline.value = false;
   }
 };
 
@@ -2393,6 +2690,11 @@ const updateTotalScore = () => {
 const selectedQuestionType = ref(null);
 const questionSearchQuery = ref('');
 
+// Create Class Modal State
+const showCreateClassModal = ref(false);
+const newClassName = ref('');
+const newClassCode = ref('');
+
 // 添加 API 数据加载函数
 /*
 const loadApiData = async () => {
@@ -2446,42 +2748,76 @@ const fetchAllCourseInfo = async () => {
     loading.value = true;
     error.value = '';
     
-    console.log("正在获取课程详情，ID:", courseId.value);
-    
     const courseRes = await getCourseDetail(courseId.value);
-    console.log("课程详情API返回:", courseRes);
     
     if (courseRes.data && courseRes.data.data) {
-      const courseData = courseRes.data.data;
-      courseName.value = courseData.name;
-      courseStudents.value = courseData.studentCount;
-      courseDuration.value = courseData.duration;
+      currentFullCourseData.value = courseRes.data.data; // Store the full course object
+
+      // Populate other refs from currentFullCourseData.value
+      courseName.value = currentFullCourseData.value.name || '';
+      // Ensure studentCount and duration are handled correctly (e.g., string or number as needed by UI)
+      courseStudents.value = currentFullCourseData.value.studentCount?.toString() || '0';
+      courseDuration.value = currentFullCourseData.value.duration || '';
+      rawOutlineFromApi.value = currentFullCourseData.value.outline || '';
       
-      // 处理大纲数据
-      const outlineDataFromApi = courseData.outline;
-      if (typeof outlineDataFromApi === 'string' && outlineDataFromApi.trim().startsWith('[')) {
+      // 处理大纲数据 for structured display (courseOutline.value)
+      const outlineDataToParse = rawOutlineFromApi.value;
+      if (typeof outlineDataToParse === 'string' && outlineDataToParse.trim().startsWith('[')) {
         try {
-          const parsed = JSON.parse(outlineDataFromApi);
+          const parsed = JSON.parse(outlineDataToParse);
           if (Array.isArray(parsed)) {
             courseOutline.value = parsed;
           } else {
             console.warn("Parsed outline data is not an array. Wrapping as description.");
-            courseOutline.value = [{ title: "课程大纲", description: outlineDataFromApi, points: [] }];
+            courseOutline.value = [{ title: "课程大纲", description: outlineDataToParse, points: [] }];
           }
         } catch (e) {
           console.warn("Failed to parse course outline JSON string, treating as plain description:", e);
-          courseOutline.value = [{ title: "课程大纲", description: outlineDataFromApi, points: [] }];
+          courseOutline.value = [{ title: "课程大纲", description: outlineDataToParse, points: [] }];
         }
-      } else if (Array.isArray(outlineDataFromApi)) { // Should not happen if API sends string per OpenAPI
-        courseOutline.value = outlineDataFromApi;
-      } else if (typeof outlineDataFromApi === 'string') { // Plain string, not JSON array
+      } else if (Array.isArray(outlineDataToParse)) { // Should not happen if API sends string per OpenAPI
+        courseOutline.value = outlineDataToParse;
+      } else if (typeof outlineDataToParse === 'string') { // Plain string, not JSON array
          console.warn("Course outline is a plain string. Wrapping as description.");
-         courseOutline.value = [{ title: "课程大纲", description: outlineDataFromApi, points: [] }];
-      }else {
+         courseOutline.value = [{ title: "课程大纲", description: outlineDataToParse, points: [] }];
+      } else {
         courseOutline.value = [];
       }
       
-      courseChapters.value = courseData.chapters || [];
+      // 处理章节数据 (courseChapters.value)
+      // This logic should correctly interpret chapters, whether they are in a dedicated field or from the outline string.
+      if (currentFullCourseData.value.chapters && Array.isArray(currentFullCourseData.value.chapters)) {
+        courseChapters.value = currentFullCourseData.value.chapters.map((chapter, index) => ({
+            id: chapter.id || 'ch-' + index + '-' + Date.now(),
+            title: chapter.title || '章节 ' + (index + 1),
+            order: chapter.order || index + 1,
+            description: chapter.description || '',
+            sections: chapter.sections || [],
+            expanded: chapter.expanded === undefined ? true : chapter.expanded,
+        }));
+      } else if (typeof outlineDataToParse === 'string' && outlineDataToParse.trim().startsWith('[')) {
+        // If no direct chapters field, try parsing outline as chapters (fallback as per previous logic)
+        try {
+          const parsedChapters = JSON.parse(outlineDataToParse);
+          if (Array.isArray(parsedChapters)) {
+            courseChapters.value = parsedChapters.map((chapter, index) => ({
+                id: chapter.id || 'ch-' + index + '-' + Date.now(),
+                title: chapter.title || '章节 ' + (index + 1),
+                order: chapter.order || index + 1,
+                description: chapter.description || '',
+                sections: chapter.sections || [],
+                expanded: chapter.expanded === undefined ? true : chapter.expanded,
+            }));
+          } else { // Outline is JSON array but not structured as chapters expected by this mapping
+            courseChapters.value = [];
+          }
+        } catch (e) { // Outline is not a valid JSON for chapters
+          courseChapters.value = [];
+        }
+      } else {
+        courseChapters.value = []; // No chapter data found
+      }
+
       console.log("课程基本信息处理完成");
       console.log("大纲数据:", courseOutline.value);
       console.log("章节数据:", courseChapters.value);
@@ -2506,38 +2842,66 @@ const fetchAllCourseInfo = async () => {
       courseResources.value = []; // Set default on error
     }
 
-    // 获取课程练习
+    // 获取课程练习 - 新逻辑
+    exercises.value = []; // Reset exercises before fetching
     try {
-      const assignmentsRes = await getClassAssignments(courseId.value); // Assuming this takes courseId, check API if it's classId
-      console.log("课程练习API返回:", assignmentsRes);
-      if (assignmentsRes.data && assignmentsRes.data.data) {
-        exercises.value = assignmentsRes.data.data;
-        console.log("课程练习获取成功:", exercises.value);
+      console.log("准备获取课程班级列表以加载练习, courseId:", courseId.value);
+      const classesRes = await getCourseClasses(courseId.value); // This is already called above for permissions, reuse or ensure it populates a usable list.
+      
+      let allClassesForAssignments = [];
+      if (classesRes.data && classesRes.data.data) {
+        allClassesForAssignments = classesRes.data.data; // Assuming this is an array of class objects with an 'id' property
+        console.log("获取到班级列表 for assignments:", allClassesForAssignments);
       } else {
-        console.warn("课程练习为空或格式异常");
+        console.warn("课程下没有班级或班级列表获取失败，无法加载练习。");
+      }
+
+      if (allClassesForAssignments.length > 0) {
+        const assignmentPromises = allClassesForAssignments.map(classItem =>
+          getClassAssignments(classItem.id)
+            .then(res => {
+              if (res.data && res.data.data) {
+                return res.data.data; // Expecting an array of assignments
+              }
+              console.warn(`班级 ${classItem.id} 的练习数据为空或格式异常`);
+              return []; // Return empty array for this class on error/no data
+            })
+            .catch(err => {
+              console.error(`获取班级 ${classItem.id} 的练习失败:`, err);
+              return []; // Return empty array for this class on error
+            })
+        );
+
+        const results = await Promise.all(assignmentPromises);
+        exercises.value = results.flat(); // Flatten the array of arrays
+        console.log("所有班级练习汇总成功:", exercises.value);
+      } else {
+        console.log("课程没有班级，练习列表为空。");
         exercises.value = [];
       }
     } catch (err) {
-      console.error("获取课程练习失败:", err);
+      console.error("获取课程练习的整体流程失败 (获取班级或练习时出错):", err);
       exercises.value = []; // Set default on error
     }
 
-    // 获取课程下的班级列表 for permissions
+    // 获取课程下的班级列表 for permissions (This part was already there, ensure it runs correctly)
+    // It seems redundant if classesRes above is already fetching the same data.
+    // We can potentially consolidate this.
+    // For now, let it run as is, but consider refactoring if it's a duplicate call.
     try {
-      console.log("正在获取课程班级列表 for permissions, ID:", courseId.value);
-      const classesRes = await getCourseClasses(courseId.value);
-      console.log("课程班级列表API返回:", classesRes);
-      if (classesRes.data && classesRes.data.data) {
-        availableClassesForPermissions.value = classesRes.data.data.map(cls => ({ id: cls.id, name: cls.name }));
-        console.log("课程班级列表获取成功:", availableClassesForPermissions.value);
+      console.log("正在获取课程班级列表 for permissions, ID:", courseId.value); // This log was already present
+      const classesPermissionRes = await getCourseClasses(courseId.value); // Potentially redundant call
+      console.log("课程班级列表API返回 for permissions:", classesPermissionRes);
+      if (classesPermissionRes.data && classesPermissionRes.data.data) {
+        availableClassesForPermissions.value = classesPermissionRes.data.data.map(cls => ({ id: cls.id, name: cls.name }));
+        console.log("课程班级列表获取成功 for permissions:", availableClassesForPermissions.value);
       } else {
-        console.warn("课程班级列表为空或格式异常");
+        console.warn("课程班级列表为空或格式异常 for permissions");
         availableClassesForPermissions.value = [];
       }
     } catch (err) {
-      console.error("获取课程班级列表失败:", err);
-      availableClassesForPermissions.value = []; // Set default on error
-      // Optionally set a specific error message for this part
+      console.error("获取课程班级列表失败 for permissions:", err);
+      availableClassesForPermissions.value = []; 
     }
 
   } catch (err) {
@@ -2546,6 +2910,62 @@ const fetchAllCourseInfo = async () => {
     error.value = err.response?.data?.message || err.message || "获取课程信息失败，请重试";
   } finally {
     loading.value = false;
+  }
+};
+
+// Watch for courseId changes
+// Create Class Modal Functions
+const openCreateClassModal = () => {
+  newClassName.value = '';
+  newClassCode.value = '';
+  showCreateClassModal.value = true;
+};
+
+const closeCreateClassModal = () => {
+  showCreateClassModal.value = false;
+};
+
+const handleCreateClass = async () => {
+  if (!newClassName.value.trim()) {
+    alert('请输入班级名称');
+    return;
+  }
+  if (!newClassCode.value.trim()) {
+    alert('请输入班级邀请码');
+    return;
+  }
+  if (!courseId.value) {
+    alert('获取课程ID失败，无法创建班级');
+    console.error('Course ID is not available.');
+    return;
+  }
+
+  try {
+    const classData = {
+      name: newClassName.value.trim(),
+      code: newClassCode.value.trim(),
+      courseId: courseId.value
+    };
+    const response = await createClass(classData);
+    // 假设API成功响应时，直接返回创建的班级对象或成功状态
+    // 根据实际API响应结构调整下面的判断逻辑
+    if (response && (response.status === 201 || response.status === 200 || response.data)) { // 假设201是创建成功, 或者检查response.data
+      alert(`班级 "${classData.name}" 创建成功！`);
+      closeCreateClassModal();
+      // 可以在这里添加刷新班级列表等后续操作
+    } else {
+      // 处理API返回的特定错误信息
+      const errorMessage = response && response.data && response.data.message ? response.data.message : '创建班级失败，请稍后再试。';
+      alert(errorMessage);
+      console.error('Failed to create class:', response);
+    }
+  } catch (error) {
+    console.error('Error creating class:', error);
+    let errorMessage = '创建班级过程中发生错误。';
+    if (error.response && error.response.data && error.response.data.message) {
+      errorMessage = error.response.data.message;
+    }
+    alert(errorMessage);
   }
 };
 
@@ -2560,6 +2980,27 @@ watch(courseId, (newId) => {
 onMounted(() => {
   fetchAllCourseInfo();
 });
+
+// Helper function to get displayable class names for resource visibility
+const getVisibleClassNames = (resource) => {
+  if (!resource.visibleForClasses || resource.visibleForClasses === null) {
+    return '所有人可见';
+  }
+  if (resource.visibleForClasses.length === 0) {
+    return '仅创建者可见'; // Corresponds to "若为空列表则均不可见"
+  }
+  if (availableClassesForPermissions.value && availableClassesForPermissions.value.length > 0) {
+    const classNames = resource.visibleForClasses
+      .map(id => {
+        const foundClass = availableClassesForPermissions.value.find(cls => String(cls.id) === String(id)); // Ensure type a.g.nostic comparison for IDs
+        return foundClass ? foundClass.name : `班级ID:${id}`;
+      })
+      .filter(name => name);
+    return classNames.length > 0 ? classNames.join(', ') : '未指定班级或班级信息加载失败';
+  }
+  // Fallback if class list isn't ready but resource has specific classes
+  return resource.visibleForClasses.map(id => `班级ID:${id}`).join(', ') || '信息加载中...';
+};
 </script>
 
 <style scoped>
@@ -2665,7 +3106,7 @@ onMounted(() => {
 }
 
 .tab-item {
-  padding: 16px 24px;
+  padding: 16px 32px;
   border-bottom: 3px solid transparent;
   cursor: pointer;
   display: flex;
@@ -2945,6 +3386,21 @@ onMounted(() => {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.resource-visibility {
+  font-size: 13px;
+  color: #555; /* Slightly darker for better readability */
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0; /* Separator line */
+  display: flex;
+  align-items: center;
+}
+
+.resource-visibility i {
+  color: #666; /* Icon color */
+  margin-right: 6px; /* Spacing after icon */
 }
 
 /* Course Chapters Tab styles */
@@ -3672,6 +4128,26 @@ onMounted(() => {
 }
 
 /* Responsive styles */
+.btn-light-blue {
+  background-color: #A0D2DB; /* Light Blue */
+  border-color: #A0D2DB;
+  color: #FFFFFF; /* White text */
+}
+
+.btn-light-blue:hover {
+  background-color: #8FBEC5; /* Darker Light Blue */
+  border-color: #8FBEC5;
+  color: #FFFFFF;
+}
+
+.btn-light-blue:active,
+.btn-light-blue:focus {
+  background-color: #7DAEB5; /* Even Darker Light Blue */
+  border-color: #7DAEB5;
+  color: #FFFFFF;
+  box-shadow: 0 0 0 0.2rem rgba(160, 210, 219, 0.5); /* Optional: focus ring */
+}
+
 @media (max-width: 768px) {
   .header-content {
     flex-direction: column;
