@@ -86,7 +86,7 @@
                         <div v-for="(option, oIndex) in currentQuestion.options" :key="oIndex"
                             class="flex items-center p-3 rounded-lg cursor-pointer hover:bg-gray-50"
                             :class="{ 'bg-green-50 border border-green-200': newAnswers[currentQuestionIndex] === oIndex }"
-                            @click="selectAnswer(oIndex)">
+                            @click="!questionSubmitted[currentQuestionIndex] && selectAnswer(oIndex)">
                             <div class="w-6 h-6 rounded-full flex items-center justify-center border mr-2"
                                 :class="{ 'bg-green-500 border-green-500 text-white': newAnswers[currentQuestionIndex] === oIndex, 'border-gray-300': newAnswers[currentQuestionIndex] !== oIndex }">
                                 {{ ['A', 'B', 'C', 'D'][oIndex] }}
@@ -119,7 +119,8 @@
                             </div>
                             <textarea v-model="newCodeAnswers[currentQuestionIndex]"
                                 class="w-full p-4 font-mono text-sm h-64 focus:outline-none" placeholder="在此编写代码..."
-                                @copy="detectCopy" @paste="detectPaste" @cut="detectCut"></textarea>
+                                @copy="detectCopy" @paste="detectPaste" @cut="detectCut"
+                                :disabled="questionSubmitted[currentQuestionIndex]"></textarea>
                         </div>
 
                         <!-- 上次测试结果 -->
@@ -156,6 +157,28 @@
                     </div>
                 </div>
             </div>
+            
+            <!-- 答案解析部分 - 只在题目提交后显示 -->
+            <div v-if="questionSubmitted[currentQuestionIndex]" class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h3 class="text-lg font-bold text-blue-800 mb-2">答案解析</h3>
+                
+                <div class="mb-4">
+                    <div class="font-medium text-gray-700">正确答案:</div>
+                    <div v-if="exercise.type === 'choice'" 
+                         class="mt-2 px-4 py-2 bg-green-100 border border-green-200 rounded text-green-800 font-bold">
+                        {{ formatCorrectAnswer(getCurrentQuestionCorrectAnswer) }}
+                    </div>
+                    <pre v-else 
+                         class="mt-2 p-4 bg-gray-100 border border-gray-200 rounded text-gray-800 overflow-x-auto font-mono text-sm">{{ getCurrentQuestionCorrectAnswer }}</pre>
+                </div>
+                
+                <div v-if="currentQuestion.explanation">
+                    <div class="font-medium text-gray-700">解析说明:</div>
+                    <p class="mt-2 px-4 py-2 bg-yellow-50 border border-yellow-200 rounded">
+                        {{ currentQuestion.explanation }}
+                    </p>
+                </div>
+            </div>
 
             <!-- 导航按钮 -->
             <div class="flex justify-between mt-6">
@@ -164,17 +187,31 @@
                     :class="{ 'opacity-50 cursor-not-allowed': currentQuestionIndex === 0 }" @click="previousQuestion">
                     上一题
                 </button>
-
-                <button v-if="currentQuestionIndex < incorrectQuestions.length - 1"
-                    class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-6 rounded-lg"
-                    @click="nextQuestion">
-                    下一题
-                </button>
-
-                <button v-else class="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-6 rounded-lg"
-                    @click="confirmSubmit">
+                
+                <!-- 当前题未提交时显示提交按钮 -->
+                <button v-if="!questionSubmitted[currentQuestionIndex]"
+                    class="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-6 rounded-lg"
+                    @click="submitCurrentQuestion">
                     提交答案
                 </button>
+                
+                <div>
+                    <button v-if="currentQuestionIndex < incorrectQuestions.length - 1"
+                        class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-6 rounded-lg"
+                        :disabled="!questionSubmitted[currentQuestionIndex]"
+                        :class="{ 'opacity-50 cursor-not-allowed': !questionSubmitted[currentQuestionIndex] }"
+                        @click="nextQuestion">
+                        下一题
+                    </button>
+                    
+                    <button v-else 
+                        class="bg-purple-500 hover:bg-purple-600 text-white font-medium py-2 px-6 rounded-lg"
+                        :disabled="!allQuestionsSubmitted"
+                        :class="{ 'opacity-50 cursor-not-allowed': !allQuestionsSubmitted }"
+                        @click="confirmSubmit">
+                        完成练习
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -193,9 +230,13 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useCourseStore } from '@/stores/course';
 import { getSubmissionDetail, getAssignmentQuestions } from '@/api/assignment';
+import { useUserStore } from '@/stores/user';
 
 const router = useRouter();
 const courseStore = useCourseStore();
+const userStore = useUserStore();
+
+
 
 // 用户信息 - 使用模拟数据进行预览
 const user = ref({
@@ -226,23 +267,22 @@ const showMessage = (message) => {
     }, 2000);
 };
 
-// 检查是否有重做信息
-if (!courseStore.retryExerciseId || !courseStore.retrySubmissionId) {
-    router.push({ name: 'StudentCourses' });
-}
+
 
 // 获取练习和提交信息
 const exercise = ref({});
 const previousSubmission = ref({});
 const loading = ref(true);
+const questionSubmitted = ref([]);
 
 onMounted(async () => {
-    try {
+    
         loading.value = true;
         // 从 store 获取练习ID和提交ID
-        const exerciseId = courseStore.retryExerciseId;
-        const submissionId = courseStore.retrySubmissionId;
-
+        // 改为使用currentSubmissionId
+        const exerciseId = courseStore.currentExerciseId;
+        const submissionId = courseStore.currentSubmissionId;
+        
         // 验证ID是否存在
         if (!exerciseId || !submissionId) {
             throw new Error('练习信息不完整');
@@ -263,37 +303,47 @@ onMounted(async () => {
             questions
         };
         previousSubmission.value = submission;
-    } catch (error) {
-        showMessage(error.message || '加载失败');
-        router.push({ name: 'StudentCourses' });
-    } finally {
+        
+        // 初始化题目提交状态跟踪数组
+        setTimeout(() => {
+            questionSubmitted.value = new Array(incorrectQuestionIndices.value.length).fill(false);
+        }, 100);
+        
+        // 启动计时器
+        startTime.value = Date.now();
+        timerInterval = setInterval(updateTimer, 1000);
+        
+        // 添加防作弊监听
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('blur', handleWindowBlur);
+        document.addEventListener('contextmenu', (e) => e.preventDefault());
+        document.addEventListener('copy', detectCopy);
+        document.addEventListener('paste', detectPaste);
+  
         loading.value = false;
-    }
+    
 });
 
-// 组件卸载时清除重做信息
-onUnmounted(() => {
-    courseStore.clearRetryInfo();
-});
-
-// 错误题目索引
+// 错题索引计算 - 使用correct字段
 const incorrectQuestionIndices = computed(() => {
-    if (exercise.value.type === 'choice') {
-        return exercise.value.questions
-            .map((q, index) => (previousSubmission.value.answers[index] !== q.correctAnswer ? index : -1))
-            .filter(index => index !== -1);
-    } else {
-        return exercise.value.questions
-            .map((q, index) => {
-                if (!q.testResults) return -1;
-                return q.testResults.some(test => !test.passed) ? index : -1;
-            })
-            .filter(index => index !== -1);
-    }
+  if (!previousSubmission.value || !previousSubmission.value.answers) return [];
+  
+  // 创建一个问题ID到索引的映射表
+  const questionIndexMap = {};
+  exercise.value.questions?.forEach((question, index) => {
+    questionIndexMap[question.id] = index;
+  });
+
+  // 筛选出incorrect=false的题目的索引
+  return previousSubmission.value.answers
+    .filter(answer => answer.correct === false) // 只保留错误的题目
+    .map(answer => questionIndexMap[answer.questionId])
+    .filter(index => index !== undefined); // 过滤掉未匹配的题目
 });
 
-// 错误题目
+// 错题列表
 const incorrectQuestions = computed(() => {
+    if (!exercise.value.questions) return [];
     return incorrectQuestionIndices.value.map(index => exercise.value.questions[index]);
 });
 
@@ -310,12 +360,37 @@ const currentQuestion = computed(() => {
 const newAnswers = ref([]);
 const newCodeAnswers = ref([]);
 
-// 初始化新答案数组
-if (exercise.value.type === 'choice') {
-    newAnswers.value = new Array(incorrectQuestions.value.length).fill(null);
-} else {
-    newCodeAnswers.value = incorrectQuestionIndices.value.map(index => previousSubmission.value.codeAnswers[index] || '');
-}
+// 检查是否所有题目都已提交
+const allQuestionsSubmitted = computed(() => {
+    return questionSubmitted.value.every(submitted => submitted === true);
+});
+
+// 获取当前题目的正确答案
+const getCurrentQuestionCorrectAnswer = computed(() => {
+    if (!currentQuestion.value || !previousSubmission.value.answers) return null;
+    
+    // 根据当前题目ID查找对应答案
+    const questionId = currentQuestion.value.id;
+    const answerData = previousSubmission.value.answers.find(a => a.questionId === questionId);
+    
+    return answerData?.correctAnswer || '未提供答案';
+});
+
+// 格式化显示答案（针对选择题）
+const formatCorrectAnswer = (answer) => {
+    if (!answer) return '未提供答案';
+    
+    if (exercise.value.type === 'choice') {
+        // 如果是数字索引转为字母
+        if (typeof answer === 'number') {
+            return ['A', 'B', 'C', 'D'][answer];
+        }
+        // 如果已经是字母直接返回
+        return answer;
+    }
+    // 编程题直接返回代码
+    return answer;
+};
 
 // 选择答案
 const selectAnswer = (optionIndex) => {
@@ -332,45 +407,53 @@ const previousQuestion = () => {
 // 下一题
 const nextQuestion = () => {
     if (currentQuestionIndex.value < incorrectQuestions.value.length - 1) {
-        // 检查当前题目是否已回答
-        if (exercise.value.type === 'choice' && newAnswers.value[currentQuestionIndex.value] === null) {
-            showMessage('请先回答当前题目');
+        // 必须先提交当前题目才能进入下一题
+        if (!questionSubmitted.value[currentQuestionIndex.value]) {
+            showMessage('请先提交当前题目答案');
             return;
         }
-
+        
         currentQuestionIndex.value++;
     }
 };
 
-// 确认提交
-const confirmSubmit = () => {
-    // 检查是否所有题目都已回答
-    if (exercise.value.type === 'choice') {
-        const unansweredIndex = newAnswers.value.findIndex(answer => answer === null);
-        if (unansweredIndex !== -1) {
-            showMessage(`第 ${unansweredIndex + 1} 题还未回答`);
-            currentQuestionIndex.value = unansweredIndex;
-            return;
-        }
+// 提交当前题目答案
+const submitCurrentQuestion = () => {
+    // 检查当前题目是否已回答
+    if (exercise.value.type === 'choice' && newAnswers.value[currentQuestionIndex.value] === null) {
+        showMessage('请先选择答案');
+        return;
     }
-
-    if (confirm('确定要提交吗？提交后将无法修改答案。')) {
-        submitAnswers();
+    
+    if (exercise.value.type !== 'choice' && !newCodeAnswers.value[currentQuestionIndex.value]?.trim()) {
+        showMessage('请先编写代码');
+        return;
     }
+    
+    // 标记该题已提交，可查看答案
+    questionSubmitted.value[currentQuestionIndex.value] = true;
+    
+    // 显示提交成功消息
+    showMessage('答案已提交，可查看正确答案');
 };
 
-// 提交答案
-const submitAnswers = () => {
-    // 在实际应用中，这里应该调用API提交答案
-    console.log('提交错题重做答案', exercise.value.type === 'choice' ? newAnswers.value : newCodeAnswers.value);
+// 确认提交
+const confirmSubmit = () => {
+    // 检查是否所有题目都已提交
+    if (!allQuestionsSubmitted.value) {
+        showMessage('请完成所有题目');
+        return;
+    }
 
-    // 显示提交成功提示
-    showMessage('答案已提交');
+    if (confirm('确定要完成练习吗？完成后将返回练习反馈页面。')) {
+        // 显示提交成功提示
+        showMessage('练习完成');
 
-    // 2秒后跳转回反馈页面
-    setTimeout(() => {
-        goBackToFeedback();
-    }, 1000);
+        // 2秒后跳转回反馈页面
+        setTimeout(() => {
+            goBackToFeedback();
+        }, 1000);
+    }
 };
 
 // 返回反馈页面
@@ -388,6 +471,7 @@ const confirmExit = () => {
 // 计时器相关
 const startTime = ref(Date.now());
 const elapsedTime = ref(0);
+let timerInterval;
 
 // 格式化时间（秒 -> HH:MM:SS）
 const formatTime = (seconds) => {
@@ -403,7 +487,6 @@ const formatTime = (seconds) => {
 };
 
 // 更新计时器
-let timerInterval;
 const updateTimer = () => {
     elapsedTime.value = Math.floor((Date.now() - startTime.value) / 1000);
 };
@@ -439,24 +522,21 @@ const detectCut = (event) => {
     showMessage('检测到剪切操作！请不要在考试期间剪切内容。');
 };
 
-// 组件挂载时
+// 初始化新答案和代码答案数组
 onMounted(() => {
-    // 启动计时器
-    timerInterval = setInterval(updateTimer, 1000);
-
-    // 添加页面可见性变化事件监听
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    // 添加窗口失焦事件监听
-    window.addEventListener('blur', handleWindowBlur);
-
-    // 禁用右键菜单
-    document.addEventListener('contextmenu', (e) => e.preventDefault());
-
-    // 禁用全局复制粘贴
-    document.addEventListener('copy', detectCopy);
-    document.addEventListener('paste', detectPaste);
-    document.addEventListener('cut', detectCut);
+  if (incorrectQuestions.value && incorrectQuestions.value.length > 0) {
+    if (exercise.value.type === 'choice') {
+      newAnswers.value = new Array(incorrectQuestions.value.length).fill(null);
+    } else {
+      // 查找原始代码答案并填充
+      newCodeAnswers.value = incorrectQuestionIndices.value.map(index => {
+        // 从提交中查找对应题目的代码答案
+        const questionId = exercise.value.questions[index]?.id;
+        const answer = previousSubmission.value.answers.find(a => a.questionId === questionId);
+        return answer?.codeResponse || '';
+      });
+    }
+  }
 });
 
 // 组件卸载时
@@ -470,5 +550,7 @@ onUnmounted(() => {
     document.removeEventListener('copy', detectCopy);
     document.removeEventListener('paste', detectPaste);
     document.removeEventListener('cut', detectCut);
+    // 清除重做信息
+    courseStore.clearRetryInfo();
 });
 </script>
