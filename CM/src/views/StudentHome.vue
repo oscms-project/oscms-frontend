@@ -132,8 +132,7 @@ import { useRouter } from 'vue-router';
 const router = useRouter();
 //api中封装的方法
 import { getUser, getUserCourses } from '@/api/user'
-import { getCourseDetail } from '@/api/course'
-import { getExerciseRecords } from '@/api/record'
+import { getStudentClasses, getStudentAssignmentSummary } from '@/api/class';
 //component中封装的组件
 import BaseCarousel from '@/components/BaseCarousel.vue'
 import BaseHeader from '@/components/BaseHeader.vue'
@@ -189,54 +188,28 @@ const activeTab = ref(0);
 
 // 测试课程数据
 const testCourses = ref([
-  {
-    id: 'test-os-001',
-    title: '操作系统',
-    teacher: '孙海龙',
-    image: 'https://placeholder.svg?height=200&width=300',
-    bgColor: '#0a4d8c',
-    type: 0
-  },
-  {
-    title: '人工智能',
-    teacher: '张晶',
-    image: 'https://placeholder.svg?height=200&width=300',
-    bgColor: '#ff7e45',
-    type: 0
-  },
-  {
-    title: '数据管理技术',
-    teacher: '黄坚',
-    image: 'https://placeholder.svg?height=200&width=300',
-    bgColor: '#2e1a7a',
-    type: 0
-  },
-  {
-    title: '面向对象程序设计',
-    teacher: '高祥',
-    image: 'https://placeholder.svg?height=200&width=300',
-    bgColor: '#b71c1c',
-    type: 1
-  },
-  {
-    title: '算法分析与设计',
-    teacher: '宋友',
-    image: 'https://placeholder.svg?height=200&width=300',
-    bgColor: '#1565c0',
-    type: 1
-  },
-  {
-    title: '计算机硬件基础',
-    teacher: '牛建伟',
-    image: 'https://placeholder.svg?height=200&width=300',
-    bgColor: '#42a5f5',
-    type: 1
-  },
+  
 ]);
 
 // 后端课程数据
 const realCourses = ref([]);
-
+const fetchStudentCoursesList = async () => {
+  try {
+    const res = await getUserCourses(userStore.userId);
+    if (res.data && res.data.data) {
+      realCourses.value = res.data.data.map(c => ({
+        id: c.id,
+        title: c.name,
+        teacher: c.teacherName || '未知教师',
+        image: c.image || 'https://placeholder.svg?height=200&width=300',
+        bgColor: '#2196f3',
+        type: c.completed ? 1 : 0 // 1: 已结课, 0: 进行中
+      }));
+    }
+  } catch (e) {
+    console.error('获取课程列表失败', e);
+  }
+};
 // 合并课程数据
 const courses = computed(() => [...testCourses.value, ...realCourses.value]);
 
@@ -247,27 +220,7 @@ const filteredCourses = computed(() => {
 
 // 测试进度数据
 const testStudentCourses = ref([
-  {
-    title: '操作系统',
-    completedUnits: 9,
-    totalUnits: 12,
-    // 添加未完成练习数
-    get uncompletedUnits() { return this.totalUnits - this.completedUnits; }
-  },
-  {
-    title: '人工智能',
-    completedUnits: 6,
-    totalUnits: 10,
-    get uncompletedUnits() { return this.totalUnits - this.completedUnits; }
-  },
-  {
-    title: '数据管理技术',
-    completedUnits: 3,
-    totalUnits: 10,
-    get uncompletedUnits() { return this.totalUnits - this.completedUnits; }
-  },
 ]);
-
 // 修改fetchStudentCourses函数中组装进度数据的部分
 // 修改相关代码：
 // realStudentCourses.value.push({
@@ -339,49 +292,35 @@ const fetchStudentInfo = async () => {
 // 获取学生课程和进度
 const fetchStudentCourses = async () => {
   try {
-    // 1. 获取学生课程
-    const res = await getUserCourses(userStore.userId);
-    if (res.data && res.data.data) {
-      // 组装课程数据
-      realCourses.value = res.data.data.map(c => ({
-        title: c.name,
-        teacher: c.teacherName || '未知教师',
-        image: 'https://placeholder.svg?height=200&width=300',
-        bgColor: '#2196f3',
-        type: c.completed ? 1 : 0, // 1: 已结课, 0: 进行中
-        id: c.id
-      }));
-
-      // 2. 获取每门课程的章节数和进度
-      for (const course of realCourses.value) {
-        // 获取课程详情
-          const detailRes = await getCourseDetail(course.id);
-        const chapters = detailRes.data?.data?.chapters || [];
-        const totalUnits = chapters.length;
-
-        // 获取练习记录
-        const exerciseRes = await getExerciseRecords();
-        const exerciseRecords = exerciseRes.data?.data || [];
-        // 统计该课程已完成的练习数
-        const completedUnits = exerciseRecords.filter(
-          r => r.courseId === course.id && r.status === 'submitted'
-        ).length;
-
-        // 组装进度数据
-        realStudentCourses.value.push({
-          title: course.title,
-          progress: totalUnits > 0 ? Math.round((completedUnits / totalUnits) * 100) : 0,
-          completedUnits,
-          totalUnits
-        });
+    // 1. 获取学生加入的所有班级及其课程信息
+    const classesRes = await getStudentClasses(userStore.userId);
+    const studentClasses = classesRes.data?.data || [];
+    
+    // 2. 清空之前的进度数据
+    realStudentCourses.value = [];
+    
+    // 3. 遍历每个班级，查作业完成情况
+    for (const cls of studentClasses) {
+      try {
+        const summaryRes = await getStudentAssignmentSummary(cls.classId, userStore.userId);
+        if (summaryRes.data && summaryRes.data.data) {
+          const summary = summaryRes.data.data;
+          // 4. 组装进度数据，显示课程名
+          realStudentCourses.value.push({
+            title: cls.courseName, // 用接口返回的课程名
+            completedUnits: summary.completedAssignments,
+            totalUnits: summary.totalAssignments,
+            uncompletedUnits: summary.pendingAssignments
+          });
+        }
+      } catch (err) {
+        console.error(`获取班级${cls.className || cls.classId}的作业进度失败:`, err);
       }
     }
   } catch (e) {
-    // 失败时不影响测试样例展示
-    console.error('获取课程或进度失败', e);
+    console.error('获取班级或进度失败', e);
   }
 };
-
 onMounted(() => {
 // if (!userStore.isLoggedIn) {
 //     // 处理未登录状态...
@@ -390,7 +329,7 @@ onMounted(() => {
 //   } 
   // 获取用户信息
   fetchStudentInfo();
-  
+   fetchStudentCoursesList();
   // 获取课程数据
   fetchStudentCourses();
 });

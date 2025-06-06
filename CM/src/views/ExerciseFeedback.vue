@@ -32,242 +32,143 @@
             </div>
         </div>
 
-        <div v-if="loading">加载中...</div>
-        <div v-else-if="error">{{ error }}</div>
-        <div v-else-if="exercise && submission">
-            <!-- 成绩概览 -->
-            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h1 class="text-2xl font-bold">{{ exercise.title }} - 练习反馈</h1>
-                    <div class="flex items-center">
-                        <span class="text-sm text-gray-500 mr-2">完成时间: {{ formatDateTime(submission.submittedAt) }}</span>
+        <!-- 成绩概览 -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <h1 class="text-2xl font-bold">{{ exercise.title }} - 练习反馈</h1>
+                <div class="flex items-center">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div class="text-sm text-green-600 mb-1">总分</div>
+                    <div class="flex items-end">
+                        <span class="text-3xl font-bold text-green-700">{{ submission?.totalScore || 0 }}</span>
+                        <span class="text-xl text-green-600 ml-1">/ {{ exercise?.totalPoints || 0 }}</span>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-                        <div class="text-sm text-green-600 mb-1">总分</div>
-                        <div class="flex items-end">
-                            <span class="text-3xl font-bold text-green-700">{{ submission.score }}</span>
-                            <span class="text-xl text-green-600 ml-1">/ {{ exercise.totalPoints }}</span>
-                        </div>
-                    </div>
-
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <div class="text-sm text-blue-600 mb-1">正确率</div>
-                        <div class="flex items-end">
-                            <span class="text-3xl font-bold text-blue-700">{{ correctPercentage }}%</span>
-                            <span class="text-sm text-blue-600 ml-2 mb-1">{{ correctCount }} / {{ exercise.questions.length
-                                }} 题</span>
-                        </div>
-                    </div>
-
-                    <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                        <div class="text-sm text-purple-600 mb-1">用时</div>
-                        <div class="text-3xl font-bold text-purple-700">{{ formatDuration(submission.duration) }}</div>
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div class="text-sm text-blue-600 mb-1">正确率</div>
+                    <div class="flex items-end">
+                        <span class="text-3xl font-bold text-blue-700">{{ correctPercentage }}%</span>
+                        <span class="text-sm text-blue-600 ml-2 mb-1">{{ correctCount }} / {{ exercise?.questions?.length || 0
+                            }} 题</span>
                     </div>
                 </div>
 
-                <!-- 错题重做按钮 -->
-                <div v-if="incorrectQuestions.length > 0" class="flex justify-end mb-2">
-                    <button class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm flex items-center"
-                        @click="retryIncorrectQuestions">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                            class="mr-1">
-                            <path d="M21 2v6h-6"></path>
-                            <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
-                            <path d="M3 22v-6h6"></path>
-                            <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
-                        </svg>
-                        错题重做 ({{ incorrectQuestions.length }}题)
+                <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                    <div class="text-sm text-purple-600 mb-1">提交时间</div>
+                    <div class="text-xl font-bold text-purple-700">{{ formatDateTime(submission?.submittedAt) }}</div>
+                </div>
+            </div>
+
+            <!-- 错题重做按钮 -->
+            <div v-if="incorrectQuestions.length > 0" class="flex justify-end mb-2">
+                <button class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm flex items-center"
+                    @click="retryIncorrectQuestions">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                        class="mr-1">
+                        <path d="M21 2v6h-6"></path>
+                        <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
+                        <path d="M3 22v-6h6"></path>
+                        <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+                    </svg>
+                    错题重做 ({{ incorrectQuestions.length }}题)
+                </button>
+            </div>
+        </div>
+
+        <!-- 题目解析 -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold">答案解析</h2>
+                <div class="flex space-x-2">
+                    <button class="px-3 py-1 rounded-lg text-sm"
+                        :class="{ 'bg-gray-200 text-gray-800': filter === 'all', 'text-gray-500 hover:bg-gray-100': filter !== 'all' }"
+                        @click="filter = 'all'">
+                        全部 ({{ exercise?.questions?.length || 0 }})
+                    </button>
+                    <button class="px-3 py-1 rounded-lg text-sm"
+                        :class="{ 'bg-green-200 text-green-800': filter === 'correct', 'text-gray-500 hover:bg-gray-100': filter !== 'correct' }"
+                        @click="filter = 'correct'">
+                        正确 ({{ correctCount }})
+                    </button>
+                    <button class="px-3 py-1 rounded-lg text-sm"
+                        :class="{ 'bg-red-200 text-red-800': filter === 'incorrect', 'text-gray-500 hover:bg-gray-100': filter !== 'incorrect' }"
+                        @click="filter = 'incorrect'">
+                        错误 ({{ incorrectCount }})
                     </button>
                 </div>
             </div>
 
-            <!-- 题目解析 -->
-            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-xl font-bold">答案解析</h2>
-                    <div class="flex space-x-2">
-                        <button class="px-3 py-1 rounded-lg text-sm"
-                            :class="{ 'bg-gray-200 text-gray-800': filter === 'all', 'text-gray-500 hover:bg-gray-100': filter !== 'all' }"
-                            @click="filter = 'all'">
-                            全部 ({{ exercise.questions.length }})
-                        </button>
-                        <button class="px-3 py-1 rounded-lg text-sm"
-                            :class="{ 'bg-green-200 text-green-800': filter === 'correct', 'text-gray-500 hover:bg-gray-100': filter !== 'correct' }"
-                            @click="filter = 'correct'">
-                            正确 ({{ correctCount }})
-                        </button>
-                        <button class="px-3 py-1 rounded-lg text-sm"
-                            :class="{ 'bg-red-200 text-red-800': filter === 'incorrect', 'text-gray-500 hover:bg-gray-100': filter !== 'incorrect' }"
-                            @click="filter = 'incorrect'">
-                            错误 ({{ incorrectCount }})
-                        </button>
-                        <button class="px-3 py-1 rounded-lg text-sm"
-                            :class="{ 'bg-yellow-200 text-yellow-800': filter === 'bookmarked', 'text-gray-500 hover:bg-gray-100': filter !== 'bookmarked' }"
-                            @click="filter = 'bookmarked'">
-                            收藏 ({{ bookmarkedCount }})
-                        </button>
+            <!-- 题目列表 -->
+            <div v-for="(question, qIndex) in filteredQuestions" :key="qIndex" class="mb-8 border rounded-lg p-4"
+                :class="{
+                    'border-green-200 bg-green-50': question.correct,
+                    'border-red-200 bg-red-50': !question.correct
+                }">
+                <div class="flex justify-between items-start mb-2">
+                    <div class="flex items-start">
+                        <span class="font-medium mr-2">{{ qIndex + 1 }}.</span>
+                        <div>
+                            <div class="font-medium">{{ question.title }}</div>
+                            <div class="text-sm text-gray-500 mt-1">{{ question.score }} 分</div>
+                        </div>
+                    </div>
+                    <div class="text-sm" :class="question.correct ? 'text-green-600' : 'text-red-600'">
+                        得分：{{ question.score }} 分
                     </div>
                 </div>
 
-                <!-- 选择题解析 -->
-                <div v-if="exercise.type === 'choice'">
-                    <div v-for="(question, qIndex) in filteredQuestions" :key="qIndex" class="mb-8 border rounded-lg p-4"
+                <!-- 选择题 -->
+                <div v-if="question.type === 'choice'" class="ml-6 mt-4">
+                    <div v-for="(choice, cIndex) in question.choices" :key="cIndex"
+                        class="flex items-center p-3 rounded-lg mb-2"
                         :class="{
-                            'border-green-200 bg-green-50': isCorrect(qIndex),
-                            'border-red-200 bg-red-50': !isCorrect(qIndex)
+                            'bg-green-100 border border-green-300': choice === question.correctAnswer,
+                            'bg-red-100 border border-red-300': choice === question.studentAnswer && choice !== question.correctAnswer,
+                            'bg-gray-50 border border-gray-200': choice !== question.studentAnswer && choice !== question.correctAnswer
                         }">
-                        <div class="flex justify-between items-start mb-2">
-                            <div class="flex items-start">
-                                <span class="font-medium mr-2">{{ qIndex + 1 }}.</span>
-                                <div>
-                                    <div class="font-medium">{{ question.text }}</div>
-                                    <div class="text-sm text-gray-500 mt-1">{{ question.points }} 分</div>
-                                </div>
-                            </div>
-                            <div class="flex items-center">
-                                <button class="text-gray-400 hover:text-yellow-500 focus:outline-none"
-                                    :class="{ 'text-yellow-500': isBookmarked(qIndex) }" @click="toggleBookmark(qIndex)">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                                        fill="isBookmarked(qIndex) ? 'currentColor' : 'none'" stroke="currentColor"
-                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
-                                    </svg>
-                                </button>
-                            </div>
+                        <div class="w-6 h-6 rounded-full flex items-center justify-center border mr-2"
+                            :class="{
+                                'bg-green-500 border-green-500 text-white': choice === question.correctAnswer,
+                                'bg-red-500 border-red-500 text-white': choice === question.studentAnswer && choice !== question.correctAnswer,
+                                'border-gray-300': choice !== question.studentAnswer && choice !== question.correctAnswer
+                            }">
+                            {{ choice }}
                         </div>
-
-                        <div class="ml-6 space-y-2 mt-4">
-                            <div v-for="(option, oIndex) in question.options" :key="oIndex"
-                                class="flex items-center p-3 rounded-lg" :class="{
-                                    'bg-green-100 border border-green-300': question.correctAnswer === oIndex,
-                                    'bg-red-100 border border-red-300': submission.answers[qIndex] === oIndex && question.correctAnswer !== oIndex,
-                                    'bg-gray-50 border border-gray-200': submission.answers[qIndex] !== oIndex && question.correctAnswer !== oIndex
-                                }">
-                                <div class="w-6 h-6 rounded-full flex items-center justify-center border mr-2" :class="{
-                                    'bg-green-500 border-green-500 text-white': question.correctAnswer === oIndex,
-                                    'bg-red-500 border-red-500 text-white': submission.answers[qIndex] === oIndex && question.correctAnswer !== oIndex,
-                                    'border-gray-300': submission.answers[qIndex] !== oIndex && question.correctAnswer !== oIndex
-                                }">
-                                    {{ ['A', 'B', 'C', 'D'][oIndex] }}
-                                </div>
-                                <div>{{ option }}</div>
-                            </div>
-                        </div>
-
-                        <!-- 解析 -->
-                        <div class="mt-4 ml-6 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                            <div class="text-sm font-medium text-gray-700 mb-1">解析:</div>
-                            <div class="text-sm text-gray-600">{{ question.explanation }}</div>
-                        </div>
+                        <div>{{ choice }}</div>
                     </div>
                 </div>
 
-                <!-- 编程题解析 -->
-                <div v-if="exercise.type === 'programming'">
-                    <div v-for="(question, qIndex) in filteredQuestions" :key="qIndex" class="mb-8 border rounded-lg p-4"
-                        :class="{
-                            'border-green-200 bg-green-50': isCorrect(qIndex),
-                            'border-red-200 bg-red-50': !isCorrect(qIndex)
-                        }">
-                        <div class="flex justify-between items-start mb-2">
-                            <div class="flex items-start">
-                                <span class="font-medium mr-2">{{ qIndex + 1 }}.</span>
-                                <div>
-                                    <div class="font-medium">{{ question.text }}</div>
-                                    <div class="text-sm text-gray-500 mt-1">{{ question.points }} 分</div>
-                                </div>
-                            </div>
-                            <div class="flex items-center">
-                                <button class="text-gray-400 hover:text-yellow-500 focus:outline-none"
-                                    :class="{ 'text-yellow-500': isBookmarked(qIndex) }" @click="toggleBookmark(qIndex)">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                                        fill="isBookmarked(qIndex) ? 'currentColor' : 'none'" stroke="currentColor"
-                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="ml-6 mt-4">
-                            <div class="mb-2 text-sm text-gray-600">{{ question.description }}</div>
-
-                            <!-- 学生代码 -->
-                            <div class="mb-4">
-                                <div class="text-sm font-medium text-gray-700 mb-1">你的代码:</div>
-                                <div class="border rounded-lg overflow-hidden">
-                                    <div class="bg-gray-100 px-4 py-2 border-b flex justify-between items-center">
-                                        <span>{{ question.language }}</span>
-                                        <div class="text-sm" :class="isCorrect(qIndex) ? 'text-green-600' : 'text-red-600'">
-                                            {{ isCorrect(qIndex) ? '通过测试' : '未通过测试' }}
-                                        </div>
-                                    </div>
-                                    <pre
-                                        class="p-4 font-mono text-sm overflow-x-auto bg-gray-50">{{ submission.codeAnswers[qIndex] }}</pre>
-                                </div>
-                            </div>
-
-                            <!-- 参考答案 -->
-                            <div class="mb-4">
-                                <div class="text-sm font-medium text-gray-700 mb-1">参考答案:</div>
-                                <div class="border rounded-lg overflow-hidden">
-                                    <div class="bg-gray-100 px-4 py-2 border-b">
-                                        <span>{{ question.language }}</span>
-                                    </div>
-                                    <pre
-                                        class="p-4 font-mono text-sm overflow-x-auto bg-gray-50">{{ question.sampleAnswer }}</pre>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- 解析 -->
-                        <div class="mt-4 ml-6 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                            <div class="text-sm font-medium text-gray-700 mb-1">解析:</div>
-                            <div class="text-sm text-gray-600">{{ question.explanation }}</div>
-                        </div>
-
-                        <!-- 测试结果 -->
-                        <div v-if="question.testResults" class="mt-4 ml-6">
-                            <div class="text-sm font-medium text-gray-700 mb-1">测试结果:</div>
-                            <div class="border rounded-lg overflow-hidden">
-                                <div v-for="(test, tIndex) in question.testResults" :key="tIndex"
-                                    class="border-b last:border-b-0 p-3"
-                                    :class="{ 'bg-green-50': test.passed, 'bg-red-50': !test.passed }">
-                                    <div class="flex items-center">
-                                        <div class="w-5 h-5 rounded-full flex items-center justify-center mr-2"
-                                            :class="{ 'bg-green-500 text-white': test.passed, 'bg-red-500 text-white': !test.passed }">
-                                            <svg v-if="test.passed" xmlns="http://www.w3.org/2000/svg" width="14"
-                                                height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                <polyline points="20 6 9 17 4 12"></polyline>
-                                            </svg>
-                                            <svg v-else xmlns="http://www.w3.org/2000/svg" width="14" height="14"
-                                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                                stroke-linecap="round" stroke-linejoin="round">
-                                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                                <line x1="6" y1="6" x2="18" y2="18"></line>
-                                            </svg>
-                                        </div>
-                                        <div class="text-sm font-medium">测试 {{ tIndex + 1 }}: {{ test.name }}</div>
-                                    </div>
-                                    <div class="mt-2 text-sm">
-                                        <div><span class="font-medium">输入:</span> {{ test.input }}</div>
-                                        <div><span class="font-medium">期望输出:</span> {{ test.expectedOutput }}</div>
-                                        <div><span class="font-medium">实际输出:</span> {{ test.actualOutput }}</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                <!-- 简答题 -->
+                <div v-if="question.type === 'short_answer'" class="ml-6 mt-4">
+                    <div class="mb-4">
+                        <div class="text-sm font-medium text-gray-700 mb-2">你的答案:</div>
+                        <div class="p-4 bg-gray-50 border rounded-lg">{{ question.studentAnswer || '未作答' }}</div>
+                    </div>
+                    <div class="mb-4">
+                        <div class="text-sm font-medium text-gray-700 mb-2">参考答案:</div>
+                        <div class="p-4 bg-gray-50 border rounded-lg">{{ question.correctAnswer }}</div>
                     </div>
                 </div>
 
-                <div v-if="filteredQuestions.length === 0" class="text-center py-8 text-gray-500">
-                    没有符合条件的题目
+                <!-- 解析 -->
+                <div class="mt-4 ml-6 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <div class="text-sm font-medium text-gray-700 mb-1">解析:</div>
+                    <div class="text-sm text-gray-600">{{ question.explanation }}</div>
+                    <div v-if="question.feedback" class="mt-2 text-sm text-gray-600">
+                        <div class="font-medium mb-1">教师反馈:</div>
+                        {{ question.feedback }}
+                    </div>
                 </div>
+            </div>
+
+            <div v-if="filteredQuestions.length === 0" class="text-center py-8 text-gray-500">
+                没有符合条件的题目
             </div>
         </div>
     </div>
@@ -275,159 +176,157 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
-import { getSubmissionDetail } from '@/api/assignment';
+import { useRoute, useRouter } from 'vue-router';
+import { getSubmissionDetail, getAssignmentQuestions } from '@/api/assignment';
+import { useCourseStore } from '@/stores/course';
+import { useUserStore } from '@/stores/user';
 
-const router = useRouter();
 const route = useRoute();
+const router = useRouter();
+const courseStore = useCourseStore();
+const userStore = useUserStore();
 
-const loading = ref(true);
-const error = ref(null);
-const exercise = ref(null);
+// 检查用户是否已登录
+if (!userStore.token) {
+    router.push({ name: 'Login' });
+}
+
+const submissionId = courseStore.currentSubmissionId;
 const submission = ref(null);
-
-onMounted(async () => {
-    loading.value = true;
-    try {
-        const submissionId = route.params.submissionId;
-        const data = await getSubmissionDetail(submissionId);
-        exercise.value = data.assignment;
-        submission.value = data;
-    } catch (e) {
-        error.value = e.message || '加载失败';
-    } finally {
-        loading.value = false;
-    }
-});
-
-// 用户信息 - 使用模拟数据进行预览
-const user = ref({
-    id: '12345',
-    username: 'student001',
-    name: '张三',
-    role: 'student',
-    email: 'student001@example.com',
-    college: '计算机科学与技术学院',
-    avatar: '/placeholder.svg?height=40&width=40'
-});
-
-// 提示框状态
+const loading = ref(true);
 const showAlert = ref(false);
 const alertMessage = ref('');
+const bookmarkedQuestions = ref([]);
+const filter = ref('all');
 
-// 显示提示信息
 const showMessage = (message) => {
     alertMessage.value = message;
     showAlert.value = true;
-
-    // 2秒后自动关闭
     setTimeout(() => {
         showAlert.value = false;
     }, 2000);
 };
 
-// 收藏的题目
-const bookmarkedQuestions = ref([]);
+// 用户信息（可根据实际项目从 userStore 获取，这里保留原有结构）
+const user = ref({
+    id: '',
+    username: '',
+    name: '',
+    role: '',
+    email: '',
+    college: '',
+    avatar: ''
+});
 
-// 过滤条件
-const filter = ref('all');
+const exercise = computed( () => submission.value?.assignment || { questions: [] });
+onMounted(async () => {
+    try {
+        const submissionId = courseStore.currentSubmissionId;
+        console.log('当前提交ID:', submissionId);
+        
+        if (!submissionId) {
+            throw new Error('提交ID不存在');
+        }
 
-// 计算属性：正确题目数量
+        loading.value = true;
+        const assignmentId = courseStore.currentExerciseId;
+        console.log('当前练习ID:', assignmentId);
+        
+        if (!assignmentId) {
+            throw new Error('练习ID不存在');
+        }
+
+        const [questions, detail] = await Promise.all([
+            getAssignmentQuestions(assignmentId),
+            getSubmissionDetail(submissionId)
+        ]);
+
+        console.log('获取到的提交详情:', detail);
+        console.log('获取到的题目:', questions);
+        
+        // 设置提交信息
+        submission.value = {
+            ...detail,
+            assignment: {
+                id: assignmentId,
+                questions: questions.map((q, index) => ({
+                    ...q,
+                    studentAnswer: detail.answers[index]?.response || '',
+                    score: detail.answers[index]?.score || 0,
+                    correct: detail.answers[index]?.correct || false,
+                    feedback: detail.answers[index]?.feedback || ''
+                })),
+                title: '在线练习',
+                totalPoints: questions?.reduce((total, q) => total + (q.score || 0), 0) || 0
+            }
+        };
+
+        console.log('处理后的数据:', submission.value);
+
+        // 可选：填充 user 信息
+        if (userStore.userId) {
+            user.value = {
+                id: userStore.userId,
+                username: userStore.username,
+                name: userStore.name,
+                role: userStore.role,
+                email: userStore.email,
+                college: userStore.college,
+                avatar: userStore.avatar
+            };
+        }
+    } catch (e) {
+        console.error('加载失败:', e);
+        showMessage(e.message || '加载失败');
+        router.push({ name: 'StudentCourses' });
+    } finally {
+        loading.value = false;
+    }
+});
+
 const correctCount = computed(() => {
-    if (exercise.value.type === 'choice') {
-        return exercise.value.questions.filter((q, index) =>
-            submission.value.answers[index] === q.correctAnswer
-        ).length;
-    } else {
-        // 编程题根据测试结果判断
-        return exercise.value.questions.filter((q, index) => {
-            if (!q.testResults) return false;
-            return q.testResults.every(test => test.passed);
-        }).length;
-    }
+    if (!submission.value || !submission.value.answers) return 0;
+    return submission.value.answers.filter(ans => ans.correct === true).length;
 });
 
-// 计算属性：错误题目数量
 const incorrectCount = computed(() => {
-    return exercise.value.questions.length - correctCount.value;
+    if (!submission.value || !submission.value.answers) return 0;
+    return submission.value.answers.filter(ans => ans.correct === false).length;
 });
 
-// 计算属性：正确率
 const correctPercentage = computed(() => {
-    return Math.round((correctCount.value / exercise.value.questions.length) * 100);
+    if (!submission.value || !submission.value.answers) return 0;
+    return Math.round((correctCount.value / submission.value.answers.length) * 100);
 });
 
-// 计算属性：收藏题目数量
-const bookmarkedCount = computed(() => {
-    return bookmarkedQuestions.value.length;
-});
+const bookmarkedCount = computed(() => bookmarkedQuestions.value.length);
 
-// 计算属性：错误题目
 const incorrectQuestions = computed(() => {
-    if (exercise.value.type === 'choice') {
-        return exercise.value.questions.filter((q, index) =>
-            submission.value.answers[index] !== q.correctAnswer
-        );
-    } else {
-        // 编程题根据测试结果判断
-        return exercise.value.questions.filter((q, index) => {
-            if (!q.testResults) return true;
-            return q.testResults.some(test => !test.passed);
-        });
-    }
+    if (!submission.value || !submission.value.answers) return [];
+    return exercise.value.questions.filter((q, idx) => !submission.value.answers[idx]?.correct);
 });
 
-// 计算属性：过滤后的题目
 const filteredQuestions = computed(() => {
+    if (!submission.value || !submission.value.answers) return [];
     if (filter.value === 'all') {
         return exercise.value.questions;
     } else if (filter.value === 'correct') {
-        if (exercise.value.type === 'choice') {
-            return exercise.value.questions.filter((q, index) =>
-                submission.value.answers[index] === q.correctAnswer
-            );
-        } else {
-            return exercise.value.questions.filter((q, index) => {
-                if (!q.testResults) return false;
-                return q.testResults.every(test => test.passed);
-            });
-        }
+        return exercise.value.questions.filter((q, idx) => submission.value.answers[idx]?.correct === true);
     } else if (filter.value === 'incorrect') {
-        if (exercise.value.type === 'choice') {
-            return exercise.value.questions.filter((q, index) =>
-                submission.value.answers[index] !== q.correctAnswer
-            );
-        } else {
-            return exercise.value.questions.filter((q, index) => {
-                if (!q.testResults) return true;
-                return q.testResults.some(test => !test.passed);
-            });
-        }
+        return exercise.value.questions.filter((q, idx) => submission.value.answers[idx]?.correct === false);
     } else if (filter.value === 'bookmarked') {
-        return exercise.value.questions.filter((q, index) =>
-            bookmarkedQuestions.value.includes(index)
-        );
+        return exercise.value.questions.filter((q, idx) => bookmarkedQuestions.value.includes(idx));
     }
     return [];
 });
 
-// 判断题目是否正确
 const isCorrect = (questionIndex) => {
-    if (exercise.value.type === 'choice') {
-        return submission.value.answers[questionIndex] === exercise.value.questions[questionIndex].correctAnswer;
-    } else {
-        const question = exercise.value.questions[questionIndex];
-        if (!question.testResults) return false;
-        return question.testResults.every(test => test.passed);
-    }
+    if (!submission.value || !submission.value.answers) return false;
+    return submission.value.answers[questionIndex]?.correct === true;
 };
 
-// 判断题目是否收藏
-const isBookmarked = (questionIndex) => {
-    return bookmarkedQuestions.value.includes(questionIndex);
-};
+const isBookmarked = (questionIndex) => bookmarkedQuestions.value.includes(questionIndex);
 
-// 切换收藏状态
 const toggleBookmark = (questionIndex) => {
     const index = bookmarkedQuestions.value.indexOf(questionIndex);
     if (index === -1) {
@@ -439,26 +338,27 @@ const toggleBookmark = (questionIndex) => {
     }
 };
 
-// 错题重做
 const retryIncorrectQuestions = () => {
+    if (!exercise.value?.id) {
+        showMessage('练习信息不完整');
+        return;
+    }
     showMessage('开始错题重做');
-    // 在实际应用中，这里应该跳转到错题重做页面
-    router.push({ name: 'IncorrectQuestionsRetry', params: { id: exercise.value.id } })
+    courseStore.setRetryInfo(exercise.value.id, submissionId);
+    router.push({ name: 'IncorrectQuestionsRetry' });
 };
 
-// 格式化日期时间
 const formatDateTime = (dateTimeStr) => {
     if (!dateTimeStr) return '';
     const date = new Date(dateTimeStr);
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 };
 
-// 格式化时长
 const formatDuration = (seconds) => {
+    if (!seconds) return '0秒';
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-
     if (hours > 0) {
         return `${hours}小时 ${minutes}分钟`;
     } else if (minutes > 0) {
@@ -468,9 +368,12 @@ const formatDuration = (seconds) => {
     }
 };
 
-// 返回练习列表
 const goBackToList = () => {
-    // 在实际应用中，这里应该跳转回练习列表页面
-    router.push({ name: 'ExerciseList' });
+    router.push({ name: 'StudentCourses' });
+};
+
+const startExercise = (practice) => {
+    courseStore.setCurrentExerciseId(practice.id);
+    router.push('/exercise/:id');
 };
 </script>

@@ -5,7 +5,7 @@
       <div class="header-content">
         <div class="logo-section">
           <div class="logo-circle"></div>
-          <span class="university-name">北京航空航天大学 | 智学北航</span>
+          <span class="university-name">北京航空航天大学 | 智慧教育</span>
         </div>
         <div class="user-info">
           <div class="avatar"></div>
@@ -14,6 +14,13 @@
             <div class="user-id">{{ userStore.userId }}</div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- 中央提示框 -->
+    <div v-if="showAlert" class="fixed inset-0 flex items-center justify-center z-50">
+      <div class="bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg">
+        {{ alertMessage }}
       </div>
     </div>
 
@@ -102,22 +109,33 @@
     <h3>📁 课程资料</h3>
   </div>
   <div class="filter-container">
-    <label for="chapter-filter">按章节筛选：</label>
-    <select 
-      id="chapter-filter" 
-      v-model="selectedChapter" 
-      class="chapter-filter"
+  <label for="chapter-filter">按章节筛选：</label>
+  <select 
+    id="chapter-filter" 
+    v-model="selectedChapter" 
+    class="chapter-filter"
+  >
+    <option value="all">全部章节</option>
+    <option 
+      v-for="outline in availableChapters" 
+      :key="outline.chapter"
+      :value="outline.chapter"
     >
-      <option value="all">全部章节</option>
-      <option 
-        v-for="outline in availableChapters" 
-        :key="outline.chapter"
-          :value="outline.chapter"
-      >
-        第{{ outline.chapter }}章
-      </option>
-    </select>
-  </div>
+      第{{ outline.chapter }}章
+    </option>
+  </select>
+  <label for="type-filter" style="margin-left: 24px;">按类型筛选：</label>
+  <select 
+    id="type-filter" 
+    v-model="selectedType" 
+    class="chapter-filter"
+  >
+    <option value="all">全部类型</option>
+    <option v-for="type in availableTypes" :key="type" :value="type">
+      {{ type.toUpperCase() }}
+    </option>
+  </select>
+</div>
   <div class="materials-list">
     <div class="material-item" v-for="material in filteredMaterials" :key="material.id">
       <!-- 文件类型图标 -->
@@ -127,11 +145,18 @@
         <div class="material-name">{{ material.filename }}</div>
         <div class="material-meta">
           <!-- 上传时间 -->
-         <span>上传时间：{{ formatDate(material.updatedAt) }}</span>
+         <span>上传时间：{{ material.updatedAt }}</span>
           <!-- 章节信息 -->
           <span v-if="material.chapterOrder">章节：{{ material.chapterOrder }}</span>
         </div>
       </div>
+      <!-- 在每个 material-item 内添加预览按钮 -->
+      <button 
+        class="preview-btn"
+        @click="previewFile(material.url, material.filename)"
+      >
+        在线预览
+      </button>
       <!-- 下载按钮链接到文件URL -->
       <!-- <a 
         :href="material.url" 
@@ -150,13 +175,15 @@
       </button>
     </div>
   </div>
+  <!-- filepath: e:\test\git_test\CM\src\views\StudentCourses.vue -->
+
 </div>
 
       <!-- Online Practice -->
       <div v-if="activeTab === 'practice'" class="tab-content">
   <div class="content-header">
     <h3>💻 在线练习</h3>
-    <button class="practice-report-btn">练习报告</button>
+    <button class="practice-report-btn" @click="navigateToExerciseReport">练习报告</button>
   </div>
   <div class="practice-list">
     <div class="practice-item" v-for="practice in onlinePractices" :key="practice.id">
@@ -173,8 +200,16 @@
           class="action-btn primary"
           @click="startExercise(practice)"
         >开始做题</button>
-        <button class="action-btn secondary" :disabled="practice.wrongCount === 0">错题重做</button>
-        <button class="action-btn tertiary" :disabled="practice.attempts === 0">查看上次记录</button>
+        <button
+          class="action-btn secondary" 
+          :disabled="practice.wrongCount === 0 || practice.attempts === 0"
+          @click="retryWrongQuestions(practice)"
+        >错题重做</button>
+        <button 
+          class="action-btn tertiary" 
+          :disabled="practice.attempts === 0"
+          @click="viewLastRecord(practice)"
+        >查看上次练习记录</button>
       </div>
     </div>
   </div>
@@ -186,10 +221,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useUserStore } from '@/stores/user';
-import { useCourseStore } from '@/stores/course'
+import { useCourseStore } from '@/stores/course';
 import { useRoute } from 'vue-router'; 
 import { getCourseDetail } from '@/api/course'; // 确保导入API
-import { getMaterials } from '@/api/materials'
+import { getMaterials } from '@/api/materials';
 import { getStudentClassInCourse } from '@/api/class'; // 新增
 // 添加这个导入
 import { getClassAssignments } from '@/api/class';
@@ -197,8 +232,8 @@ import { useRouter } from 'vue-router';
 const router = useRouter();
 
 const userStore = useUserStore();
-const courseStore = useCourseStore() 
-const activeTab = ref('outline')
+const courseStore = useCourseStore();
+const activeTab = ref('outline');
 // 从路由参数中获取课程信息
 const route = useRoute()
 const courseId = computed(() => courseStore.currentCourseId) // 修改为从store获取
@@ -208,6 +243,15 @@ const courseChapters = ref([])
 const courseMaterials = ref([])
 const onlinePractices = ref([])
 const classId = ref(null) 
+const currentSubmissionId = ref('');
+const showAlert = ref(false);
+const alertMessage = ref('');
+
+function setCurrentSubmissionId(id) {
+  currentSubmissionId.value = id;
+}
+
+
 // 假设班级ID可以从课程详情或其他API获得，这里先用courseId代替
 const tabs = [
   { key: 'outline', label: '课程大纲' },
@@ -215,14 +259,69 @@ const tabs = [
   { key: 'materials', label: '课程资料' },
   { key: 'practice', label: '在线练习' }
 ]
-
+const previewFile = (url, filename) => {
+  // 直接新窗口打开，浏览器支持的格式会自动预览
+  window.open(url, '_blank');
+};
 const startExercise = (practice) => {
   // 使用store保存练习ID
   courseStore.setCurrentExerciseId(practice.id);
   
   // 跳转到简洁的URL，无需查询参数
-  router.push('/exercise/:id');
+  router.push('/exercise');
 };
+
+const navigateToExerciseReport = () => {
+  // courseId已经存储在courseStore中，不需要额外设置
+  // 跳转到练习报告页面
+  router.push('/exercise/report');
+};
+
+
+const retryWrongQuestions = (practice) => {
+  console.log('点击错题重做按钮，练习数据:', practice);
+  
+  // 检查是否有练习记录
+  if (practice.attempts === 0) {
+    console.log('没有练习记录，attempts:', practice.attempts);
+    showMessage('您还没有开始过这个练习，无法重做错题');
+    return;
+  }
+  
+  // 检查是否有错题
+  if (practice.wrongCount === 0) {
+    console.log('没有错题，wrongCount:', practice.wrongCount);
+    showMessage('恭喜！您没有错题需要重做');
+    return;
+  }
+
+  console.log('准备跳转到错题重做页面，练习ID:', practice.id, '最后提交ID:', practice.lastSubmissionId);
+  // 使用store保存练习ID和最近一次提交ID
+  courseStore.setRetryInfo(practice.id, practice.lastSubmissionId);
+  
+  // 跳转到错题重做页面
+  router.push('/retry');
+};
+
+const viewLastRecord = (practice) => {
+  console.log('点击查看上次练习记录按钮，练习数据:', practice);
+  
+  // 确保只有当有练习记录时才能点击
+  if (practice.attempts === 0) {
+    console.log('没有练习记录，attempts:', practice.attempts);
+    showMessage('您还没有开始过这个练习');
+    return;
+  }
+  
+  console.log('准备跳转到反馈页面，练习ID:', practice.id, '最后提交ID:', practice.lastSubmissionId);
+  // 使用store保存练习ID
+  courseStore.setCurrentExerciseId(practice.id);
+  courseStore.setCurrentSubmissionId(practice.lastSubmissionId);
+  
+  // 跳转到练习反馈页面
+  router.push('/feedback');
+};
+
 // 添加加载状态和错误处理
 const loading = ref(true);
 const error = ref('');
@@ -249,6 +348,7 @@ const fetchAllCourseInfo = async () => {
         title: '课程大纲',
         description: res.data.data.outline
       }
+      
     ];
   } else if (Array.isArray(res.data.data.outline)) {
     // 如果已经是数组，直接使用
@@ -257,7 +357,6 @@ const fetchAllCourseInfo = async () => {
     // 默认为空数组
     courseOutline.value = [];
   }
-  
       courseChapters.value = res.data.data.chapters || [];
       console.log("课程基本信息处理完成:", courseData.value);
       console.log("大纲数据:", courseOutline.value);
@@ -299,8 +398,24 @@ const fetchAllCourseInfo = async () => {
           const pracRes = await getClassAssignments(classId.value);
           console.log("班级练习API返回:", pracRes);
           if (pracRes.data && pracRes.data.data) {
-            onlinePractices.value = pracRes.data.data;
-            console.log("班级练习获取成功:", onlinePractices.value);
+            // 确保每个练习对象都有必要的字段
+            onlinePractices.value = pracRes.data.data.map(practice => {
+              // 打印原始数据，用于调试
+              console.log("原始练习数据:", practice);
+              
+              return {
+                id: practice.id,
+                title: practice.title || '未命名练习',
+                description: practice.description || '',
+                attempts: Number(practice.attempts || 0),
+                wrongCount: Number(practice.wrongCount || 0),
+                questionCount: Number(practice.questionCount || 0),
+                lastSubmissionId: practice.lastSubmissionId || null,
+                status: practice.status || 'active',
+                ...practice
+              };
+            });
+            console.log("处理后的练习数据:", onlinePractices.value);
           } else {
             console.warn("班级练习为空或格式异常");
             onlinePractices.value = [];
@@ -326,36 +441,28 @@ const fetchAllCourseInfo = async () => {
 };
 // 添加在script部分的ref引用列表中
 const selectedChapter = ref('all'); // 默认显示全部章节
-
-// 计算可用的章节列表，用于筛选器
-// 修改可用的章节列表，使用courseOutline中的chapter字段
+const selectedType = ref('all'); // 默认显示全部类型
+// 修改可用的章节列表，仅使用courseChapters中的章节
 const availableChapters = computed(() => {
-  // 从课程大纲中获取章节列表
-  const chaptersFromOutline = courseOutline.value.map(outline => ({
-    chapter: outline.chapter,
-    title: outline.title
-  }));
-
-  // 从资料中提取可能存在的其他章节
-  const chaptersFromMaterials = new Map();
-  courseMaterials.value.forEach(material => {
-    if (material.chapterOrder && !chaptersFromOutline.some(c => c.chapter === material.chapterOrder)) {
-      chaptersFromMaterials.set(material.chapterOrder, {
-        chapter: material.chapterOrder,
-        title: `第${material.chapterOrder}章`
-      });
-    }
-  });
-  
-  // 合并两个章节来源
-  return [
-    ...chaptersFromOutline,
-    ...Array.from(chaptersFromMaterials.values())
-  ].sort((a, b) => a.chapter - b.chapter); // 按章节序号排序
+  // 只从课程章节中获取章节列表
+  return courseChapters.value
+    .map(chapter => ({
+      chapter: chapter.order , // 使用章节的序号
+      title: chapter.title
+    }))
+    .sort((a, b) => a.chapter - b.chapter); // 按章节序号排序
 });
-
+// 计算所有出现过的资料类型
+const availableTypes = computed(() => {
+  const types = new Set();
+  courseMaterials.value.forEach(material => {
+    const ext = material.filename?.split('.').pop()?.toLowerCase();
+    if (ext) types.add(ext);
+  });
+  return Array.from(types);
+});
 // 根据选中的章节过滤资料
-const filteredMaterials = computed(() => {
+const filteredMaterials_c = computed(() => {
   if (selectedChapter.value === 'all') {
     return courseMaterials.value; // 返回所有资料
   } else {
@@ -364,6 +471,20 @@ const filteredMaterials = computed(() => {
       material.chapterOrder === selectedChapter.value
     );
   }
+});
+//根据资料类型筛选资料
+const filteredMaterials = computed(() => {
+  let filtered = courseMaterials.value;
+  if (selectedChapter.value !== 'all') {
+    filtered = filtered.filter(material => material.chapterOrder === selectedChapter.value);
+  }
+  if (selectedType.value !== 'all') {
+    filtered = filtered.filter(material => {
+      const ext = material.filename?.split('.').pop()?.toLowerCase();
+      return ext === selectedType.value;
+    });
+  }
+  return filtered;
 });
 // 完善下载函数
 const downloadFile = (url, filename) => {
@@ -475,7 +596,21 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
 }
-
+.preview-btn {
+  background-color: #43a047;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  margin-left: 10px;
+  min-width: 70px;
+  transition: background-color 0.2s;
+}
+.preview-btn:hover {
+  background-color: #2e7031;
+}
 .university-name {
   font-size: 18px;
   font-weight: 500;

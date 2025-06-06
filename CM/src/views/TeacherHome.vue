@@ -104,21 +104,6 @@ import BaseHeader from '@/components/BaseHeader.vue'
 import BaseFooter from '@/components/BaseFooter.vue'
 import BaseWindow from '@/components/BaseWindow.vue'
 
-///JWT解码函数
-// function parseJwt(token) {
-//   if (!token) return null;
-//   const base64Url = token.split('.')[1];
-//   if (!base64Url) return null;
-//   const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-//   const jsonPayload = decodeURIComponent(
-//     atob(base64)
-//       .split('')
-//       .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-//       .join('')
-//   );
-//   return JSON.parse(jsonPayload);
-// }
-
 const userStore = useUserStore();
 const courseStore = useCourseStore();
 const router = useRouter(); // 添加路由器
@@ -218,7 +203,7 @@ const createCourse = async () => {
     // 处理章节为数组
     // 处理章节为数组 - 优化版本
 const chaptersArr = newCourse.value.chapters
-  .split(',')
+  .split(','||'，') // 支持英文和中文逗号分隔
   .map(s => s.trim()) // 先清除每个章节的前后空格
   .filter(title => title.length > 0) // 过滤掉空章节名
   .map((title, index) => ({
@@ -263,19 +248,6 @@ const navigateToCourseDetail = (course) => {
 };
 
 onMounted(() => {
-  // 不再需要解析token，直接使用store中信息
-  // if (!userStore.isLoggedIn) {
-  //   // 处理未登录状态
-  //   router.push('/login');
-  //   return;
-  // }
-  /*
-  if (!userStore.isLoggedIn) {
-    // 处理未登录状态
-    router.push('/login');
-    return;
-  }
-  */
   fetchTeacherInfo();
   fetchTeacherCourses();
 });

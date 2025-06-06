@@ -6,15 +6,18 @@ import axios from 'axios'
  * @returns {Promise<Array>} 题目数组
  */
 export function getAssignmentQuestions(assignmentId) {
+    if (!assignmentId) {
+        return Promise.reject(new Error('作业ID不能为空'));
+    }
     return axios
-        .get(`/api/assignments/${assignmentId}/questions`)
+        .get(`/assignments/${assignmentId}/questions`)
         .then(res => {
             if (res.data && res.data.code === 200) {
-                return res.data.data
+                return res.data.data;
             } else {
-                throw new Error(res.data?.message || '获取题目失败')
+                throw new Error(res.data?.message || '获取题目失败');
             }
-        })
+        });
 }
 
 /**
@@ -26,7 +29,7 @@ export function getAssignmentQuestions(assignmentId) {
  */
 export function submitAssignmentAnswers(classId, assignmentId, data) {
     return axios
-        .post(`/api/classes/${classId}/assignments/${assignmentId}/submissions`, data)
+        .post(`/classes/${classId}/assignments/${assignmentId}/submissions`, data)
         .then(res => {
             if (res.data && res.data.code === 201) {
                 return res.data.data
@@ -42,15 +45,18 @@ export function submitAssignmentAnswers(classId, assignmentId, data) {
  * @returns {Promise<Object>} 提交详情对象
  */
 export function getSubmissionDetail(submissionId) {
+    if (!submissionId) {
+        return Promise.reject(new Error('提交ID不能为空'));
+    }
     return axios
-        .get(`/api/submissions/${submissionId}`)
+        .get(`/submissions/${submissionId}`)
         .then(res => {
             if (res.data && res.data.code === 200) {
-                return res.data.data
+                return res.data.data;
             } else {
-                throw new Error(res.data?.message || '获取提交详情失败')
+                throw new Error(res.data?.message || '获取提交详情失败');
             }
-        })
+        });
 }
 
 /**
@@ -60,7 +66,7 @@ export function getSubmissionDetail(submissionId) {
  */
 export function getQuestionBank(params = {}) {
     return axios
-        .get('/api/questions', { params })
+        .get('/questions', { params })
         .then(res => {
             if (res.data && res.data.code === 200) {
                 return res.data.data
@@ -78,7 +84,7 @@ export function getQuestionBank(params = {}) {
  */
 export function importQuestionsToAssignment(assignmentId, questionIds) {
     return axios
-        .post(`/api/assignments/${assignmentId}/questions`, { ids: questionIds })
+        .post(`/assignments/${assignmentId}/questions`, { ids: questionIds })
         .then(res => {
             if (res.data && res.data.code === 200) {
                 return res.data.data
@@ -96,7 +102,7 @@ export function importQuestionsToAssignment(assignmentId, questionIds) {
  */
 export function createAssignment(classId, assignmentData) {
     return axios
-        .post(`/api/classes/${classId}/assignments`, assignmentData)
+        .post(`/classes/${classId}/assignments`, assignmentData)
         .then(res => {
             if (res.data && res.data.code === 201) {
                 return res.data.data
@@ -104,4 +110,60 @@ export function createAssignment(classId, assignmentData) {
                 throw new Error(res.data?.message || '布置作业失败')
             }
         })
+}
+
+/**
+ * 获取某班级下某作业的全部提交（教师端）
+ * @param {string} classId
+ * @param {string} assignmentId
+ * @returns {Promise<Array>} 提交列表
+ */
+export function getAssignmentSubmissions(classId, assignmentId) {
+    return axios
+        .get(`/classes/${classId}/assignments/${assignmentId}/submissions`)
+        .then(res => {
+            if (res.data && res.data.code === 200) {
+                return res.data.data;
+            } else {
+                throw new Error(res.data?.message || '获取提交列表失败');
+            }
+        });
+}
+
+/**
+ * 教师批改主观题
+ * @param {string} submissionId
+ * @param {Array} grades 形如 [{ questionId, score, feedback }]
+ * @returns {Promise<Object>} 更新后的提交详情
+ */
+export function gradeSubmission(submissionId, grades) {
+    return axios
+        .put(`/submissions/${submissionId}/grade`, { grades })
+        .then(res => {
+            if (res.data && res.data.code === 200) {
+                return res.data.data;
+            } else {
+                throw new Error(res.data?.message || '批改失败');
+            }
+        });
+}
+
+/**
+ * 获取学生在某作业的最新提交
+ * @param {string} assignmentId
+ * @returns {Promise<Object>} 最新提交详情
+ */
+export function getLatestSubmission(assignmentId) {
+    if (!assignmentId) {
+        return Promise.reject(new Error('作业ID不能为空'));
+    }
+    return axios
+        .get(`/assignments/${assignmentId}/latest-submission`)
+        .then(res => {
+            if (res.data && res.data.code === 200) {
+                return res.data;
+            } else {
+                throw new Error(res.data?.message || '获取最新提交失败');
+            }
+        });
 }

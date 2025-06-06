@@ -52,7 +52,7 @@
       <div class="flex justify-between items-center mb-6">
         <h1 class="text-2xl font-bold">{{ exercise.title }}</h1>
         <div class="text-sm text-gray-500">
-          总分: {{ exercise.totalPoints }} 分
+          总分: {{ totalScore }} 分
         </div>
       </div>
 
@@ -67,40 +67,42 @@
         </div>
       </div>
 
-      <!-- 选择题 -->
-      <div v-if="exercise.type === 'choice'">
-        <div v-for="(question, qIndex) in exercise.questions" :key="qIndex" class="mb-8">
-          <div class="mb-2 font-medium">{{ qIndex + 1 }}. {{ question.text }}</div>
-          <div class="ml-4 space-y-2">
-            <div v-for="(option, oIndex) in question.options" :key="oIndex"
-              class="flex items-center p-3 rounded-lg cursor-pointer hover:bg-gray-50"
-              :class="{ 'bg-green-50 border border-green-200': answers[qIndex] === oIndex }"
-              @click="selectAnswer(qIndex, oIndex)">
-              <div class="w-6 h-6 rounded-full flex items-center justify-center border mr-2"
-                :class="{ 'bg-green-500 border-green-500 text-white': answers[qIndex] === oIndex, 'border-gray-300': answers[qIndex] !== oIndex }">
-                {{ ['A', 'B', 'C', 'D'][oIndex] }}
-              </div>
-              <div>{{ option }}</div>
-            </div>
+      <!-- 题目列表 -->
+      <div v-for="(question, qIndex) in exercise.questions" :key="question.id" class="mb-8">
+        <div class="flex justify-between items-start mb-2">
+          <div class="font-medium">
+            {{ qIndex + 1 }}. {{ question.title }}
+            <span class="text-sm text-gray-500 ml-2">({{ question.score }}分)</span>
+          </div>
+          <div class="text-sm text-gray-500">
+            {{ question.type === 'choice' ? '选择题' : '简答题' }}
           </div>
         </div>
-      </div>
 
-      <!-- 编程题 -->
-      <div v-if="exercise.type === 'programming'">
-        <div v-for="(question, qIndex) in exercise.questions" :key="qIndex" class="mb-8">
-          <div class="mb-2 font-medium">{{ qIndex + 1 }}. {{ question.text }}</div>
-          <div class="mb-2 text-sm text-gray-600">{{ question.description }}</div>
-
-          <!-- 代码编辑器 -->
-          <div class="border rounded-lg overflow-hidden">
-            <div class="bg-gray-100 px-4 py-2 border-b flex justify-between items-center">
-              <span>{{ question.language }}</span>
-              <div class="text-sm text-gray-500">请在此编写代码</div>
+        <!-- 选择题 -->
+        <div v-if="question.type === 'choice'" class="ml-4 space-y-2">
+          <div v-for="(choice, cIndex) in question.choices" :key="cIndex"
+            class="flex items-center p-3 rounded-lg cursor-pointer hover:bg-gray-50"
+            :class="{ 'bg-green-50 border border-green-200': answers[qIndex] === choice }"
+            @click="selectAnswer(qIndex, choice)">
+            <div class="w-6 h-6 rounded-full flex items-center justify-center border mr-2"
+              :class="{ 'bg-green-500 border-green-500 text-white': answers[qIndex] === choice, 'border-gray-300': answers[qIndex] !== choice }">
+              {{ choice }}
             </div>
-            <textarea v-model="codeAnswers[qIndex]" class="w-full p-4 font-mono text-sm h-64 focus:outline-none"
-              placeholder="在此编写代码..." @copy="detectCopy" @paste="detectPaste" @cut="detectCut"></textarea>
+            <div>{{ choice }}</div>
           </div>
+        </div>
+
+        <!-- 简答题 -->
+        <div v-if="question.type === 'short_answer'" class="mt-2">
+          <textarea
+            v-model="answers[qIndex]"
+            class="w-full p-4 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 min-h-[120px]"
+            :placeholder="'请在此输入答案...'"
+            @copy="detectCopy"
+            @paste="detectPaste"
+            @cut="detectCut"
+          ></textarea>
         </div>
       </div>
 
@@ -126,31 +128,75 @@ import { useRouter } from 'vue-router'
 import { getAssignmentQuestions, submitAssignmentAnswers } from '@/api/assignment'
 import { useCourseStore } from '@/stores/course';
 import { useUserStore } from '@/stores/user';
-const userStore = useUserStore();
-const courseStore = useCourseStore();
+import { getStudentClassInCourse } from '@/api/class';
+
 const router = useRouter();
-// 练习数据 - 使用接口数据
+const courseStore = useCourseStore();
+const userStore = useUserStore();
+
+// 检查用户是否已登录
+if (!userStore.token) {
+    router.push({ name: 'Login' });
+}
+
+// 练习数据
 const exercise = ref({
-  id: 'ex-002',
-  title: '栈与队列实现',
-  type: 'programming',
-  questions: []
+    id: '',
+    title: '',
+    questions: []
 });
 
 // 答案状态
 const answers = ref([]);
-const codeAnswers = ref([]);
 
-// 初始化答案数组
-if (exercise.value.type === 'choice') {
-  answers.value = new Array(exercise.value.questions.length).fill(null);
-} else if (exercise.value.type === 'programming') {
-  codeAnswers.value = new Array(exercise.value.questions.length).fill('');
-}
+// 计算总分
+const totalScore = computed(() => {
+    return exercise.value.questions.reduce((total, q) => total + q.score, 0);
+});
 
 // 选择答案
-const selectAnswer = (questionIndex, optionIndex) => {
-  answers.value[questionIndex] = optionIndex;
+const selectAnswer = (questionIndex, choice) => {
+    answers.value[questionIndex] = choice;
+};
+
+// 加载练习数据
+const loadExerciseData = async () => {
+    try {
+        const exerciseId = courseStore.currentExerciseId;
+        console.log('获取练习信息，ID:', exerciseId);
+        
+        // 检查是否有有效的练习ID
+        if (!exerciseId) {
+            throw new Error('未找到练习信息');
+        }
+
+        // 获取班级ID
+        const classRes = await getStudentClassInCourse(userStore.userId, courseStore.currentCourseId);
+        if (!classRes?.data?.data?.id) {
+            throw new Error('未找到班级信息');
+        }
+        exercise.value.classId = classRes.data.data.id;
+
+        const questions = await getAssignmentQuestions(exerciseId);
+        
+        if (!questions || !Array.isArray(questions)) {
+            throw new Error('获取题目失败');
+        }
+
+        exercise.value = {
+            id: exerciseId,
+            questions,
+            title: '在线练习',
+            classId: exercise.value.classId // 保持班级ID
+        };
+
+        // 初始化答案数组
+        answers.value = new Array(exercise.value.questions.length).fill('');
+    } catch (error) {
+        console.error('获取题目失败:', error.message);
+        alert(error.message || '加载练习失败');
+        router.push({ name: 'StudentCourses' });
+    }
 };
 
 // 计时器相关
@@ -168,7 +214,6 @@ const formatTime = (seconds) => {
   const secs = Math.floor(seconds % 60);
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
-
 // 更新计时器
 let timerInterval;
 const updateTimer = () => {
@@ -242,62 +287,75 @@ const confirmSubmit = () => {
 
 // 提交练习
 const submitExercise = async () => {
-  try {
-    const assignmentId = userStore.currentAssignmentId;
-    const classId = courseStore.currentClassId; // 假设班级id也在store里
-    const studentId = userStore.userId;
+    try {
+        const assignmentId = courseStore.currentExerciseId;
+        const classId = exercise.value.classId;
+        const studentId = userStore.userId;
+        console.log("提交练习，作业ID:", assignmentId, "班级ID:", classId, "学生ID:", studentId);       
+        if (!assignmentId || !classId || !studentId) {
+            throw new Error('缺少必要的提交信息');
+        }
 
-    // 构造 answers 数组
-    const answersArr = exercise.value.questions.map((question, index) => ({
-      questionId: question.id,
-      response: exercise.value.type === 'choice'
-        ? answers.value[index]?.toString()
-        : codeAnswers.value[index]
-    }))
+        // 检查是否所有题目都已作答
+        const unansweredQuestions = exercise.value.questions.reduce((acc, q, index) => {
+            if (!answers.value[index]) {
+                acc.push(index + 1);
+            }
+            return acc;
+        }, []);
 
-    await submitAssignmentAnswers(classId, assignmentId, { studentId, answers: answersArr })
+        if (unansweredQuestions.length > 0) {
+            if (!confirm(`第 ${unansweredQuestions.join(', ')} 题尚未作答，确定要提交吗？`)) {
+                return;
+            }
+        }
 
-    alert('答案已提交')
-    router.push({ name: 'ExerciseFeedback', params: { id: exercise.value.id } })
-  } catch (e) {
-    alert(e.message || '提交失败')
-  }
-}
+        // 构造 answers 数组
+        const answersArr = exercise.value.questions.map((question, index) => ({
+            questionId: question.id,
+            response: answers.value[index] || ''
+        }));
+
+        // 提交答案
+        const result = await submitAssignmentAnswers(classId, assignmentId, {
+            studentId,
+            answers: answersArr
+        });
+
+        if (!result?.id) {
+            throw new Error('提交失败：未获取到提交ID');
+        }
+        console.log("提交练习，提交ID:", result.id);
+        
+        // 存储提交ID
+        courseStore.setCurrentSubmissionId(result.id);
+        
+        // 确保store中的值已经设置成功
+        if (!courseStore.currentSubmissionId) {
+            throw new Error('存储提交ID失败');
+        }
+        
+        // 跳转到反馈页面
+        router.push({ name: 'ExerciseFeedback' });
+    } catch (error) {
+        console.error('提交失败:', error);
+        alert(error.message || '提交失败');
+    }
+};
 
 // 组件挂载时
 onMounted(async () => {
-  // 启动计时器
-  timerInterval = setInterval(updateTimer, 1000);
+    // 启动计时器
+    timerInterval = setInterval(updateTimer, 1000);
 
-  // 添加页面可见性变化事件监听
-  document.addEventListener('visibilitychange', handleVisibilityChange);
+    // 添加页面可见性变化事件监听
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
-  // 禁用右键菜单
-  document.addEventListener('contextmenu', (e) => e.preventDefault());
+    // 禁用右键菜单
+    document.addEventListener('contextmenu', (e) => e.preventDefault());
 
-  try {
-    const assignmentId = userStore.currentAssignmentId;
-    const questions = await getAssignmentQuestions(assignmentId);
-    const exerciseId = courseStore.currentExerciseId;
-    console.log('获取练习信息，ID:', exerciseId);
-    // 检查是否有有效的练习ID
-    if (!exerciseId) {
-      console.error('未找到练习ID');
-      alert('未找到练习信息');
-      router.push('/student/courses'); // 返回课程页面
-      return;
-    }
-    exercise.value = {
-      questions
-    }
-    if (exercise.value.type === 'choice') {
-      answers.value = new Array(exercise.value.questions.length).fill(null);
-    } else if (exercise.value.type === 'programming') {
-      codeAnswers.value = new Array(exercise.value.questions.length).fill('');
-    }
-  } catch (e) {
-    console.error('获取题目失败:', e.message || '请求失败')
-  }
+    // 加载练习数据
+    await loadExerciseData();
 });
 
 // 组件卸载时
@@ -319,3 +377,4 @@ onUnmounted(() => {
   -ms-user-select: none;
 }
 </style>
+

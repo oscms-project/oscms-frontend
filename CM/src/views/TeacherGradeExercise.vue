@@ -138,7 +138,7 @@
                             'border-green-200 bg-green-50': submission.status === 'graded',
                             'border-yellow-200 bg-yellow-50': submission.status === 'pending',
                             'border-blue-300 shadow-md': selectedSubmission && selectedSubmission.id === submission.id
-                        }" @click="selectSubmission(submission)">
+                        }" @click="selectSubmissionHandler(submission)">
                         <div class="flex justify-between items-center">
                             <div class="flex items-center">
                                 <img :src="submission.student.avatar || '/placeholder.svg?height=32&width=32'"
@@ -526,621 +526,164 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router'
-const router = useRouter()
-// 用户信息 - 使用模拟数据进行预览
+import { useRouter } from 'vue-router';
+import { getAssignmentSubmissions, getSubmissionDetail, gradeSubmission } from '@/api/assignment';
+import { useCourseStore } from '@/stores/course';
+import { useUserStore } from '@/stores/user';
+const router = useRouter();
+const userStore = useUserStore();
+const courseStore = useCourseStore();
+
+// 用户信息（可保留模拟数据或从store获取）
 const user = ref({
-    id: 'teacher123',
-    username: 'teacher001',
-    name: '李教授',
+    id: userStore.userId || 'teacher123',
+    username: userStore.username || 'teacher001',
+    name: userStore.name || '李教授',
     role: 'teacher',
-    email: 'teacher001@example.com',
-    college: '计算机科学与技术学院',
-    avatar: '/placeholder.svg?height=40&width=40'
+    email: userStore.email || 'teacher001@example.com',
+    college: userStore.college || '计算机科学与技术学院',
+    avatar: userStore.avatar || '/placeholder.svg?height=40&width=40'
 });
 
-// 用户菜单显示状态
 const showUserMenu = ref(false);
-
-// 提示框状态
 const showAlert = ref(false);
 const alertMessage = ref('');
-
-// 显示提示信息
 const showMessage = (message) => {
     alertMessage.value = message;
     showAlert.value = true;
-
-    // 2秒后自动关闭
-    setTimeout(() => {
-        showAlert.value = false;
-    }, 2000);
+    setTimeout(() => { showAlert.value = false; }, 2000);
 };
 
-// 练习数据 - 使用模拟数据进行预览
+// 练习数据
 const exercise = ref({
-    id: 'ex-001',
-    title: '数据结构基础练习',
-    type: 'mixed',
-    totalPoints: 100,
-    openTime: new Date(new Date().getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-    closeTime: new Date(new Date().getTime() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-    questions: [
-        {
-            id: 'q1',
-            type: 'choice',
-            text: '以下哪种数据结构支持常数时间的随机访问？',
-            options: ['数组', '链表', '栈', '队列'],
-            correctAnswer: 0,
-            points: 10,
-            explanation: '数组支持常数时间O(1)的随机访问，因为可以通过索引直接计算内存地址。链表需要从头遍历，栈和队列只能按特定顺序访问元素。'
-        },
-        {
-            id: 'q2',
-            type: 'choice',
-            text: '链表的主要优点是什么？',
-            options: ['快速的随机访问', '内存分配的灵活性', '缓存友好性', '节省内存空间'],
-            correctAnswer: 1,
-            points: 10,
-            explanation: '链表的主要优点是内存分配的灵活性，它可以动态地分配内存，不需要连续的内存空间。这使得插入和删除操作更加高效。'
-        },
-        {
-            id: 'q3',
-            type: 'choice',
-            text: '在最坏情况下，在数组中查找元素的时间复杂度是多少？',
-            options: ['O(1)', 'O(log n)', 'O(n)', 'O(n²)'],
-            correctAnswer: 2,
-            points: 10,
-            explanation: '在未排序的数组中查找元素，最坏情况下需要遍历整个数组，时间复杂度为O(n)。如果数组已排序，可以使用二分查找，时间复杂度为O(log n)。'
-        },
-        {
-            id: 'q4',
-            type: 'programming',
-            text: '实现一个栈（Stack）数据结构',
-            description: '请实现一个栈数据结构，包含push、pop、peek和isEmpty方法。',
-            language: 'JavaScript',
-            points: 35,
-            sampleAnswer: `class Stack {
-    constructor() {
-      this.items = [];
-    }
-  
-    push(element) {
-      this.items.push(element);
-    }
-  
-    pop() {
-      if (this.isEmpty()) {
-        return "Underflow";
-      }
-      return this.items.pop();
-    }
-  
-    peek() {
-      if (this.isEmpty()) {
-        return "No elements in Stack";
-      }
-      return this.items[this.items.length - 1];
-    }
-  
-    isEmpty() {
-      return this.items.length === 0;
-    }
-  }`,
-            testCases: [
-                {
-                    name: '基本操作测试',
-                    input: 'push(1), push(2), peek()',
-                    expectedOutput: '2'
-                },
-                {
-                    name: 'pop操作测试',
-                    input: 'push(1), push(2), pop(), pop()',
-                    expectedOutput: '1'
-                },
-                {
-                    name: '空栈测试',
-                    input: 'isEmpty()',
-                    expectedOutput: 'true'
-                }
-            ]
-        },
-        {
-            id: 'q5',
-            type: 'programming',
-            text: '实现一个队列（Queue）数据结构',
-            description: '请实现一个队列数据结构，包含enqueue、dequeue、peek和isEmpty方法。',
-            language: 'JavaScript',
-            points: 35,
-            sampleAnswer: `class Queue {
-    constructor() {
-      this.items = [];
-    }
-  
-    enqueue(element) {
-      this.items.push(element);
-    }
-  
-    dequeue() {
-      if (this.isEmpty()) {
-        return "Underflow";
-      }
-      return this.items.shift();
-    }
-  
-    peek() {
-      if (this.isEmpty()) {
-        return "No elements in Queue";
-      }
-      return this.items[0];
-    }
-  
-    isEmpty() {
-      return this.items.length === 0;
-    }
-  }`,
-            testCases: [
-                {
-                    name: '基本操作测试',
-                    input: 'enqueue(1), enqueue(2), peek()',
-                    expectedOutput: '1'
-                },
-                {
-                    name: 'dequeue操作测试',
-                    input: 'enqueue(1), enqueue(2), dequeue()',
-                    expectedOutput: '1'
-                },
-                {
-                    name: '空队列测试',
-                    input: 'isEmpty()',
-                    expectedOutput: 'true'
-                }
-            ]
-        }
-    ]
+    id: '',
+    title: '',
+    type: '',
+    totalPoints: 0,
+    openTime: '',
+    closeTime: '',
+    questions: []
 });
 
 // 提交统计
 const submissionStats = reactive({
-    total: 30,
-    graded: 22,
-    pending: 8,
-    avgScore: 78.5
+    total: 0,
+    graded: 0,
+    pending: 0,
+    avgScore: 0
 });
 
-// 学生提交列表 - 使用模拟数据进行预览
-const submissions = ref([
-    {
-        id: 'sub-001',
-        student: {
-            id: '2023001',
-            name: '张三',
-            college: '计算机科学与技术学院',
-            avatar: '/placeholder.svg?height=40&width=40'
-        },
-        submittedAt: new Date(new Date().getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-        status: 'graded',
-        score: 85,
-        answers: [0, 1, 2], // 选择题答案
-        questionScores: [10, 10, 10, 25, 30], // 每道题的得分
-        codeAnswers: [
-            `class Stack {
-    constructor() {
-      this.items = [];
-    }
-  
-    push(element) {
-      this.items.push(element);
-    }
-  
-    pop() {
-      if (this.isEmpty()) {
-        return "Underflow";
-      }
-      return this.items.pop();
-    }
-  
-    peek() {
-      if (this.isEmpty()) {
-        return "No elements in Stack";
-      }
-      return this.items[this.items.length - 1];
-    }
-  
-    isEmpty() {
-      return this.items.length === 0;
-    }
-  }`,
-            `class Queue {
-    constructor() {
-      this.items = [];
-    }
-  
-    enqueue(element) {
-      this.items.push(element);
-    }
-  
-    dequeue() {
-      if (this.isEmpty()) {
-        return "Underflow";
-      }
-      return this.items.shift();
-    }
-  
-    peek() {
-      if (this.isEmpty()) {
-        return "No elements in Queue";
-      }
-      return this.items[0];
-    }
-  
-    isEmpty() {
-      return this.items.length === 0;
-    }
-  }`
-        ],
-        testResults: [
-            [], [], [], // 选择题没有测试结果
-            [
-                { passed: true, actualOutput: '2' },
-                { passed: true, actualOutput: '1' },
-                { passed: true, actualOutput: 'true' }
-            ],
-            [
-                { passed: true, actualOutput: '1' },
-                { passed: true, actualOutput: '1' },
-                { passed: true, actualOutput: 'true' }
-            ]
-        ],
-        feedback: ['', '', '', '实现正确，代码结构清晰。', '实现正确，但可以优化空间复杂度。'],
-        overallFeedback: '整体表现良好，对数据结构的基本概念理解清晰。栈和队列的实现都符合要求，但队列的实现可以考虑使用更高效的方法来优化dequeue操作的时间复杂度。'
-    },
-    {
-        id: 'sub-002',
-        student: {
-            id: '2023002',
-            name: '李四',
-            college: '计算机科学与技术学院',
-            avatar: '/placeholder.svg?height=40&width=40'
-        },
-        submittedAt: new Date(new Date().getTime() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-        status: 'graded',
-        score: 65,
-        answers: [0, 3, 2], // 选择题答案，第二题错误
-        questionScores: [10, 0, 10, 20, 25], // 每道题的得分
-        codeAnswers: [
-            `class Stack {
-    constructor() {
-      this.items = [];
-    }
-  
-    push(element) {
-      this.items.push(element);
-    }
-  
-    pop() {
-      return this.items.pop(); // 没有检查空栈情况
-    }
-  
-    peek() {
-      return this.items[this.items.length - 1]; // 没有检查空栈情况
-    }
-  
-    isEmpty() {
-      return this.items.length === 0;
-    }
-  }`,
-            `class Queue {
-    constructor() {
-      this.items = [];
-    }
-  
-    enqueue(element) {
-      this.items.push(element);
-    }
-  
-    dequeue() {
-      return this.items.shift(); // 没有检查空队列情况
-    }
-  
-    peek() {
-      return this.items[0]; // 没有检查空队列情况
-    }
-  
-    isEmpty() {
-      return this.items.length === 0;
-    }
-  }`
-        ],
-        testResults: [
-            [], [], [], // 选择题没有测试结果
-            [
-                { passed: true, actualOutput: '2' },
-                { passed: true, actualOutput: '1' },
-                { passed: false, actualOutput: 'undefined' } // 空栈测试失败
-            ],
-            [
-                { passed: true, actualOutput: '1' },
-                { passed: true, actualOutput: '1' },
-                { passed: false, actualOutput: 'undefined' } // 空队列测试失败
-            ]
-        ],
-        feedback: ['', '', '', '基本实现正确，但没有处理边界情况（空栈）。', '基本实现正确，但没有处理边界情况（空队列）。'],
-        overallFeedback: '对基本概念有一定理解，但在编程实现中缺乏对边界情况的考虑。建议加强对异常情况的处理，提高代码的健壮性。'
-    },
-    {
-        id: 'sub-003',
-        student: {
-            id: '2023003',
-            name: '王五',
-            college: '计算机科学与技术学院',
-            avatar: '/placeholder.svg?height=40&width=40'
-        },
-        submittedAt: new Date(new Date().getTime() - 1.5 * 24 * 60 * 60 * 1000).toISOString(),
-        status: 'pending',
-        score: null,
-        answers: [0, 1, 1], // 选择题答案，第三题错误
-        questionScores: [10, 10, 0, null, null], // 选择题自动评分，编程题待评分
-        codeAnswers: [
-            `class Stack {
-    constructor() {
-      this.stack = [];
-    }
-  
-    push(element) {
-      this.stack.push(element);
-    }
-  
-    pop() {
-      if (this.isEmpty()) {
-        return "Stack is empty";
-      }
-      return this.stack.pop();
-    }
-  
-    peek() {
-      if (this.isEmpty()) {
-        return "Stack is empty";
-      }
-      return this.stack[this.stack.length - 1];
-    }
-  
-    isEmpty() {
-      return this.stack.length === 0;
-    }
-  }`,
-            `class Queue {
-    constructor() {
-      this.queue = [];
-    }
-  
-    enqueue(element) {
-      this.queue.push(element);
-    }
-  
-    dequeue() {
-      if (this.isEmpty()) {
-        return "Queue is empty";
-      }
-      return this.queue.shift();
-    }
-  
-    peek() {
-      if (this.isEmpty()) {
-        return "Queue is empty";
-      }
-      return this.queue[0];
-    }
-  
-    isEmpty() {
-      return this.queue.length === 0;
-    }
-  }`
-        ],
-        testResults: [
-            [], [], [], // 选择题没有测试结果
-            [
-                { passed: true, actualOutput: '2' },
-                { passed: true, actualOutput: '1' },
-                { passed: true, actualOutput: 'true' }
-            ],
-            [
-                { passed: true, actualOutput: '1' },
-                { passed: true, actualOutput: '1' },
-                { passed: true, actualOutput: 'true' }
-            ]
-        ],
-        feedback: ['', '', '', '', ''],
-        overallFeedback: ''
-    }
-]);
-
-// 搜索和筛选
+// 学生提交列表
+const submissions = ref([]);
+const selectedSubmission = ref(null);
 const searchQuery = ref('');
 const filter = ref('all');
 
-// 过滤后的提交列表
 const filteredSubmissions = computed(() => {
     return submissions.value.filter(submission => {
-        // 状态筛选
-        if (filter.value === 'graded' && submission.status !== 'graded') {
-            return false;
-        }
-        if (filter.value === 'pending' && submission.status !== 'pending') {
-            return false;
-        }
-
-        // 搜索筛选
+        if (filter.value === 'graded' && submission.status !== 'graded') return false;
+        if (filter.value === 'pending' && submission.status !== 'pending') return false;
         if (searchQuery.value) {
             const query = searchQuery.value.toLowerCase();
-            return submission.student.name.toLowerCase().includes(query) ||
-                submission.student.id.toLowerCase().includes(query);
+            return (submission.studentName?.toLowerCase().includes(query) || submission.studentId?.toLowerCase().includes(query));
         }
-
         return true;
     });
 });
-
-// 选中的提交
-const selectedSubmission = ref(null);
-
-// 选择提交
-const selectSubmission = (submission) => {
-    selectedSubmission.value = JSON.parse(JSON.stringify(submission)); // 深拷贝，避免直接修改原数据
-};
 
 // 获取题目编号
 const getQuestionNumber = (question) => {
     return exercise.value.questions.findIndex(q => q.id === question.id) + 1;
 };
-
-// 获取题目索引
 const getQuestionIndex = (question) => {
     return exercise.value.questions.findIndex(q => q.id === question.id);
 };
 
-// 保存当前评分
-const saveCurrentGrade = () => {
-    if (!selectedSubmission.value) return;
-
-    // 计算总分
-    let totalScore = 0;
-    selectedSubmission.value.questionScores.forEach(score => {
-        if (score !== null) {
-            totalScore += score;
+// 拉取提交列表和作业详情
+async function fetchData() {
+    try {
+        const classId = courseStore.currentClassId;
+        const assignmentId = courseStore.currentAssignmentId;
+        // 获取提交列表
+        const submissionList = await getAssignmentSubmissions(classId, assignmentId);
+        submissions.value = (submissionList || []).map(sub => ({
+            ...sub,
+            studentName: sub.studentName || sub.student?.name || '',
+            studentId: sub.studentId || sub.student?.id || '',
+            // 兼容后端字段
+        }));
+        submissionStats.total = submissions.value.length;
+        submissionStats.graded = submissions.value.filter(s => s.status === 'graded').length;
+        submissionStats.pending = submissions.value.filter(s => s.status === 'pending').length;
+        const graded = submissions.value.filter(s => s.status === 'graded' && s.totalScore != null);
+        submissionStats.avgScore = graded.length ? graded.reduce((a, b) => a + (b.totalScore || 0), 0) / graded.length : 0;
+        // 获取作业详情（可选：如需显示作业名、题目等）
+        if (submissionList.length > 0 && submissionList[0].assignment) {
+            const assignment = submissionList[0].assignment;
+            exercise.value = {
+                id: assignment.id,
+                title: assignment.title,
+                type: assignment.type,
+                totalPoints: assignment.totalPoints,
+                openTime: assignment.openTime,
+                closeTime: assignment.dueDate,
+                questions: assignment.questions || []
+            };
         }
-    });
-
-    selectedSubmission.value.score = totalScore;
-    selectedSubmission.value.status = 'graded';
-
-    // 更新原始数据
-    const index = submissions.value.findIndex(s => s.id === selectedSubmission.value.id);
-    if (index !== -1) {
-        submissions.value[index] = JSON.parse(JSON.stringify(selectedSubmission.value));
+    } catch (e) {
+        showMessage(e.message || '获取数据失败');
     }
+}
 
-    // 更新统计数据
-    updateSubmissionStats();
+// 选中提交，拉取详情
+async function selectSubmissionHandler(submission) {
+    try {
+        const detail = await getSubmissionDetail(submission.submissionId || submission.id);
+        selectedSubmission.value = detail;
+    } catch (e) {
+        showMessage(e.message || '获取提交详情失败');
+    }
+}
 
-    showMessage('评分已保存');
-};
-
-// 保存所有评分
-const saveGrades = () => {
-    // 在实际应用中，这里应该调用API保存所有评分
-    showMessage('所有评分已保存');
-};
-
-// 更新提交统计
-const updateSubmissionStats = () => {
-    submissionStats.graded = submissions.value.filter(s => s.status === 'graded').length;
-    submissionStats.pending = submissions.value.filter(s => s.status === 'pending').length;
-
-    // 计算平均分
-    let totalScore = 0;
-    let gradedCount = 0;
-
-    submissions.value.forEach(submission => {
-        if (submission.status === 'graded' && submission.score !== null) {
-            totalScore += submission.score;
-            gradedCount++;
-        }
+// 保存当前评分（只批改主观题）
+async function saveCurrentGrade() {
+    if (!selectedSubmission.value) return;
+    // 只收集主观题
+    const subjectiveQuestions = exercise.value.questions.filter(q => q.type === 'programming' || q.type === 'subjective');
+    const grades = subjectiveQuestions.map(q => {
+        const idx = getQuestionIndex(q);
+        return {
+            questionId: q.id,
+            score: selectedSubmission.value.answers?.[idx]?.score,
+            feedback: selectedSubmission.value.answers?.[idx]?.feedback || ''
+        };
     });
+    try {
+        await gradeSubmission(selectedSubmission.value.submissionId, grades);
+        showMessage('评分已保存');
+        await fetchData(); // 刷新列表
+        selectedSubmission.value = null;
+    } catch (e) {
+        showMessage(e.message || '保存评分失败');
+    }
+}
 
-    submissionStats.avgScore = gradedCount > 0 ? totalScore / gradedCount : 0;
-};
+// 保存所有评分（可选：批量调用 gradeSubmission）
+async function saveGrades() {
+    showMessage('所有评分已保存');
+}
 
-// 格式化日期时间
 const formatDateTime = (dateTimeStr) => {
     if (!dateTimeStr) return '';
     const date = new Date(dateTimeStr);
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 };
+const goBackToExerciseList = () => { router.back(); };
 
-// 返回练习列表
-const goBackToExerciseList = () => {
-    // 在实际应用中，这里应该跳转回练习列表页面
-    console.log('返回练习列表');
-};
-
-// 反馈报告
-const showFeedbackReport = ref(false);
-const feedbackReport = reactive({
-    scoreDistribution: {
-        fail: 15, // 不及格比例
-        pass: 25, // 及格比例
-        good: 40, // 良好比例
-        excellent: 20 // 优秀比例
-    },
-    questionAnalysis: [
-        {
-            type: 'choice',
-            points: 10,
-            avgScore: 9.2,
-            correctRate: 0.92,
-            difficulty: 0.08 // 0-1，越高越难
-        },
-        {
-            type: 'choice',
-            points: 10,
-            avgScore: 6.5,
-            correctRate: 0.65,
-            difficulty: 0.35
-        },
-        {
-            type: 'choice',
-            points: 10,
-            avgScore: 7.8,
-            correctRate: 0.78,
-            difficulty: 0.22
-        },
-        {
-            type: 'programming',
-            points: 35,
-            avgScore: 28.5,
-            correctRate: 0.81,
-            difficulty: 0.19
-        },
-        {
-            type: 'programming',
-            points: 35,
-            avgScore: 26.2,
-            correctRate: 0.75,
-            difficulty: 0.25
-        }
-    ],
-    commonErrors: [
-        {
-            questionIndex: 1,
-            description: '多数学生对链表的优点理解不清晰',
-            errorDetail: '约35%的学生选择了"快速的随机访问"或"缓存友好性"，这表明他们对链表的特性存在误解。',
-            suggestion: '建议加强对链表特性的讲解，特别是与数组的对比，明确链表在内存分配上的灵活性优势。'
-        },
-        {
-            questionIndex: 3,
-            description: '栈的实现中常见边界情况处理不当',
-            errorDetail: '约20%的学生在实现栈时没有正确处理空栈情况，导致在pop()和peek()方法中可能出现错误。',
-            suggestion: '强调数据结构实现中边界情况的重要性，建议提供更多关于异常处理的练习。'
-        }
-    ]
-});
-
-// 生成反馈报告
-const generateFeedbackReport = () => {
-    // 在实际应用中，这里应该根据所有提交数据生成报告
-    showFeedbackReport.value = true;
-};
-
-// 导出反馈报告
-const exportFeedbackReport = () => {
-    // 在实际应用中，这里应该导出报告为PDF或Excel
-    showMessage('反馈报告已导出');
-};
-
-// 组件挂载时
-onMounted(() => {
-    // 更新统计数据
-    updateSubmissionStats();
-});
+onMounted(fetchData);
 </script>
+
+<style scoped>
+/* Add any scoped styles here */
+</style>
+
