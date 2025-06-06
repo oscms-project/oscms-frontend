@@ -16,8 +16,9 @@ export function getExerciseTemplates() {
   return axios.get('/exercises/templates')
 }
 
-export function getAssignmentSubmissions(assignmentId) {
-  return axios.get(`/assignments/${assignmentId}/submissions`)
+// 获取当前班级id下的某个作业的所有提交
+export function getAssignmentSubmissions(classId, assignmentId) {
+  return axios.get(`/classes/${classId}/assignments/${assignmentId}/submissions`)
 }
 
 export function submitAssignment(assignmentId, data) {

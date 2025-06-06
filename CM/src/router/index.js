@@ -72,6 +72,11 @@ const routes = [
     name: 'TeacherGradeExercise',
     component: () => import('@/views/TeacherGradeExercise.vue'),
     meta: { requiresAuth: true, role: 'teacher' }
+  },
+  {
+    path: '/exercise/report',
+    name: 'ExerciseReport',
+    component: () => import('@/views/ExerciseReport.vue'),
   }
 ]
 

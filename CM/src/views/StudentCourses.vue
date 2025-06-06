@@ -176,7 +176,7 @@
       <div v-if="activeTab === 'practice'" class="tab-content">
   <div class="content-header">
     <h3>💻 在线练习</h3>
-    <button class="practice-report-btn">练习报告</button>
+    <button class="practice-report-btn" @click="navigateToExerciseReport">练习报告</button>
   </div>
   <div class="practice-list">
     <div class="practice-item" v-for="practice in onlinePractices" :key="practice.id">
@@ -260,6 +260,14 @@ const startExercise = (practice) => {
   // 跳转到简洁的URL，无需查询参数
   router.push('/exercise');
 };
+
+const navigateToExerciseReport = () => {
+  // courseId已经存储在courseStore中，不需要额外设置
+  // 跳转到练习报告页面
+  router.push('/exercise/report');
+};
+
+
 const retryWrongQuestions = (practice) => {
   // 确保只有当有错题时才能点击
   if (practice.wrongCount === 0) return;
