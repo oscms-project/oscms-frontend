@@ -128,6 +128,7 @@ import { useRouter } from 'vue-router'
 import { getAssignmentQuestions, submitAssignmentAnswers } from '@/api/assignment'
 import { useCourseStore } from '@/stores/course';
 import { useUserStore } from '@/stores/user';
+import { getStudentClassInCourse } from '@/api/class';
 
 const router = useRouter();
 const courseStore = useCourseStore();
@@ -169,6 +170,13 @@ const loadExerciseData = async () => {
             throw new Error('未找到练习信息');
         }
 
+        // 获取班级ID
+        const classRes = await getStudentClassInCourse(userStore.userId, courseStore.currentCourseId);
+        if (!classRes?.data?.data?.id) {
+            throw new Error('未找到班级信息');
+        }
+        exercise.value.classId = classRes.data.data.id;
+
         const questions = await getAssignmentQuestions(exerciseId);
         
         if (!questions || !Array.isArray(questions)) {
@@ -178,7 +186,8 @@ const loadExerciseData = async () => {
         exercise.value = {
             id: exerciseId,
             questions,
-            title: '在线练习'
+            title: '在线练习',
+            classId: exercise.value.classId // 保持班级ID
         };
 
         // 初始化答案数组
@@ -280,9 +289,9 @@ const confirmSubmit = () => {
 const submitExercise = async () => {
     try {
         const assignmentId = courseStore.currentExerciseId;
-        const classId = courseStore.currentClassId;
+        const classId = exercise.value.classId;
         const studentId = userStore.userId;
-
+        console.log("提交练习，作业ID:", assignmentId, "班级ID:", classId, "学生ID:", studentId);       
         if (!assignmentId || !classId || !studentId) {
             throw new Error('缺少必要的提交信息');
         }
@@ -313,12 +322,20 @@ const submitExercise = async () => {
             answers: answersArr
         });
 
-        if (!result?.submissionId) {
+        if (!result?.id) {
             throw new Error('提交失败：未获取到提交ID');
         }
-
-        // 存储提交ID并跳转
-        courseStore.setCurrentSubmissionId(result.submissionId);
+        console.log("提交练习，提交ID:", result.id);
+        
+        // 存储提交ID
+        courseStore.setCurrentSubmissionId(result.id);
+        
+        // 确保store中的值已经设置成功
+        if (!courseStore.currentSubmissionId) {
+            throw new Error('存储提交ID失败');
+        }
+        
+        // 跳转到反馈页面
         router.push({ name: 'ExerciseFeedback' });
     } catch (error) {
         console.error('提交失败:', error);
@@ -360,3 +377,4 @@ onUnmounted(() => {
   -ms-user-select: none;
 }
 </style>
+

@@ -89,7 +89,7 @@
                     <button class="px-3 py-1 rounded-lg text-sm"
                         :class="{ 'bg-gray-200 text-gray-800': filter === 'all', 'text-gray-500 hover:bg-gray-100': filter !== 'all' }"
                         @click="filter = 'all'">
-                        全部 ({{ exercise.questions.length }})
+                        全部 ({{ exercise?.questions?.length || 0 }})
                     </button>
                     <button class="px-3 py-1 rounded-lg text-sm"
                         :class="{ 'bg-green-200 text-green-800': filter === 'correct', 'text-gray-500 hover:bg-gray-100': filter !== 'correct' }"
@@ -101,174 +101,68 @@
                         @click="filter = 'incorrect'">
                         错误 ({{ incorrectCount }})
                     </button>
-                    <button class="px-3 py-1 rounded-lg text-sm"
-                        :class="{ 'bg-yellow-200 text-yellow-800': filter === 'bookmarked', 'text-gray-500 hover:bg-gray-100': filter !== 'bookmarked' }"
-                        @click="filter = 'bookmarked'">
-                        收藏 ({{ bookmarkedCount }})
-                    </button>
                 </div>
             </div>
 
-            <!-- 选择题解析 -->
-            <div v-if="exercise.type === 'choice'">
-                <div v-for="(question, qIndex) in filteredQuestions" :key="qIndex" class="mb-8 border rounded-lg p-4"
-                    :class="{
-                        'border-green-200 bg-green-50': isCorrect(qIndex),
-                        'border-red-200 bg-red-50': !isCorrect(qIndex)
-                    }">
-                    <div class="flex justify-between items-start mb-2">
-                        <div class="flex items-start">
-                            <span class="font-medium mr-2">{{ qIndex + 1 }}.</span>
-                            <div>
-                                <div class="font-medium">{{ question.text }}</div>
-                                <div class="text-sm text-gray-500 mt-1">{{ question.points }} 分</div>
-                            </div>
-                        </div>
-                        <div class="flex items-center">
-                            <button class="text-gray-400 hover:text-yellow-500 focus:outline-none"
-                                :class="{ 'text-yellow-500': isBookmarked(qIndex) }" @click="toggleBookmark(qIndex)">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                                    fill="isBookmarked(qIndex) ? 'currentColor' : 'none'" stroke="currentColor"
-                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
-                                </svg>
-                            </button>
+            <!-- 题目列表 -->
+            <div v-for="(question, qIndex) in filteredQuestions" :key="qIndex" class="mb-8 border rounded-lg p-4"
+                :class="{
+                    'border-green-200 bg-green-50': question.correct,
+                    'border-red-200 bg-red-50': !question.correct
+                }">
+                <div class="flex justify-between items-start mb-2">
+                    <div class="flex items-start">
+                        <span class="font-medium mr-2">{{ qIndex + 1 }}.</span>
+                        <div>
+                            <div class="font-medium">{{ question.title }}</div>
+                            <div class="text-sm text-gray-500 mt-1">{{ question.score }} 分</div>
                         </div>
                     </div>
-
-                    <div class="ml-6 space-y-2 mt-4">
-                        <div v-for="(option, oIndex) in question.options" :key="oIndex"
-                            class="flex items-center p-3 rounded-lg" :class="{
-                                'bg-green-100 border border-green-300': question.correctAnswer === oIndex,
-                                'bg-red-100 border border-red-300': submission?.answers[qIndex]?.response === oIndex && question.correctAnswer !== oIndex,
-                                'bg-gray-50 border border-gray-200': submission?.answers[qIndex]?.response !== oIndex && question.correctAnswer !== oIndex
-                            }">
-                            <div class="w-6 h-6 rounded-full flex items-center justify-center border mr-2" :class="{
-                                'bg-green-500 border-green-500 text-white': question.correctAnswer === oIndex,
-                                'bg-red-500 border-red-500 text-white': submission?.answers[qIndex]?.response === oIndex && question.correctAnswer !== oIndex,
-                                'border-gray-300': submission?.answers[qIndex]?.response !== oIndex && question.correctAnswer !== oIndex
-                            }">
-                                {{ ['A', 'B', 'C', 'D'][oIndex] }}
-                            </div>
-                            <div>{{ option }}</div>
-                        </div>
-                    </div>
-
-                    <!-- 解析 -->
-                    <div class="mt-4 ml-6 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                        <div class="text-sm font-medium text-gray-700 mb-1">解析:</div>
-                        <div class="text-sm text-gray-600">{{ question.explanation }}</div>
+                    <div class="text-sm" :class="question.correct ? 'text-green-600' : 'text-red-600'">
+                        得分：{{ question.score }} 分
                     </div>
                 </div>
-            </div>
 
-            <!-- 编程题解析 -->
-            <div v-if="exercise.type === 'programming'">
-                <div v-for="(question, qIndex) in filteredQuestions" :key="qIndex" class="mb-8 border rounded-lg p-4"
-                    :class="{
-                        'border-green-200 bg-green-50': isCorrect(qIndex),
-                        'border-red-200 bg-red-50': !isCorrect(qIndex)
-                    }">
-                    <div class="flex justify-between items-start mb-2">
-                        <div class="flex items-start">
-                            <span class="font-medium mr-2">{{ qIndex + 1 }}.</span>
-                            <div>
-                                <div class="font-medium">{{ question.text }}</div>
-                                <div class="text-sm text-gray-500 mt-1">{{ question.points }} 分</div>
-                            </div>
+                <!-- 选择题 -->
+                <div v-if="question.type === 'choice'" class="ml-6 mt-4">
+                    <div v-for="(choice, cIndex) in question.choices" :key="cIndex"
+                        class="flex items-center p-3 rounded-lg mb-2"
+                        :class="{
+                            'bg-green-100 border border-green-300': choice === question.correctAnswer,
+                            'bg-red-100 border border-red-300': choice === question.studentAnswer && choice !== question.correctAnswer,
+                            'bg-gray-50 border border-gray-200': choice !== question.studentAnswer && choice !== question.correctAnswer
+                        }">
+                        <div class="w-6 h-6 rounded-full flex items-center justify-center border mr-2"
+                            :class="{
+                                'bg-green-500 border-green-500 text-white': choice === question.correctAnswer,
+                                'bg-red-500 border-red-500 text-white': choice === question.studentAnswer && choice !== question.correctAnswer,
+                                'border-gray-300': choice !== question.studentAnswer && choice !== question.correctAnswer
+                            }">
+                            {{ choice }}
                         </div>
-                        <div class="flex items-center">
-                            <button class="text-gray-400 hover:text-yellow-500 focus:outline-none"
-                                :class="{ 'text-yellow-500': isBookmarked(qIndex) }" @click="toggleBookmark(qIndex)">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                                    fill="isBookmarked(qIndex) ? 'currentColor' : 'none'" stroke="currentColor"
-                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
-                                </svg>
-                            </button>
-                        </div>
+                        <div>{{ choice }}</div>
                     </div>
+                </div>
 
-                    <div class="ml-6 mt-4">
-                        <div class="mb-2 text-sm text-gray-600">{{ question.description }}</div>
-
-                        <!-- 学生代码 -->
-                        <div class="mb-4">
-                            <div class="text-sm font-medium text-gray-700 mb-1">你的代码:</div>
-                            <div class="border rounded-lg overflow-hidden">
-                                <div class="bg-gray-100 px-4 py-2 border-b flex justify-between items-center">
-                                    <span>{{ question.language }}</span>
-                                    <div class="text-sm" :class="isCorrect(qIndex) ? 'text-green-600' : 'text-red-600'">
-                                        {{ isCorrect(qIndex) ? '通过测试' : '未通过测试' }}
-                                    </div>
-                                </div>
-                                <pre
-                                    class="p-4 font-mono text-sm overflow-x-auto bg-gray-50">{{ submission?.answers[qIndex]?.response }}</pre>
-                            </div>
-                        </div>
-
-                        <!-- 参考答案 -->
-                        <div class="mb-4">
-                            <div class="text-sm font-medium text-gray-700 mb-1">参考答案:</div>
-                            <div class="border rounded-lg overflow-hidden">
-                                <div class="bg-gray-100 px-4 py-2 border-b">
-                                    <span>{{ question.language }}</span>
-                                </div>
-                                <pre
-                                    class="p-4 font-mono text-sm overflow-x-auto bg-gray-50">{{ question.sampleAnswer }}</pre>
-                            </div>
-                        </div>
+                <!-- 简答题 -->
+                <div v-if="question.type === 'short_answer'" class="ml-6 mt-4">
+                    <div class="mb-4">
+                        <div class="text-sm font-medium text-gray-700 mb-2">你的答案:</div>
+                        <div class="p-4 bg-gray-50 border rounded-lg">{{ question.studentAnswer || '未作答' }}</div>
                     </div>
-
-                    <!-- 解析 -->
-                    <div class="mt-4 ml-6 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                        <div class="text-sm font-medium text-gray-700 mb-1">解析:</div>
-                        <div class="text-sm text-gray-600">{{ question.explanation }}</div>
-                        <div v-if="submission?.answers[qIndex]?.feedback" class="mt-2 text-sm text-gray-600">
-                            <div class="font-medium mb-1">教师反馈:</div>
-                            {{ submission.answers[qIndex].feedback }}
-                        </div>
+                    <div class="mb-4">
+                        <div class="text-sm font-medium text-gray-700 mb-2">参考答案:</div>
+                        <div class="p-4 bg-gray-50 border rounded-lg">{{ question.correctAnswer }}</div>
                     </div>
+                </div>
 
-                    <!-- 得分 -->
-                    <div class="mt-4 ml-6 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                        <div class="text-sm font-medium text-gray-700 mb-1">得分:</div>
-                        <div class="text-sm text-gray-600">
-                            {{ submission?.answers[qIndex]?.score || 0 }} / {{ question.points }} 分
-                        </div>
-                    </div>
-
-                    <!-- 测试结果 -->
-                    <div v-if="question.testResults" class="mt-4 ml-6">
-                        <div class="text-sm font-medium text-gray-700 mb-1">测试结果:</div>
-                        <div class="border rounded-lg overflow-hidden">
-                            <div v-for="(test, tIndex) in question.testResults" :key="tIndex"
-                                class="border-b last:border-b-0 p-3"
-                                :class="{ 'bg-green-50': test.passed, 'bg-red-50': !test.passed }">
-                                <div class="flex items-center">
-                                    <div class="w-5 h-5 rounded-full flex items-center justify-center mr-2"
-                                        :class="{ 'bg-green-500 text-white': test.passed, 'bg-red-500 text-white': !test.passed }">
-                                        <svg v-if="test.passed" xmlns="http://www.w3.org/2000/svg" width="14"
-                                            height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <polyline points="20 6 9 17 4 12"></polyline>
-                                        </svg>
-                                        <svg v-else xmlns="http://www.w3.org/2000/svg" width="14" height="14"
-                                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                            stroke-linecap="round" stroke-linejoin="round">
-                                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                                        </svg>
-                                    </div>
-                                    <div class="text-sm font-medium">测试 {{ tIndex + 1 }}: {{ test.name }}</div>
-                                </div>
-                                <div class="mt-2 text-sm">
-                                    <div><span class="font-medium">输入:</span> {{ test.input }}</div>
-                                    <div><span class="font-medium">期望输出:</span> {{ test.expectedOutput }}</div>
-                                    <div><span class="font-medium">实际输出:</span> {{ test.actualOutput }}</div>
-                                </div>
-                            </div>
-                        </div>
+                <!-- 解析 -->
+                <div class="mt-4 ml-6 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <div class="text-sm font-medium text-gray-700 mb-1">解析:</div>
+                    <div class="text-sm text-gray-600">{{ question.explanation }}</div>
+                    <div v-if="question.feedback" class="mt-2 text-sm text-gray-600">
+                        <div class="font-medium mb-1">教师反馈:</div>
+                        {{ question.feedback }}
                     </div>
                 </div>
             </div>
@@ -327,12 +221,17 @@ const user = ref({
 const exercise = computed( () => submission.value?.assignment || { questions: [] });
 onMounted(async () => {
     try {
+        const submissionId = courseStore.currentSubmissionId;
+        console.log('当前提交ID:', submissionId);
+        
         if (!submissionId) {
             throw new Error('提交ID不存在');
         }
 
         loading.value = true;
         const assignmentId = courseStore.currentExerciseId;
+        console.log('当前练习ID:', assignmentId);
+        
         if (!assignmentId) {
             throw new Error('练习ID不存在');
         }
@@ -342,24 +241,42 @@ onMounted(async () => {
             getSubmissionDetail(submissionId)
         ]);
 
-        if (!detail || !detail.assignment) {
-            throw new Error('无法获取提交详情');
-        }
+        console.log('获取到的提交详情:', detail);
+        console.log('获取到的题目:', questions);
+        
+        // 设置提交信息
+        submission.value = {
+            ...detail,
+            assignment: {
+                id: assignmentId,
+                questions: questions.map((q, index) => ({
+                    ...q,
+                    studentAnswer: detail.answers[index]?.response || '',
+                    score: detail.answers[index]?.score || 0,
+                    correct: detail.answers[index]?.correct || false,
+                    feedback: detail.answers[index]?.feedback || ''
+                })),
+                title: '在线练习',
+                totalPoints: questions?.reduce((total, q) => total + (q.score || 0), 0) || 0
+            }
+        };
 
-        submission.value = detail;
+        console.log('处理后的数据:', submission.value);
+
         // 可选：填充 user 信息
-        if (detail.student) {
+        if (userStore.userId) {
             user.value = {
-                id: detail.student.id,
-                username: detail.student.username,
-                name: detail.student.name,
-                role: detail.student.role,
-                email: detail.student.email,
-                college: detail.student.college,
-                avatar: detail.student.avatar
+                id: userStore.userId,
+                username: userStore.username,
+                name: userStore.name,
+                role: userStore.role,
+                email: userStore.email,
+                college: userStore.college,
+                avatar: userStore.avatar
             };
         }
     } catch (e) {
+        console.error('加载失败:', e);
         showMessage(e.message || '加载失败');
         router.push({ name: 'StudentCourses' });
     } finally {
@@ -452,7 +369,7 @@ const formatDuration = (seconds) => {
 };
 
 const goBackToList = () => {
-    router.push({ name: 'ExerciseList' });
+    router.push({ name: 'StudentCourses' });
 };
 
 const startExercise = (practice) => {

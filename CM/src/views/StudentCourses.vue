@@ -17,6 +17,13 @@
       </div>
     </div>
 
+    <!-- 中央提示框 -->
+    <div v-if="showAlert" class="fixed inset-0 flex items-center justify-center z-50">
+      <div class="bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg">
+        {{ alertMessage }}
+      </div>
+    </div>
+
     <!-- Course Card -->
    <!-- Course Card -->
 <div class="course-card">
@@ -204,14 +211,14 @@
         >开始做题</button>
         <button
           class="action-btn secondary" 
-          :disabled="practice.wrongCount === 0"
+          :disabled="practice.wrongCount === 0 || practice.attempts === 0"
           @click="retryWrongQuestions(practice)"
         >错题重做</button>
         <button 
           class="action-btn tertiary" 
           :disabled="practice.attempts === 0"
           @click="viewLastRecord(practice)"
-  >查看上次练习记录</button>
+        >查看上次练习记录</button>
       </div>
     </div>
   </div>
@@ -246,6 +253,9 @@ const courseMaterials = ref([])
 const onlinePractices = ref([])
 const classId = ref(null) 
 const currentSubmissionId = ref('');
+const showAlert = ref(false);
+const alertMessage = ref('');
+
 function setCurrentSubmissionId(id) {
   currentSubmissionId.value = id;
 }
@@ -266,26 +276,59 @@ const startExercise = (practice) => {
   // 跳转到简洁的URL，无需查询参数
   router.push('/exercise');
 };
+
+const showMessage = (message) => {
+  alertMessage.value = message;
+  showAlert.value = true;
+  setTimeout(() => {
+    showAlert.value = false;
+  }, 2000);
+};
+
 const retryWrongQuestions = (practice) => {
-  // 确保只有当有错题时才能点击
-  if (practice.wrongCount === 0) return;
+  console.log('点击错题重做按钮，练习数据:', practice);
   
-  // 使用store保存练习ID
-  courseStore.setCurrentExerciseId(practice.id);
+  // 检查是否有练习记录
+  if (practice.attempts === 0) {
+    console.log('没有练习记录，attempts:', practice.attempts);
+    showMessage('您还没有开始过这个练习，无法重做错题');
+    return;
+  }
   
-  // 跳转到错题重做页面，使用纯路径
+  // 检查是否有错题
+  if (practice.wrongCount === 0) {
+    console.log('没有错题，wrongCount:', practice.wrongCount);
+    showMessage('恭喜！您没有错题需要重做');
+    return;
+  }
+
+  console.log('准备跳转到错题重做页面，练习ID:', practice.id, '最后提交ID:', practice.lastSubmissionId);
+  // 使用store保存练习ID和最近一次提交ID
+  courseStore.setRetryInfo(practice.id, practice.lastSubmissionId);
+  
+  // 跳转到错题重做页面
   router.push('/retry');
 };
+
 const viewLastRecord = (practice) => {
-  // 确保只有当有练习记录时才能点击
-  if (practice.attempts === 0) return;
+  console.log('点击查看上次练习记录按钮，练习数据:', practice);
   
+  // 确保只有当有练习记录时才能点击
+  if (practice.attempts === 0) {
+    console.log('没有练习记录，attempts:', practice.attempts);
+    showMessage('您还没有开始过这个练习');
+    return;
+  }
+  
+  console.log('准备跳转到反馈页面，练习ID:', practice.id, '最后提交ID:', practice.lastSubmissionId);
   // 使用store保存练习ID
   courseStore.setCurrentExerciseId(practice.id);
+  courseStore.setCurrentSubmissionId(practice.lastSubmissionId);
   
-  // 跳转到练习反馈页面，使用纯路径
-  router.push(`/feedback`);
+  // 跳转到练习反馈页面
+  router.push('/feedback');
 };
+
 // 添加加载状态和错误处理
 const loading = ref(true);
 const error = ref('');
@@ -362,8 +405,24 @@ const fetchAllCourseInfo = async () => {
           const pracRes = await getClassAssignments(classId.value);
           console.log("班级练习API返回:", pracRes);
           if (pracRes.data && pracRes.data.data) {
-            onlinePractices.value = pracRes.data.data;
-            console.log("班级练习获取成功:", onlinePractices.value);
+            // 确保每个练习对象都有必要的字段
+            onlinePractices.value = pracRes.data.data.map(practice => {
+              // 打印原始数据，用于调试
+              console.log("原始练习数据:", practice);
+              
+              return {
+                id: practice.id,
+                title: practice.title || '未命名练习',
+                description: practice.description || '',
+                attempts: Number(practice.attempts || 0),
+                wrongCount: Number(practice.wrongCount || 0),
+                questionCount: Number(practice.questionCount || 0),
+                lastSubmissionId: practice.lastSubmissionId || null,
+                status: practice.status || 'active',
+                ...practice
+              };
+            });
+            console.log("处理后的练习数据:", onlinePractices.value);
           } else {
             console.warn("班级练习为空或格式异常");
             onlinePractices.value = [];

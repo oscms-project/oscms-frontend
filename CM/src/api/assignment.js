@@ -147,3 +147,23 @@ export function gradeSubmission(submissionId, grades) {
             }
         });
 }
+
+/**
+ * 获取学生在某作业的最新提交
+ * @param {string} assignmentId
+ * @returns {Promise<Object>} 最新提交详情
+ */
+export function getLatestSubmission(assignmentId) {
+    if (!assignmentId) {
+        return Promise.reject(new Error('作业ID不能为空'));
+    }
+    return axios
+        .get(`/assignments/${assignmentId}/latest-submission`)
+        .then(res => {
+            if (res.data && res.data.code === 200) {
+                return res.data;
+            } else {
+                throw new Error(res.data?.message || '获取最新提交失败');
+            }
+        });
+}
