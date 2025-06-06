@@ -149,23 +149,70 @@ const fetchExerciseReport = async () => {
   }
 };
 
-const exportToPdf = () => {
-  // 设置文件名（通过标题）
-  const now = new Date();
-  const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  document.title = `练习报告_${dateStr}`;
+
+const exportToPdf = async () => {
+  // 获取要转换的DOM元素
+  const element = document.querySelector('.practice-report-container');
   
-  // 应用打印样式
-  document.body.classList.add('printing');
+  // 隐藏导出按钮避免它出现在PDF中
+  const exportBtn = element.querySelector('.export-btn');
+  const exportBtnDisplay = exportBtn ? exportBtn.style.display : '';
   
-  // 触发打印
-  window.print();
-  
-  // 打印对话框关闭后恢复
-  setTimeout(() => {
-    document.body.classList.remove('printing');
-    document.title = '练习报告'; // 恢复原标题
-  }, 500);
+  try {
+    // 隐藏按钮
+    if (exportBtn) exportBtn.style.display = 'none';
+    
+    // 设置生成PDF的日期时间
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    
+    // 转换HTML为Canvas
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      logging: true,
+      letterRendering: true,
+      allowTaint: true
+    });
+    
+    // Canvas转为图片
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    
+    // 计算PDF尺寸（A4）
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = canvas.width;
+    const imgHeight = canvas.height;
+    const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+    const imgX = (pdfWidth - imgWidth * ratio) / 2;
+    let imgY = 20; // 顶部留出20mm空间
+    
+    // 添加页眉
+    pdf.setFontSize(20);
+    pdf.setTextColor(44, 62, 80);
+    pdf.text('练习报告', pdfWidth/2, 10, {align: 'center'});
+    
+    // 添加图像
+    pdf.addImage(
+      imgData, 'JPEG', 
+      imgX, imgY, 
+      imgWidth * ratio, imgHeight * ratio
+    );
+    
+    // 保存PDF
+    pdf.save(`练习报告_${dateStr}.pdf`);
+    
+  } catch (error) {
+    console.error('PDF导出失败:', error);
+    alert('PDF导出失败，请查看控制台了解详情。');
+  } finally {
+    // 无论成功还是失败，都确保恢复按钮显示
+    if (exportBtn) {
+      // 明确设置为 'block' 或使用保存的值
+      exportBtn.style.display = exportBtnDisplay || 'inline-flex';
+    }
+  }
 };
 // 页面加载时获取数据
 onMounted(() => {
@@ -473,61 +520,12 @@ const getRankClass = (rank) => {
 
 /* 打印样式 */
 @media print {
-  /* 隐藏导出按钮和不需要的元素 */
-  .export-btn {
-    display: none !important;
-  }
-  
-  /* 去除阴影 */
-  .practice-report-container {
-    box-shadow: none !important;
-    margin: 0 !important;
-    padding: 20px !important;
-  }
-  
-  /* 确保表格在纸张上清晰可见 */
   .practice-report-table {
-    width: 100% !important;
     page-break-inside: avoid;
-    box-shadow: none !important;
   }
   
-  /* 优化表格边框 */
-  .practice-report-table th,
-  .practice-report-table td {
-    border: 1px solid #ddd !important;
+  .report-title:after {
+    display: none;
   }
-  
-  /* 添加页眉 */
-  @page {
-    size: A4;
-    margin: 2cm;
-  }
-  
-  /* 隐藏其他页面元素 */
-  body > *:not(.practice-report-container) {
-    display: none !important;
-  }
-  
-  /* 确保彩色打印 */
-  .score-box, .rank-box {
-    print-color-adjust: exact !important;
-    -webkit-print-color-adjust: exact !important;
-  }
-  
-  /* 添加页脚 - 学生信息 */
-  .practice-report-container::after {
-    content: "学生姓名: " attr(data-student-name) " | 学号: " attr(data-student-id) " | 导出时间: " attr(data-export-date);
-    display: block;
-    text-align: center;
-    margin-top: 30px;
-    font-size: 12px;
-    color: #666;
-  }
-}
-
-/* 此样式用于打印时启用 */
-body.printing {
-  background: white !important;
 }
 </style>
