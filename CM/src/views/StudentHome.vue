@@ -188,49 +188,7 @@ const activeTab = ref(0);
 
 // 测试课程数据
 const testCourses = ref([
-  {
-    id: 'test-os-001',
-    title: '操作系统',
-    teacher: '孙海龙',
-    image: 'https://placeholder.svg?height=200&width=300',
-    bgColor: '#0a4d8c',
-    type: 0
-  },
-  {
-    title: '人工智能',
-    teacher: '张晶',
-    image: 'https://placeholder.svg?height=200&width=300',
-    bgColor: '#ff7e45',
-    type: 0
-  },
-  {
-    title: '数据管理技术',
-    teacher: '黄坚',
-    image: 'https://placeholder.svg?height=200&width=300',
-    bgColor: '#2e1a7a',
-    type: 0
-  },
-  {
-    title: '面向对象程序设计',
-    teacher: '高祥',
-    image: 'https://placeholder.svg?height=200&width=300',
-    bgColor: '#b71c1c',
-    type: 1
-  },
-  {
-    title: '算法分析与设计',
-    teacher: '宋友',
-    image: 'https://placeholder.svg?height=200&width=300',
-    bgColor: '#1565c0',
-    type: 1
-  },
-  {
-    title: '计算机硬件基础',
-    teacher: '牛建伟',
-    image: 'https://placeholder.svg?height=200&width=300',
-    bgColor: '#42a5f5',
-    type: 1
-  },
+  
 ]);
 
 // 后端课程数据
@@ -262,27 +220,7 @@ const filteredCourses = computed(() => {
 
 // 测试进度数据
 const testStudentCourses = ref([
-  {
-    title: '操作系统',
-    completedUnits: 9,
-    totalUnits: 12,
-    // 添加未完成练习数
-    get uncompletedUnits() { return this.totalUnits - this.completedUnits; }
-  },
-  {
-    title: '人工智能',
-    completedUnits: 6,
-    totalUnits: 10,
-    get uncompletedUnits() { return this.totalUnits - this.completedUnits; }
-  },
-  {
-    title: '数据管理技术',
-    completedUnits: 3,
-    totalUnits: 10,
-    get uncompletedUnits() { return this.totalUnits - this.completedUnits; }
-  },
 ]);
-
 // 修改fetchStudentCourses函数中组装进度数据的部分
 // 修改相关代码：
 // realStudentCourses.value.push({
