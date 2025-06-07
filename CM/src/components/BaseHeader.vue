@@ -8,8 +8,8 @@
     <div class="user-info">
       <span class="user-name">{{ user.name }}</span>
       <span class="user-id">{{ user.id }}</span>
-      <div class="avatar" @click="handleAvatarClick">
-        <img src="@/assets/head.png" alt="用户头像" />
+      <div class="avatar">
+        <img src="@/assets/head.jpg" alt="用户头像" />
       </div>
     </div>
   </header>

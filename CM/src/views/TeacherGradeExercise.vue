@@ -405,6 +405,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { getAssignmentSubmissionsList, getSubmissionDetail, gradeSubmission, getAssignmentQuestions } from '@/api/assignment';
 import { useCourseStore } from '@/stores/course';
 import { useUserStore } from '@/stores/user';
+import headImage from '@/assets/head.jpg';
 import axios from 'axios';
 
 const router = useRouter();
@@ -416,10 +417,13 @@ const loading = ref(false);
 
 // 用户信息
 const user = ref({
-    id: userStore.userId,
-    username: userStore.username,
-    role: userStore.role,
-    avatar: userStore.avatar || '/placeholder.svg?height=40&width=40'
+    id: userStore.userId || 'teacher123',
+    username: userStore.username || 'teacher001',
+    name: userStore.name || '李教授',
+    role: 'teacher',
+    email: userStore.email || 'teacher001@example.com',
+    college: userStore.college || '计算机科学与技术学院',
+    avatar: headImage || '/placeholder.svg?height=40&width=40'
 });
 
 const showUserMenu = ref(false);

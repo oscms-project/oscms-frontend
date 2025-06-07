@@ -50,3 +50,43 @@ export function getUserCourses(userId) {
 export function getUserCourseClass(userId, courseId) {
   return axios.get(`/users/${userId}/courses/${courseId}/class`)
 }
+
+// 学生收藏题目
+// 学生收藏题目 - 修正后的接口
+export function addFavoriteExercise(studentId, questionId) {
+  if (!studentId) {
+    return Promise.reject(new Error('学生ID不能为空'));
+  }
+  
+  if (!questionId) {
+    return Promise.reject(new Error('题目ID不能为空'));
+  }
+  
+
+  return axios.post(`/questions/${questionId}/favorite?studentId=${studentId}`)
+    .then(response => {
+      // 如果后端返回统一格式的响应，解析响应数据
+      if (response.data && response.data.code === 200) {
+        return response.data; // 返回成功响应
+      } else if (response.data && response.data.code !== 200) {
+        // 处理业务逻辑层面的错误（HTTP状态码可能仍为200，但code非200）
+        throw new Error(response.data.message || '收藏题目失败');
+      } else {
+        // 响应数据结构不符合预期
+        console.warn('Unexpected response structure for adding favorite:', response.data);
+        throw new Error('收藏题目失败：响应数据格式不正确');
+      }
+    })
+    .catch(error => {
+      console.error('API Error adding favorite exercise:', error.message);
+      // 尝试从 Axios 错误对象中提取后端返回的更具体的错误信息
+      if (error.response && error.response.data && error.response.data.message) {
+        throw new Error(error.response.data.message);
+      } else if (error.message) {
+        // 如果是网络错误或其他 Axios 错误，使用 error.message
+        throw new Error(error.message);
+      }
+      // Fallback 错误
+      throw new Error('收藏题目时发生未知错误');
+    });
+}

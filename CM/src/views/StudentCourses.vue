@@ -8,12 +8,12 @@
           <span class="university-name">北京航空航天大学 | 智慧教育</span>
         </div>
         <div class="user-info">
-          <div class="avatar"></div>
-          <div class="user-details">
-             <div class="username">{{ userStore.name }}</div>
-            <div class="user-id">{{ userStore.userId }}</div>
-          </div>
-        </div>
+  <img :src="headImage" alt="用户头像" class="avatar" />
+  <div class="user-details">
+    <div class="username">{{ userStore.name }}</div>
+    <div class="user-id">{{ userStore.userId }}</div>
+  </div>
+</div>
       </div>
     </div>
 
@@ -231,7 +231,7 @@ import { getStudentAssignmentSummary } from '@/api/class';
 import { getAssignmentSubmissions } from '@/api/exercise';
 import { useRouter } from 'vue-router';
 const router = useRouter();
-
+import headImage from '@/assets/head.jpg';
 const userStore = useUserStore();
 const courseStore = useCourseStore();
 const activeTab = ref('outline');
@@ -281,7 +281,7 @@ const navigateToExerciseReport = () => {
 
 const navigateToFavorites = () => {
   // 跳转到题目收藏页面
-  router.push('/favorites');
+  router.push('/favourites');
 };
 
 const retryWrongQuestions = async (practice) => {
@@ -711,8 +711,9 @@ onMounted(() => {
 .avatar {
   width: 36px;
   height: 36px;
-  background: #87ceeb;
   border-radius: 50%;
+  object-fit: cover; /* 确保图片正确填充圆形区域 */
+  border: 2px solid white; /* 可选：添加白色边框使头像更突出 */
 }
 
 .username {

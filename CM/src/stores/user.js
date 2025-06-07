@@ -27,7 +27,7 @@ export const useUserStore = defineStore('user', () => {
   const avatar = ref('')
   const isLoggedIn = computed(() => !!token.value)
 
-  // 初始化 - 从token中解析用户信息
+ 
   // 修改 initUserFromToken 函数来正确解析后端返回的 token 数据
 function initUserFromToken() {
   const payload = parseJwt(token.value)

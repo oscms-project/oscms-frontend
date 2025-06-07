@@ -35,9 +35,9 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import pic1 from '@/assets/pic_1.png'
-import pic13 from '@/assets/pic_13.png'
-import login from '@/assets/login.png'
+import pic1 from '@/assets/pic_56.jpg'
+import pic13 from '@/assets/pic_1.png'
+import login from '@/assets/login.jpg'
 
 const slides = [
   { image: login },

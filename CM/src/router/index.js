@@ -65,13 +65,13 @@ const routes = [
     path: '/teacher/create',
     name: 'TeacherCreateTask',
     component: () => import('@/views/TeacherCreateTask.vue'),
-    meta: { requiresAuth: true, role: 'teacher' }
+    //meta: { requiresAuth: true, role: 'teacher' }
   },
   {
     path: '/teacher/grade/:id',
     name: 'TeacherGradeExercise',
     component: () => import('@/views/TeacherGradeExercise.vue'),
-    meta: { requiresAuth: true, role: 'teacher' }
+    //meta: { requiresAuth: true, role: 'teacher' }
   },
   {
     path: '/exercise/report',
@@ -79,11 +79,23 @@ const routes = [
     component: () => import('@/views/ExerciseReport.vue'),
   },
   {
-    path: '/favorites',
-    name: 'FavoriteExercises',
-    component: () => import('@/views/FavoriteExercises.vue'),
-    meta: { requiresAuth: true, role: 'student' }
-  }
+    path: '/ta-home',
+    name: 'TAHome',
+    component: () => import('@/views/TaHome.vue'),
+    meta: { requiresAuth: true, role: 'ta' }
+  },
+  {
+    path: '/ta/courses',
+    name: 'CourseDetails_ta',
+    component: () => import('@/views/CourseDetails_ta.vue'),
+     meta: { requiresAuth: true, role: 'ta' }
+  },
+  {
+path: '/favorites',
+ name: 'FavoriteExercises',
+ component: () => import('@/views/FavoriteExercises.vue'),
+ meta: { requiresAuth: true, role: 'student' }
+ },
 ]
 
 // 创建路由实例

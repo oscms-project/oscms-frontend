@@ -206,7 +206,7 @@ import { useRouter } from 'vue-router';
 import { useCourseStore } from '@/stores/course';
 import { getSubmissionDetail, getAssignmentQuestions } from '@/api/assignment';
 import { useUserStore } from '@/stores/user';
-
+import headImage from '@/assets/head.jpg';
 const router = useRouter();
 const courseStore = useCourseStore();
 const userStore = useUserStore();
