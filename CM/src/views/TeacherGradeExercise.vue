@@ -530,6 +530,7 @@ import { useRouter } from 'vue-router';
 import { getAssignmentSubmissions, getSubmissionDetail, gradeSubmission } from '@/api/assignment';
 import { useCourseStore } from '@/stores/course';
 import { useUserStore } from '@/stores/user';
+import headImage from '@/assets/head.jpg';
 const router = useRouter();
 const userStore = useUserStore();
 const courseStore = useCourseStore();
@@ -542,7 +543,7 @@ const user = ref({
     role: 'teacher',
     email: userStore.email || 'teacher001@example.com',
     college: userStore.college || '计算机科学与技术学院',
-    avatar: userStore.avatar || '/placeholder.svg?height=40&width=40'
+    avatar: headImage || '/placeholder.svg?height=40&width=40'
 });
 
 const showUserMenu = ref(false);

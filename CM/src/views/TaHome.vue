@@ -44,7 +44,7 @@ import { getCourses, createCourse as apiCreateCourse } from '@/api/course'
 import BaseCarousel from '@/components/BaseCarousel.vue'
 import BaseHeader from '@/components/BaseHeader.vue'
 import BaseFooter from '@/components/BaseFooter.vue'
-
+import headImage from '@/assets/head.jpg';
 
 const userStore = useUserStore();
 const courseStore = useCourseStore();
@@ -53,7 +53,7 @@ const teacherInfo = ref({
   // 使用store中的信息初始化
   name: userStore.name,
   id: userStore.userId,
-  avatar: userStore.avatar,
+  avatar: headImage,
   role: userStore.role
 });
 

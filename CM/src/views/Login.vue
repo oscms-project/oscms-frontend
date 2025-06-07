@@ -164,7 +164,7 @@ const goToRegister = () => {
   display: flex;
   min-height: 100vh;
   /* 使用图片作为背景 */
- background: url('@/assets/login.png') no-repeat center center;
+ background: url('@/assets/login.jpg') no-repeat center center;
   background-size: cover;
   font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }

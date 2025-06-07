@@ -132,7 +132,7 @@ const goToLogin = () => {
 .login-container {
   display: flex;
   min-height: 100vh;
-  background: url('@/assets/login.png') no-repeat center center;
+  background: url('@/assets/login.jpg') no-repeat center center;
   background-size: cover;
   font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }

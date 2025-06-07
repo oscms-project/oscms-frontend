@@ -1015,7 +1015,7 @@ import { getMaterials, getCourseMaterials, uploadCourseMaterialFile } from '@/ap
 import { getClassAssignments } from '@/api/class';
 import { getCourseClasses } from '@/api/course';
 import { updateCourseOutline, updateCourseChapters } from '@/api/courseDetails'; // Added updateCourseChapters
-
+import headImage from '@/assets/head.jpg';
 const userStore = useUserStore();
 const courseStore = useCourseStore();
 const router = useRouter();
@@ -1035,7 +1035,7 @@ const courseId = computed(() => courseStore.currentCourseId);
 const userInfo = ref({
   id: 1,
   name: '张教授',
-  avatar: '/placeholder.svg?height=100&width=100',
+  avatar:  headImage,
   role: '教师',
   isOnline: true
 });

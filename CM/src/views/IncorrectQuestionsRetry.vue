@@ -231,7 +231,7 @@ import { useRouter } from 'vue-router';
 import { useCourseStore } from '@/stores/course';
 import { getSubmissionDetail, getAssignmentQuestions } from '@/api/assignment';
 import { useUserStore } from '@/stores/user';
-
+import headImage from '@/assets/head.jpg';
 const router = useRouter();
 const courseStore = useCourseStore();
 const userStore = useUserStore();
@@ -246,7 +246,7 @@ const user = ref({
     role: 'student',
     email: 'student001@example.com',
     college: '计算机科学与技术学院',
-    avatar: '/placeholder.svg?height=40&width=40'
+    avatar: headImage
 });
 
 // 用户菜单显示状态

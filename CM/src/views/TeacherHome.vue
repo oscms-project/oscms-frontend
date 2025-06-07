@@ -103,7 +103,7 @@ import BaseCarousel from '@/components/BaseCarousel.vue'
 import BaseHeader from '@/components/BaseHeader.vue'
 import BaseFooter from '@/components/BaseFooter.vue'
 import BaseWindow from '@/components/BaseWindow.vue'
-
+import headImage from '@/assets/head.jpg';
 const userStore = useUserStore();
 const courseStore = useCourseStore();
 const router = useRouter(); // 添加路由器
@@ -111,7 +111,7 @@ const teacherInfo = ref({
   // 使用store中的信息初始化
   name: userStore.name,
   id: userStore.userId,
-  avatar: userStore.avatar,
+  avatar: headImage,
   role: userStore.role
 });
 
@@ -155,7 +155,7 @@ const fetchTeacherInfo = async () => {
       // 更新store
       userStore.updateUserInfo({
         name: userData.username || userData.name,
-        avatar: userData.avatar
+        avatar: headImage
       });
     }
   } catch (e) {
