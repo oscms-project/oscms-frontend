@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-
+import { useLocalStorage } from '@vueuse/core'  // 添加这行导入
 // JWT解码函数
 function parseJwt(token) {
   if (!token) return null;
@@ -22,8 +22,8 @@ export const useUserStore = defineStore('user', () => {
   // 状态
   const token = ref(localStorage.getItem('token') || '')
   const userId = ref(localStorage.getItem('userId') || '')
-  const name = ref('')
-  const role = ref('')
+  const name = useLocalStorage('cm-username', '')
+  const role = useLocalStorage('cm-role', '')
   const avatar = ref('')
   const isLoggedIn = computed(() => !!token.value)
 
