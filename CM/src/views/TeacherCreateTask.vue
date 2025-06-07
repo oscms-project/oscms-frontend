@@ -13,23 +13,17 @@
                 </button>
             </div>
 
-            <!-- 用户信息 -->
-            <div class="relative flex flex-col items-end" @mouseenter="showUserMenu = true"
-                @mouseleave="showUserMenu = false">
-                <img :src="user.avatar || '/placeholder.svg?height=40&width=40'" alt="用户头像"
-                    class="w-10 h-10 rounded-full border-2 border-gray-200" />
-                <div class="text-right mt-1">
-                    <p class="text-sm font-medium">{{ user.name }}</p>
-                    <p class="text-xs text-gray-600">{{ user.username }}</p>
-                    <p class="text-xs text-gray-600">{{ user.college }}</p>
-                </div>
-                <div v-if="showUserMenu"
-                    class="absolute right-0 top-10 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
-                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">个人资料</a>
-                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">设置</a>
-                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">退出登录</a>
-                </div>
-            </div>
+
+        </div>
+
+        <!-- 班级筛选 -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-bold mb-4">班级筛选</h2>
+            <select v-model="task.classId" class="form-select mt-1 block w-full">
+                <option v-for="classItem in classes" :key="classItem.id" :value="classItem.id">
+                    {{ classItem.name }}
+                </option>
+            </select>
         </div>
 
         <!-- 中央提示框 -->
@@ -730,22 +724,86 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router'
-import { createAssignment } from '@/api/assignment'
-const router = useRouter()
-// 用户信息 - 使用模拟数据进行预览
-const user = ref({
-    id: 'teacher123',
-    username: 'teacher001',
-    name: '李教授',
-    role: 'teacher',
-    email: 'teacher001@example.com',
-    college: '计算机科学与技术学院',
-    avatar: '/placeholder.svg?height=40&width=40'
+import { useRouter } from 'vue-router';
+import { useCourseStore } from '@/stores/course';
+import { createAssignment, getQuestionBank } from '@/api/assignment';
+import { getCourseClasses } from '@/api/course';
+// 只声明一次
+const router = useRouter(); // 确保 router 实例已创建
+const courseStore = useCourseStore();
+const classes = ref([]);
+const selectedClass = ref(null);
+
+// 获取当前课程的班级列表
+const fetchClasses = async () => {
+    const courseId = courseStore.currentCourseId;
+    if (courseId) {
+        try {
+            const response = await getCourseClasses(courseId);
+            // 正常处理 resolved promise
+            if (response && response.data && Array.isArray(response.data.data)) {
+                classes.value = response.data.data.map(cls => ({
+                    id: cls.id, 
+                    name: cls.name 
+                }));
+                if (classes.value.length === 0) {
+                    console.warn(`课程 ${courseId} 下没有班级。`);
+                } else {
+                    // 默认选中第一个班级 (如果存在)
+                    task.classId = classes.value[0].id;
+                }
+            } else {
+                // 如果 promise resolve 了，但响应结构不符合预期
+                const errorMsg = '获取班级失败：响应数据格式不正确';
+                console.error(errorMsg, response);
+                showMessage(errorMsg);
+                classes.value = [];
+            }
+        } catch (e) {
+            // 处理 rejected promise
+            console.warn('Entering catch block for getCourseClasses in fetchClasses. Error object:', e);
+            // 尝试更鲁棒地判断是否为“成功响应被当作错误拒绝”
+            if (e && e.status === 200 && e.data && e.data.code === 200) {
+                // 强烈怀疑这是“成功响应被当作错误拒绝”的情况
+                // 从“错误”对象中提取数据，确保 classes.value 是数组
+                const rawClasses = (e.data.data && Array.isArray(e.data.data)) ? e.data.data : [];
+                classes.value = rawClasses.map(cls => ({
+                    id: cls.id,
+                    name: cls.name
+                }));
+                
+                console.warn(`已从被拒绝的Promise中提取班级列表 (可能为空)。Course ID: ${courseId}, Raw e.data.data:`, e.data.data);
+                if (classes.value.length === 0) {
+                    console.warn(`课程 ${courseId} 下没有班级 (通过被拒绝的promise捕获)。`);
+                } else if (!task.classId && classes.value.length > 0) {
+                    // 如果之前没有选中班级，且现在有了班级列表，则默认选中第一个
+                    task.classId = classes.value[0].id;
+                }
+                // 在这种特定情况下，不应显示错误消息给用户
+            } else {
+                // 这看起来是真正的API错误或未预期的拒绝结构
+                const errorMsg = 'Failed to fetch classes or data format is incorrect';
+                console.error(errorMsg, e); 
+                showMessage(errorMsg); 
+                classes.value = []; 
+            }
+        }
+    } else {
+        const errorMsg = '无法加载班级：课程ID无效';
+        console.error(errorMsg);
+        showMessage(errorMsg);
+        classes.value = [];
+    }
+};
+
+onMounted(() => {
+    fetchClasses();
+    // 如果需要，在这里加载草稿或执行其他初始化操作
+    // 例如：loadDraftIfAny(); 
 });
 
-// 用户菜单显示状态
-const showUserMenu = ref(false);
+
+
 
 // 提示框状态
 const showAlert = ref(false);
@@ -773,7 +831,9 @@ const task = reactive({
     allowResubmit: true,
     description: '',
     status: 'draft', // draft, published
-    questions: []
+    questions: [],
+    classId: null,
+    courseId: courseStore.currentCourseId
 });
 
 // 预览模态框状态
@@ -793,8 +853,11 @@ const selectedQuestions = ref([]);
 const showQuestionPreview = ref(false);
 const previewQuestion = ref(null);
 
-// 题库数据 - 使用模拟数据进行预览
+// 题库数据
 const questionBank = ref([]);
+
+
+
 
 // 过滤后的题库
 const filteredQuestionBank = computed(() => {
@@ -904,15 +967,20 @@ const formatDateTime = (dateTimeStr) => {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 };
 
-// 打开题库
-const openQuestionBank = () => {
+// 打开题库，自动加载题库数据
+const openQuestionBank = async () => {
     showQuestionBank.value = true;
     loadingQuestionBank.value = true;
-
-    // 模拟加载数据
-    setTimeout(() => {
+    try {
+        // 可根据需要传递 courseId 过滤题库
+        const data = await getQuestionBank({ courseId: task.courseId });
+        questionBank.value = Array.isArray(data) ? data : [];
+    } catch (e) {
+        showMessage(e.message || '获取题库失败');
+        questionBank.value = [];
+    } finally {
         loadingQuestionBank.value = false;
-    }, 500);
+    }
 };
 
 // 切换题目选择状态
@@ -1016,33 +1084,30 @@ const publishTask = async () => {
         showMessage('请输入任务标题');
         return;
     }
-
+    if (!task.classId) {
+        showMessage('请选择班级');
+        return;
+    }
     if (!task.openTime) {
         showMessage('请设置开始时间');
         return;
     }
-
     if (!task.closeTime) {
         showMessage('请设置截止时间');
         return;
     }
-
     if (task.questions.length === 0) {
         showMessage('请添加至少一道题目');
         return;
     }
-
     // 验证每道题目
     for (let i = 0; i < task.questions.length; i++) {
         const q = task.questions[i];
-
         if (!q.text) {
             showMessage(`第 ${i + 1} 题缺少题目内容`);
             return;
         }
-
         if (q.type === 'choice') {
-            // 验证选择题
             for (let j = 0; j < q.options.length; j++) {
                 if (!q.options[j]) {
                     showMessage(`第 ${i + 1} 题的选项 ${['A', 'B', 'C', 'D'][j]} 为空`);
@@ -1050,55 +1115,40 @@ const publishTask = async () => {
                 }
             }
         } else if (q.type === 'programming') {
-            // 验证编程题
             if (!q.description) {
                 showMessage(`第 ${i + 1} 题缺少题目描述`);
                 return;
             }
-
             if (!q.sampleAnswer) {
                 showMessage(`第 ${i + 1} 题缺少参考答案`);
                 return;
             }
-
             if (!q.testCases || q.testCases.length === 0) {
                 showMessage(`第 ${i + 1} 题缺少测试用例`);
                 return;
             }
         }
     }
-
-    // 在实际应用中，这里应该调用API发布任务
-    task.status = 'published';
-    console.log('发布任务', task);
-
-    showMessage('任务已发布');
-
-    // 发布成功后跳转回课程管理页面
-    setTimeout(() => {
-        goBackToCourseManagement();
-    }, 2000);
-
-    // assignmentData 结构需参考 openapi.yaml AssignmentCreateDto
+    // 合并 assignmentData，严格按接口字段
     const assignmentData = {
         title: task.title,
         description: task.description,
-        courseId: task.courseId, // 需有
-        openTime: task.openTime,
-        dueDate: task.closeTime,
-        allowResubmit: task.allowResubmit,
-        questionIds: task.questions.map(q => q.id) // 先保存题目到题库再布置
-    }
+        courseId: task.courseId,
+        openTime: new Date(task.openTime).toISOString(),
+        dueDate: new Date(task.closeTime).toISOString(),
+        allowResubmit: !!task.allowResubmit,
+        questionIds: task.questions.map(q => q.id)
+    };
     try {
-        const classId = task.classId // 需有
-        await createAssignment(classId, assignmentData)
-        alert('布置作业成功')
-        // 跳转或刷新
+        await createAssignment(task.classId, assignmentData);
+        showMessage('布置作业成功');
+        setTimeout(() => {
+            goBackToCourseManagement();
+        }, 1500);
     } catch (e) {
-        alert(e.message || '布置作业失败')
+        showMessage(e.message || '布置作业失败');
     }
 };
-
 
 // 返回课程管理
 const goBackToCourseManagement = () => {
@@ -1108,18 +1158,23 @@ const goBackToCourseManagement = () => {
         }
     }
 
-    // 在实际应用中，这里应该跳转回课程管理页面
-    console.log('返回课程管理页面');
+    router.back(); // 实现返回上一页功能
 };
 
+// 班级筛选相关
+
+
+
+
 // 组件挂载时
-onMounted(() => {
+onMounted(async () => {
     // 设置默认开始时间为当前时间
     const now = new Date();
     task.openTime = new Date(now.getTime()).toISOString().slice(0, 16);
-
     // 设置默认截止时间为一周后
     const oneWeekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     task.closeTime = oneWeekLater.toISOString().slice(0, 16);
+
+    // 注意：获取班级信息的逻辑已移至 fetchClasses 函数，并在另一个 onMounted 中调用
 });
 </script>

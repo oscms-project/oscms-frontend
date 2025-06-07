@@ -77,6 +77,12 @@ const routes = [
     path: '/exercise/report',
     name: 'ExerciseReport',
     component: () => import('@/views/ExerciseReport.vue'),
+  },
+  {
+    path: '/favorites',
+    name: 'FavoriteExercises',
+    component: () => import('@/views/FavoriteExercises.vue'),
+    meta: { requiresAuth: true, role: 'student' }
   }
 ]
 

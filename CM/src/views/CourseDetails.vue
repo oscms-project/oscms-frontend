@@ -8,7 +8,7 @@
         <p class="course-meta">{{ courseStudents }}{{ courseDuration }}</p>
       </div>
       <div class="action-buttons">
-        <button class="btn btn-light-blue" @click="showPublishExerciseModal">
+        <button class="btn btn-light-blue" @click="goToTeacherCreateTask">
           <i class="i-lucide-file-plus mr-1"></i>
           发布练习
         </button>
@@ -289,7 +289,7 @@
             <i class="i-lucide-search search-icon"></i>
             <input type="text" placeholder="搜索练习" v-model="exerciseSearchQuery">
           </div>
-          <button class="btn btn-sm btn-primary" @click="showPublishExerciseModal = true">
+          <button class="btn btn-sm btn-primary" @click="goToTeacherCreateTask">
             <i class="i-lucide-file-plus mr-1"></i>
             发布练习
           </button>
@@ -1039,6 +1039,13 @@ const userInfo = ref({
   role: '教师',
   isOnline: true
 });
+
+// 跳转到新建练习页面
+const goToTeacherCreateTask = () => {
+  // 跳转前确保设置好当前课程ID和名称
+  //courseStore.setCurrentCourse(courseId.value, courseName.value);
+  router.push({ name: 'TeacherCreateTask' });
+};
 
 // 导航到个人中心页面
 const navigateToProfile = () => {
