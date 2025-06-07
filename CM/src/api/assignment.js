@@ -149,6 +149,31 @@ export function gradeSubmission(submissionId, grades) {
 }
 
 /**
+ * 创建新题目到题库
+ * @param {Object} questionData 题目数据 (格式: { title: string, type: 'choice', choices: string[], correctAnswer: string, score: number })
+ * @returns {Promise<Object>} 创建的题目对象
+ */
+export function createQuestionInBank(questionData) {
+    return axios
+        .post('/questions', questionData)
+        .then(res => {
+            // 后端创建成功可能返回 201 Created，或者 200 OK 并附带数据
+            if (res.data && (res.data.code === 201 || res.data.code === 200)) {
+                return res.data.data; // 返回创建的题目对象
+            } else {
+                // 如果响应中没有预期的成功代码，则抛出错误
+                throw new Error(res.data?.message || '创建题目失败，未收到成功响应');
+            }
+        })
+        .catch(error => {
+            // 统一处理 axios 错误和上面抛出的自定义错误
+            console.error('Error in createQuestionInBank API call:', error.response ? error.response.data : error.message);
+            const serverMessage = error.response?.data?.message || error.message;
+            throw new Error(serverMessage || '创建题目时发生网络或服务器错误');
+        });
+}
+
+/**
  * 获取学生在某作业的最新提交
  * @param {string} assignmentId
  * @returns {Promise<Object>} 最新提交详情

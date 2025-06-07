@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-shadow duration-300 ease-in-out">
+  <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300 ease-in-out">
     <div class="p-6">
       <div class="flex justify-between items-start mb-3">
         <h3 class="text-xl font-semibold text-gray-800 leading-tight truncate" :title="exercise.title || '题目加载中...'">

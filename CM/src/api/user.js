@@ -13,27 +13,29 @@ export function getFavoriteExercises(studentId) {
     // 或者使用项目中已有的 request 工具
     return axios.get(`/users/${studentId}/favorites`)
         .then(response => {
-            // 根据你的 OpenAPI 定义，响应体直接是 ApiResponseQuestionList
-            // 假设 ApiResponseQuestionList 的实际数据在 response.data.data
-            // 并且 code === 200 表示成功
+            // 假设 ApiResponseQuestionList 的结构是 { code: number, message: string, data: Question[] }
             if (response.data && response.data.code === 200 && Array.isArray(response.data.data)) {
                 return response.data.data; // 返回题目数组
             } else if (response.data && response.data.code !== 200) {
+                // 处理业务逻辑层面的错误（HTTP状态码可能仍为200，但code非200）
                 throw new Error(response.data.message || '获取收藏题目失败');
-            }
-            // 如果后端直接返回题目数组，且没有 code/message 包装
-            // else if (Array.isArray(response.data)) { 
-            //    return response.data; 
-            // }
-            else {
-                // 根据实际情况调整错误处理和数据提取逻辑
+            } else {
+                // 响应数据结构不符合预期
                 console.warn('Unexpected response structure for favorite exercises:', response.data);
-                return []; // 或者抛出错误
+                throw new Error('获取收藏题目失败：响应数据格式不正确');
             }
         })
         .catch(error => {
-            console.error('API Error fetching favorite exercises:', error);
-            throw error; // 重新抛出，让调用者处理UI
+            console.error('API Error fetching favorite exercises:', error.message);
+            // 尝试从 Axios 错误对象中提取后端返回的更具体的错误信息
+            if (error.response && error.response.data && error.response.data.message) {
+                throw new Error(error.response.data.message);
+            } else if (error.message) {
+                // 如果是网络错误或其他 Axios 错误，使用 error.message
+                throw new Error(error.message);
+            }
+            // Fallback 错误
+            throw new Error('获取收藏题目时发生未知错误');
         });
 }
 //更新个人信息
