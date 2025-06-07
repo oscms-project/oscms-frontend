@@ -65,13 +65,13 @@ const routes = [
     path: '/teacher/create',
     name: 'TeacherCreateTask',
     component: () => import('@/views/TeacherCreateTask.vue'),
-    meta: { requiresAuth: true, role: 'teacher' }
+    //meta: { requiresAuth: true, role: 'teacher' }
   },
   {
     path: '/teacher/grade/:id',
     name: 'TeacherGradeExercise',
     component: () => import('@/views/TeacherGradeExercise.vue'),
-    meta: { requiresAuth: true, role: 'teacher' }
+    //meta: { requiresAuth: true, role: 'teacher' }
   },
   {
     path: '/exercise/report',
@@ -86,8 +86,8 @@ const routes = [
   },
   {
     path: '/ta/courses',
-    name: 'TaCourseDetails',
-    component: () => import('@/views/TaCourseDetails.vue'),
+    name: 'CourseDetails_ta',
+    component: () => import('@/views/CourseDetails_ta.vue'),
      meta: { requiresAuth: true, role: 'ta' }
   },
   {
