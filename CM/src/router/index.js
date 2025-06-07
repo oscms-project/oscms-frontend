@@ -78,12 +78,24 @@ const routes = [
     name: 'ExerciseReport',
     component: () => import('@/views/ExerciseReport.vue'),
   },
-//   {
-// path: '/favorites',
-//  name: 'FavoriteExercises',
-//  component: () => import('@/views/FavoriteExercises.vue'),
-//  meta: { requiresAuth: true, role: 'student' }
-//  }
+  {
+    path: '/ta-home',
+    name: 'TAHome',
+    component: () => import('@/views/TaHome.vue'),
+    meta: { requiresAuth: true, role: 'ta' }
+  },
+  {
+    path: '/ta/courses',
+    name: 'TaCourseDetails',
+    component: () => import('@/views/TaCourseDetails.vue'),
+     meta: { requiresAuth: true, role: 'ta' }
+  },
+  {
+path: '/favorites',
+ name: 'FavoriteExercises',
+ component: () => import('@/views/FavoriteExercises.vue'),
+ meta: { requiresAuth: true, role: 'student' }
+ },
 ]
 
 // 创建路由实例

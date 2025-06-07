@@ -116,10 +116,10 @@ const handleLogin = async() => {
       else if(role.value === 'teacher') {
         router.push('/teacherhome');
       } 
-    //   else if(role.value=='ta')
-    //   {
-    //     router.push('/ta-home');
-    //   }
+      else if(role.value=='ta')
+      {
+        router.push('/ta-home');
+      }
       else {
       alert('登录失败，请检查账号和密码');
     }
