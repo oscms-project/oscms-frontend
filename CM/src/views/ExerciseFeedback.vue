@@ -118,20 +118,35 @@
                             <div class="text-sm text-gray-500 mt-1">{{ question.score }} 分</div>
                         </div>
                     </div>
+                    <div class="flex items-center">
+            <!-- 收藏按钮 -->
+            <button 
+                class="flex items-center px-3 py-1 rounded-lg text-sm mr-3"
+                :class="isBookmarked(question.id) ? 'bg-yellow-500 text-white' : 'bg-blue-500 text-white'"
+                @click="handleFavorite(question)"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    class="mr-1" :class="{'fill-current': isBookmarked(question.id)}">
+                    <path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+                </svg>
+                {{ isBookmarked(question.id) ? '已收藏' : '收藏' }}
+            </button>
                     <div class="text-sm" :class="question.correct ? 'text-green-600' : 'text-red-600'">
                         得分：{{ question.score }} 分
                     </div>
                 </div>
+            </div>
 
-                <!-- 选择题 -->
-                <div v-if="question.type === 'choice'" class="ml-6 mt-4">
-                    <div v-for="(choice, cIndex) in question.choices" :key="cIndex"
-                        class="flex items-center p-3 rounded-lg mb-2"
-                        :class="{
-                            'bg-green-100 border border-green-300': choice === question.correctAnswer,
-                            'bg-red-100 border border-red-300': choice === question.studentAnswer && choice !== question.correctAnswer,
-                            'bg-gray-50 border border-gray-200': choice !== question.studentAnswer && choice !== question.correctAnswer
-                        }">
+            <!-- 选择题 -->
+            <div v-if="question.type === 'choice'" class="ml-6 mt-4">
+                <div v-for="(choice, cIndex) in question.choices" :key="cIndex"
+                    class="flex items-center p-3 rounded-lg mb-2"
+                    :class="{
+                        'bg-green-100 border border-green-300': choice === question.correctAnswer,
+                        'bg-red-100 border border-red-300': choice === question.studentAnswer && choice !== question.correctAnswer,
+                        'bg-gray-50 border border-gray-200': choice !== question.studentAnswer && choice !== question.correctAnswer
+                    }">
                         <div class="w-6 h-6 rounded-full flex items-center justify-center border mr-2"
                             :class="{
                                 'bg-green-500 border-green-500 text-white': choice === question.correctAnswer,
@@ -180,6 +195,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { getSubmissionDetail, getAssignmentQuestions } from '@/api/assignment';
 import { useCourseStore } from '@/stores/course';
 import { useUserStore } from '@/stores/user';
+import { addFavoriteExercise } from '@/api/user';
 
 const route = useRoute();
 const router = useRouter();
@@ -218,6 +234,25 @@ const user = ref({
     avatar: ''
 });
 
+// 在组件方法中使用
+const favoriteQuestion = async (questionId) => {
+  try {
+    const studentId = userStore.userId; // 从用户store获取当前登录的学生ID
+    await addFavoriteExercise(studentId, questionId);
+    
+    // 收藏成功处理
+    showAlert.value = true;
+    alertMessage.value = "题目已成功收藏";
+    setTimeout(() => { showAlert.value = false; }, 2000);
+    
+  } catch (error) {
+    console.error('收藏题目失败:', error);
+    showAlert.value = true;
+    alertMessage.value = error.message || "收藏失败，请稍后再试";
+    setTimeout(() => { showAlert.value = false; }, 2000);
+  }
+};
+
 const exercise = computed( () => submission.value?.assignment || { questions: [] });
 onMounted(async () => {
     try {
@@ -251,6 +286,7 @@ onMounted(async () => {
                 id: assignmentId,
                 questions: questions.map((q, index) => ({
                     ...q,
+                    id: q.id || `q-${index}`, // 确保每个题目有id
                     studentAnswer: detail.answers[index]?.response || '',
                     score: detail.answers[index]?.score || 0,
                     correct: detail.answers[index]?.correct || false,
@@ -320,24 +356,39 @@ const filteredQuestions = computed(() => {
     return [];
 });
 
-const isCorrect = (questionIndex) => {
-    if (!submission.value || !submission.value.answers) return false;
-    return submission.value.answers[questionIndex]?.correct === true;
+
+const isBookmarked = (questionId) => {
+  return bookmarkedQuestions.value.includes(questionId);
 };
 
-const isBookmarked = (questionIndex) => bookmarkedQuestions.value.includes(questionIndex);
-
-const toggleBookmark = (questionIndex) => {
-    const index = bookmarkedQuestions.value.indexOf(questionIndex);
-    if (index === -1) {
-        bookmarkedQuestions.value.push(questionIndex);
-        showMessage('已收藏题目');
-    } else {
-        bookmarkedQuestions.value.splice(index, 1);
-        showMessage('已取消收藏');
+const handleFavorite = async (question) => {
+  try {
+    if (!question.id) {
+      showMessage("题目ID不存在");
+      return;
     }
+    
+    const isAlreadyBookmarked = isBookmarked(question.id);
+    
+    if (isAlreadyBookmarked) {
+      // 如果已收藏，显示提示信息
+      showMessage("该题目已收藏");
+      return;
+    }
+    
+    // 调用收藏API
+    await favoriteQuestion(question.id);
+    
+    // 更新本地收藏状态
+    if (!bookmarkedQuestions.value.includes(question.id)) {
+      bookmarkedQuestions.value.push(question.id);
+    }
+    
+  } catch (error) {
+    console.error('收藏题目失败:', error);
+    showMessage(error.message || "收藏失败，请稍后再试");
+  }
 };
-
 const retryIncorrectQuestions = () => {
     if (!exercise.value?.id) {
         showMessage('练习信息不完整');

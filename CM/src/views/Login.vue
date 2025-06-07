@@ -82,51 +82,58 @@ const router = useRouter();
 const role = ref(''); 
 const userStore = useUserStore(); // 使用用户状态存储
 
+
 // 处理登录
 const handleLogin = async() => {
-  if (!id.value || !password.value) {
-    alert('请输入学工号和密码');
+  if (!id.value || !password.value || !role.value) {
+    alert('请输入学工号、密码和选择身份');
     return;
   }
 
-  try{
+  try {
     // 构造请求体
-    const payload={
-        userId: id.value,
-        password: password.value,
-        role: role.value
+    const payload = {
+      userId: id.value,
+      password: password.value,
+      role: role.value
     };
-    //调用接口
-     const res = await login(payload);
-    if(res.status==200&&res.data && res.data.data && res.data.data.token) 
-      {
-        if (res.data.data.role && res.data.data.role !== role.value) {
-        alert('角色与账号不匹配，请检查后重试');
-        return;
-      }
-       userStore.login({
+    
+    // 调用登录接口
+    const res = await login(payload);
+    
+    // 根据返回的code判断是否登录成功
+    if (res.data.code === 200) {
+      // 登录成功
+      userStore.login({
         token: res.data.data.token,
         userId: res.data.data.user?.id || id.value
       });
-      alert('登录成功！');
-      // 跳转到首页
-      if(role.value === 'student') {
-      router.push('/student-home');
-      }
-      else if(role.value === 'teacher') {
+      
+      // 可以使用后端返回的消息或自定义消息
+      alert(res.data.message || '登录成功！');
+      
+      // 根据角色跳转到不同页面
+      if (role.value === 'student') {
+        router.push('/student-home');
+      } else if (role.value === 'teacher') {
         router.push('/teacherhome');
-      } 
-      else if(role.value=='ta')
-      {
+      } else if (role.value === 'ta') {
         router.push('/ta-home');
       }
-      else {
-      alert('登录失败，请检查账号和密码');
+    } else {
+      // 登录失败，显示后端返回的错误信息
+      alert(res.data.message || '登录失败');
     }
-}
-  }
-catch (err) {
-    alert('登录失败，请检查账号和密码');
+  } catch (err) {
+    // 处理网络错误或其他异常
+    console.error('登录异常:', err);
+    
+    // 如果错误对象包含响应数据，尝试提取后端错误信息
+    if (err.response && err.response.data) {
+      alert(err.response.data.message || '登录失败');
+    } else {
+      alert('网络错误，请稍后重试');
+    }
   }
 };
 

@@ -5,17 +5,25 @@ const instance = axios.create({
   baseURL: 'http://localhost:8080', // 根据 openapi servers 配置
   timeout: 10000
 })
-
-instance.interceptors.request.use(config => {
-  // 从 Pinia store 获取最新 token
-  const userStore = useUserStore()
-  if (userStore.token) {
-    config.headers.Authorization = `Bearer ${userStore.token}`
+//请求拦截器
+instance.interceptors.request.use(
+  config => {
+    // 获取 store 中的 token (这是在组件外使用 store 的特殊方式)
+    const userStore = useUserStore()
+    const token = userStore.token
+    
+    // 如果有 token 则添加到 Authorization 请求头
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`
+    }
+    
+    return config
+  },
+  error => {
+    console.error('请求拦截器错误:', error)
+    return Promise.reject(error)
   }
-  return config
-}, error => {
-  return Promise.reject(error)
-})
+)
 
 // 添加响应拦截器，处理 token 失效情况
 instance.interceptors.response.use(
