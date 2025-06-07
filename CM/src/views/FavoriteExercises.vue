@@ -52,13 +52,22 @@
 
       <!-- Content: Favorite Exercises Grid -->
       <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-        <FavoriteExerciseCard 
+        <!--
+      <FavoriteExerciseCard 
           v-for="exercise in favorites" 
           :key="exercise.id" 
           :exercise="exercise"
           @remove-favorite="handleRemoveFavorite"
           @view-exercise="handleViewExercise"
         />
+      -->
+      <div v-if="favorites.length > 0">
+        <p>收藏题目数量: {{ favorites.length }}</p>
+        <p>第一个题目ID: {{ favorites[0] && favorites[0].id }}</p> 
+      </div>
+      <div v-else>
+        <p>收藏夹数据已加载，但列表为空（这应该由空状态处理，但作为测试）。</p>
+      </div>
       </div>
     </div>
   </div>

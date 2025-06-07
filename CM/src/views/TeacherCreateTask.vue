@@ -13,23 +13,17 @@
                 </button>
             </div>
 
-            <!-- 用户信息 -->
-            <div class="relative flex flex-col items-end" @mouseenter="showUserMenu = true"
-                @mouseleave="showUserMenu = false">
-                <img :src="user.avatar || '/placeholder.svg?height=40&width=40'" alt="用户头像"
-                    class="w-10 h-10 rounded-full border-2 border-gray-200" />
-                <div class="text-right mt-1">
-                    <p class="text-sm font-medium">{{ user.name }}</p>
-                    <p class="text-xs text-gray-600">{{ user.username }}</p>
-                    <p class="text-xs text-gray-600">{{ user.college }}</p>
-                </div>
-                <div v-if="showUserMenu"
-                    class="absolute right-0 top-10 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
-                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">个人资料</a>
-                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">设置</a>
-                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">退出登录</a>
-                </div>
-            </div>
+
+        </div>
+
+        <!-- 班级筛选 -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-bold mb-4">班级筛选</h2>
+            <select v-model="task.classId" class="form-select mt-1 block w-full">
+                <option v-for="classItem in classes" :key="classItem.id" :value="classItem.id">
+                    {{ classItem.name }}
+                </option>
+            </select>
         </div>
 
         <!-- 中央提示框 -->
@@ -149,9 +143,8 @@
                         </svg>
                         从题库导入
                     </button>
-                    <button v-if="task.type === 'choice' || task.type === 'mixed'"
-                        class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg text-sm flex items-center"
-                        @click="addQuestion('choice')">
+                    <button class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg text-sm flex items-center"
+                        @click="openAddChoiceModal">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                             class="mr-1">
@@ -160,9 +153,18 @@
                         </svg>
                         添加选择题
                     </button>
-                    <button v-if="task.type === 'programming' || task.type === 'mixed'"
-                        class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-lg text-sm flex items-center"
-                        @click="addQuestion('programming')">
+                    <button class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-lg text-sm flex items-center"
+                        @click="openAddShortAnswerModal">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                            class="mr-1">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        添加简答题
+                    </button>
+                    <button class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-lg text-sm flex items-center"
+                        @click="openAddCodingModal">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                             class="mr-1">
@@ -196,15 +198,17 @@
                                     }">
                                         {{ question.type === 'choice' ? '选择题' : '编程题' }}
                                     </span>
-                                    <input v-model="question.text" type="text"
+                                    <input v-if="!question.bankId" v-model="question.text" type="text"
                                         class="flex-grow px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         placeholder="请输入题目" />
+                                    <span v-else class="flex-grow px-2 py-1 text-gray-700">{{ question.text }}</span>
                                 </div>
                                 <div class="flex items-center mt-2">
                                     <label class="text-sm text-gray-600 mr-2">分值:</label>
-                                    <input v-model.number="question.points" type="number"
+                                    <input v-if="!question.bankId" v-model.number="question.points" type="number"
                                         class="w-20 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         min="0" />
+                                    <span v-else class="px-2 py-1 text-gray-700">{{ question.points === undefined || question.points === null ? '未设' : question.points + '分' }}</span>
                                 </div>
                             </div>
                         </div>
@@ -227,63 +231,57 @@
 
                     <!-- 选择题选项 -->
                     <div v-if="question.type === 'choice'" class="ml-6 space-y-2 mt-4">
-                        <div v-for="(option, oIndex) in question.options" :key="oIndex" class="flex items-center">
-                            <div class="w-6 h-6 rounded-full flex items-center justify-center border mr-2"
-                                :class="{ 'bg-green-500 border-green-500 text-white': question.correctAnswer === oIndex, 'border-gray-300': question.correctAnswer !== oIndex }">
-                                {{ ['A', 'B', 'C', 'D'][oIndex] }}
+                        <!-- Editable options for manually added questions -->
+                        <template v-if="!question.bankId">
+                            <div v-for="(option, oIndex) in question.options" :key="oIndex" class="flex items-center">
+                                <div class="w-6 h-6 rounded-full flex items-center justify-center border mr-2 cursor-pointer"
+                                    :class="{ 'bg-green-500 border-green-500 text-white': question.correctAnswer === oIndex, 'border-gray-300 hover:bg-gray-100': question.correctAnswer !== oIndex }"
+                                    @click="setCorrectAnswer(question, oIndex)">
+                                    {{ ['A', 'B', 'C', 'D'][oIndex] }}
+                                </div>
+                                <input v-model="question.options[oIndex]" type="text"
+                                    class="flex-grow px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    :placeholder="`选项 ${['A', 'B', 'C', 'D'][oIndex]}`" />
+                                <button class="ml-2 text-gray-400 hover:text-red-500 focus:outline-none"
+                                    @click="removeOption(question, oIndex)" :disabled="question.options.length <= 2"
+                                    :class="{ 'opacity-50 cursor-not-allowed': question.options.length <= 2 }">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                                </button>
+                                <!-- Removed setCorrectAnswer button from here as click on A/B/C/D does it -->
                             </div>
-                            <input v-model="question.options[oIndex]" type="text"
-                                class="flex-grow px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                :placeholder="`选项 ${['A', 'B', 'C', 'D'][oIndex]}`" />
-                            <button class="ml-2 text-gray-400 hover:text-red-500 focus:outline-none"
-                                @click="removeOption(question, oIndex)" :disabled="question.options.length <= 2"
-                                :class="{ 'opacity-50 cursor-not-allowed': question.options.length <= 2 }">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round">
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <line x1="15" y1="9" x2="9" y2="15"></line>
-                                    <line x1="9" y1="9" x2="15" y2="15"></line>
-                                </svg>
-                            </button>
-                            <button class="ml-1 text-gray-400 hover:text-green-500 focus:outline-none"
-                                @click="setCorrectAnswer(question, oIndex)">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round">
-                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                                </svg>
-                            </button>
-                        </div>
-
-                        <div v-if="question.options.length < 4" class="flex justify-center">
-                            <button class="text-blue-500 hover:text-blue-700 text-sm flex items-center"
-                                @click="addOption(question)">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round" class="mr-1">
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <line x1="12" y1="8" x2="12" y2="16"></line>
-                                    <line x1="8" y1="12" x2="16" y2="12"></line>
-                                </svg>
-                                添加选项
-                            </button>
-                        </div>
+                            <div v-if="question.options.length < 4" class="flex justify-center">
+                                <button class="text-blue-500 hover:text-blue-700 text-sm flex items-center"
+                                    @click="addOption(question)">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                                    添加选项
+                                </button>
+                            </div>
+                        </template>
+                        <!-- Read-only options for questions from bank -->
+                        <template v-else>
+                            <div v-for="(option, oIndex) in question.options" :key="option.id" class="flex items-center py-1">
+                                <div class="w-6 h-6 rounded-full flex items-center justify-center border mr-2"
+                                    :class="{ 'bg-green-500 border-green-500 text-white': question.answer === option.id, 'border-gray-300': question.answer !== option.id }">
+                                    {{ ['A', 'B', 'C', 'D'][oIndex] }}
+                                </div>
+                                <span class="text-gray-700">{{ option.text }}</span>
+                            </div>
+                        </template>
                     </div>
 
                     <!-- 编程题详情 -->
                     <div v-if="question.type === 'programming'" class="ml-6 mt-4">
                         <div class="mb-3">
                             <label class="block text-sm font-medium text-gray-700 mb-1">题目描述</label>
-                            <textarea v-model="question.description"
+                            <textarea v-if="!question.bankId" v-model="question.description"
                                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 h-24"
                                 placeholder="请输入题目描述"></textarea>
+                            <div v-else class="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-md h-24 overflow-y-auto whitespace-pre-wrap">{{ question.description || '无描述' }}</div>
                         </div>
 
                         <div class="mb-3">
                             <label class="block text-sm font-medium text-gray-700 mb-1">编程语言</label>
-                            <select v-model="question.language"
+                            <select v-if="!question.bankId" v-model="question.language"
                                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <option value="JavaScript">JavaScript</option>
                                 <option value="Python">Python</option>
@@ -291,20 +289,22 @@
                                 <option value="C++">C++</option>
                                 <option value="C">C</option>
                             </select>
+                            <span v-else class="px-1 py-1 text-gray-700">{{ question.language || '未指定' }}</span>
                         </div>
 
                         <div class="mb-3">
                             <label class="block text-sm font-medium text-gray-700 mb-1">参考答案</label>
-                            <textarea v-model="question.sampleAnswer"
+                            <textarea v-if="!question.bankId" v-model="question.sampleAnswer"
                                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 h-32 font-mono text-sm"
                                 placeholder="请输入参考答案代码"></textarea>
+                            <pre v-else class="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-md h-32 overflow-y-auto font-mono text-sm"><code class="language-plaintext">{{ question.sampleAnswer || '无参考答案' }}</code></pre>
                         </div>
 
                         <!-- 测试用例 -->
                         <div class="mb-3">
                             <div class="flex justify-between items-center mb-1">
                                 <label class="block text-sm font-medium text-gray-700">测试用例</label>
-                                <button class="text-blue-500 hover:text-blue-700 text-sm flex items-center"
+                                <button v-if="!question.bankId" class="text-blue-500 hover:text-blue-700 text-sm flex items-center"
                                     @click="addTestCase(question)">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
                                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -326,7 +326,7 @@
                                     class="border border-gray-200 rounded-lg p-3">
                                     <div class="flex justify-between items-start mb-2">
                                         <label class="text-sm font-medium text-gray-700">测试用例 {{ tIndex + 1 }}</label>
-                                        <button class="text-gray-400 hover:text-red-500 focus:outline-none"
+                                        <button v-if="!question.bankId" class="text-gray-400 hover:text-red-500 focus:outline-none"
                                             @click="removeTestCase(question, tIndex)">
                                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
                                                 viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -338,37 +338,41 @@
                                         </button>
                                     </div>
 
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                                         <div>
-                                            <label class="block text-xs text-gray-600 mb-1">测试名称</label>
-                                            <input v-model="test.name" type="text"
-                                                class="w-full px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                                placeholder="例如：基本功能测试" />
+                                            <label class="block text-xs font-medium text-gray-600 mb-1">测试名称</label>
+                                            <input v-if="!question.bankId" type="text" v-model="test.name"
+                                                class="w-full px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-blue-400"
+                                                placeholder="例如：基本情况">
+                                            <div v-else class="w-full px-2 py-1 border border-gray-200 bg-gray-100 rounded-md text-sm min-h-[30px]">{{ test.name || 'N/A' }}</div>
                                         </div>
                                         <div>
-                                            <label class="block text-xs text-gray-600 mb-1">输入</label>
-                                            <input v-model="test.input" type="text"
-                                                class="w-full px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                                placeholder="例如：push(1), push(2)" />
+                                            <label class="block text-xs font-medium text-gray-600 mb-1">输入</label>
+                                            <textarea v-if="!question.bankId" v-model="test.input"
+                                                class="w-full px-2 py-1 border border-gray-300 rounded-md text-sm h-16 focus:ring-1 focus:ring-blue-400"
+                                                placeholder="输入参数，每行一个"></textarea>
+                                            <pre v-else class="w-full px-2 py-1 border border-gray-200 bg-gray-100 rounded-md text-sm h-16 overflow-y-auto whitespace-pre-wrap">{{ test.input || 'N/A' }}</pre>
                                         </div>
                                         <div>
-                                            <label class="block text-xs text-gray-600 mb-1">期望输出</label>
-                                            <input v-model="test.expectedOutput" type="text"
-                                                class="w-full px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                                placeholder="例如：2" />
+                                            <label class="block text-xs font-medium text-gray-600 mb-1">预期输出</label>
+                                            <textarea v-if="!question.bankId" v-model="test.expectedOutput"
+                                                class="w-full px-2 py-1 border border-gray-300 rounded-md text-sm h-16 focus:ring-1 focus:ring-blue-400"
+                                                placeholder="预期输出结果"></textarea>
+                                            <pre v-else class="w-full px-2 py-1 border border-gray-200 bg-gray-100 rounded-md text-sm h-16 overflow-y-auto whitespace-pre-wrap">{{ test.expectedOutput || 'N/A' }}</pre>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- 解析 -->
-                    <div class="ml-6 mt-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">题目解析</label>
-                        <textarea v-model="question.explanation"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 h-24"
-                            placeholder="请输入题目解析，学生提交后可查看"></textarea>
+                        <!-- 解析 -->
+                        <div class="ml-6 mt-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">题目解析</label>
+                            <textarea v-if="!question.bankId" v-model="question.explanation"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 h-24"
+                                placeholder="请输入题目解析，学生提交后可查看"></textarea>
+                            <div v-else class="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-md h-24 overflow-y-auto whitespace-pre-wrap">{{ question.explanation || '无解析' }}</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -477,6 +481,135 @@
             </div>
         </div>
 
+        <!-- Add Choice Question Modal -->
+        <el-dialog
+          v-model="showAddChoiceModal"
+          title="添加选择题"
+          width="60%"
+          :before-close="() => showAddChoiceModal = false"
+          destroy-on-close
+          center
+          append-to-body
+          class="add-choice-question-dialog"
+        >
+          <el-form :model="newChoiceData" label-width="100px" ref="addChoiceFormRef" style="padding: 0 20px;">
+            <el-form-item label="题目描述" prop="title" :rules="[{ required: true, message: '请输入题目描述', trigger: 'blur' }]">
+              <el-input v-model="newChoiceData.title" type="textarea" :rows="3" placeholder="请输入题目描述"></el-input>
+            </el-form-item>
+
+            <el-form-item label="选项设置">
+              <div v-for="(choice, index) in newChoiceData.choices" :key="index" class="choice-item" style="display: flex; align-items: center; margin-bottom: 15px;">
+                <el-form-item
+                    :label="'选项 ' + (index + 1)"
+                    :prop="'choices.' + index"
+                    :rules="[{ required: true, message: '选项内容不能为空', trigger: 'blur' }]"
+                    label-width="70px"
+                    class="choice-input-item"
+                    style="flex-grow: 1; margin-bottom: 0; margin-right: 8px;"
+                >
+                    <el-input v-model="newChoiceData.choices[index]" :placeholder="'请输入选项 ' + (index + 1) + ' 内容'"></el-input>
+                </el-form-item>
+                <el-button @click.prevent="removeChoiceInput(index)" type="danger" plain :icon="Delete" :disabled="newChoiceData.choices.length <= 2" circle />
+              </div>
+              <el-button @click="addChoiceInput" type="primary" plain :icon="Plus" :disabled="newChoiceData.choices.length >= 10">
+                 添加选项
+              </el-button>
+              <span v-if="newChoiceData.choices.length >= 10" class="text-xs text-gray-500 ml-2">最多添加10个选项</span>
+            </el-form-item>
+
+            <el-form-item label="正确答案" prop="correctAnswerText" :rules="[{ required: true, message: '请选择正确答案', trigger: 'change' }]">
+                <el-select v-model="newChoiceData.correctAnswerText" placeholder="请选择正确答案" style="width: 100%;">
+                    <el-option
+                        v-for="(choiceText, index) in newChoiceData.choices.filter(c => c.trim() !== '')"
+                        :key="index"
+                        :label="'选项 ' + (newChoiceData.choices.indexOf(choiceText) + 1) + ': ' + choiceText"
+                        :value="choiceText"
+                    ></el-option>
+                </el-select>
+            </el-form-item>
+
+            <el-form-item label="分值" prop="score" :rules="[{ required: true, message: '请输入分值', trigger: 'blur' }, { type: 'number', min: 0, message: '分值必须为不小于0的数字', trigger: 'blur' }]">
+              <el-input-number v-model="newChoiceData.score" :min="0" :step="1" placeholder="请输入分值"></el-input-number>
+            </el-form-item>
+          </el-form>
+
+          <template #footer>
+            <span class="dialog-footer">
+              <el-button @click="showAddChoiceModal = false">取消</el-button>
+              <el-button type="primary" @click="handleAddChoiceQuestion" :loading="isSubmittingChoiceQuestion">
+                {{ isSubmittingChoiceQuestion ? '提交中...' : '确认添加' }}
+              </el-button>
+            </span>
+          </template>
+        </el-dialog>
+        <!-- End of Add Choice Question Modal -->
+
+        <!-- Add Short Answer Question Modal -->
+        <el-dialog
+          v-model="showAddShortAnswerModal"
+          title="添加简答题"
+          width="50%"
+          :before-close="() => showAddShortAnswerModal = false"
+          destroy-on-close
+          center
+          append-to-body
+          class="add-short-answer-question-dialog"
+        >
+          <el-form :model="newShortAnswerData" label-width="100px" ref="addShortAnswerFormRef" style="padding: 0 20px;">
+            <el-form-item label="题目描述" prop="title" :rules="[{ required: true, message: '请输入题目描述', trigger: 'blur' }]">
+              <el-input v-model="newShortAnswerData.title" type="textarea" :rows="3" placeholder="请输入题目描述"></el-input>
+            </el-form-item>
+            <el-form-item label="分值" prop="score" :rules="[{ required: true, message: '请输入分值', trigger: 'blur' }, { type: 'number', min: 0, message: '分值必须为不小于0的数字', trigger: 'blur' }]">
+              <el-input-number v-model="newShortAnswerData.score" :min="0" :step="1" placeholder="请输入分值"></el-input-number>
+            </el-form-item>
+            <el-form-item label="正确答案" prop="correctAnswer">
+                <el-input v-model="newShortAnswerData.correctAnswer" type="textarea" :rows="3" placeholder="请输入正确答案"></el-input>
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <span class="dialog-footer">
+              <el-button @click="showAddShortAnswerModal = false">取消</el-button>
+              <el-button type="primary" @click="handleAddShortAnswerQuestion" :loading="isSubmittingShortAnswer">
+                {{ isSubmittingShortAnswer ? '提交中...' : '确认添加' }}
+              </el-button>
+            </span>
+          </template>
+        </el-dialog>
+        <!-- End of Add Short Answer Question Modal -->
+
+        <!-- Add Coding Question Modal -->
+        <el-dialog
+          v-model="showAddCodingModal"
+          title="添加编程题"
+          width="50%"
+          :before-close="() => showAddCodingModal = false"
+          destroy-on-close
+          center
+          append-to-body
+          class="add-coding-question-dialog"
+        >
+          <el-form :model="newCodingData" label-width="100px" ref="addCodingFormRef" style="padding: 0 20px;">
+            <el-form-item label="题目描述" prop="title" :rules="[{ required: true, message: '请输入题目描述', trigger: 'blur' }]">
+              <el-input v-model="newCodingData.title" type="textarea" :rows="3" placeholder="请输入题目描述"></el-input>
+            </el-form-item>
+            <el-form-item label="分值" prop="score" :rules="[{ required: true, message: '请输入分值', trigger: 'blur' }, { type: 'number', min: 0, message: '分值必须为不小于0的数字', trigger: 'blur' }]">
+              <el-input-number v-model="newCodingData.score" :min="0" :step="1" placeholder="请输入分值"></el-input-number>
+            </el-form-item>
+            <el-form-item label="正确答案" prop="correctAnswer">
+                <el-input v-model="newCodingData.correctAnswer" type="textarea" :rows="3" placeholder="请输入参考答案或解题代码"></el-input>
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <span class="dialog-footer">
+              <el-button @click="showAddCodingModal = false">取消</el-button>
+              <el-button type="primary" @click="handleAddCodingQuestion" :loading="isSubmittingCoding">
+                {{ isSubmittingCoding ? '提交中...' : '确认添加' }}
+              </el-button>
+            </span>
+          </template>
+        </el-dialog>
+        <!-- End of Add Coding Question Modal -->
+
         <!-- 题库模态框 -->
         <div v-if="showQuestionBank" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div class="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
@@ -557,38 +690,45 @@
                             <div class="flex justify-between items-start">
                                 <div class="flex items-start flex-1">
                                     <div class="flex items-center h-5 mt-0.5">
-                                        <input type="checkbox" :id="`question-${question.id}`"
+                                        <input type="checkbox" :id="'question-' + question.id"
                                             :checked="selectedQuestions.includes(question.id)"
                                             @change="toggleQuestionSelection(question.id)"
                                             class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
                                     </div>
                                     <div class="ml-3 flex-1">
-                                        <label :for="`question-${question.id}`"
-                                            class="font-medium text-gray-700 cursor-pointer">
-                                            {{ question.text }}
+                                        <label :for="'question-' + question.id"
+                                            class="font-medium text-gray-700 cursor-pointer hover:text-blue-600"
+                                            @click.stop="previewBankQuestion(question)">
+                                            {{ question.title || '无标题' }} <!-- 使用 question.title 显示标题 -->
                                         </label>
-                                        <div class="flex items-center mt-1">
-                                            <span class="px-2 py-0.5 text-xs rounded-full mr-2" :class="{
-                                                'bg-blue-200 text-blue-800': question.type === 'choice',
-                                                'bg-green-200 text-green-800': question.type === 'programming'
+                                        <div class="flex items-center mt-1 text-xs">
+                                            <span class="px-1.5 py-0.5 rounded-full mr-2" :class="{
+                                                'bg-blue-100 text-blue-700': question.type === 'choice',
+                                                'bg-green-100 text-green-700': question.type === 'programming',
+                                                'bg-yellow-100 text-yellow-700': question.type === 'short_answer',
+                                                'bg-gray-100 text-gray-700': !['choice', 'programming', 'short_answer'].includes(question.type)
                                             }">
-                                                {{ question.type === 'choice' ? '选择题' : '编程题' }}
+                                                {{ question.type === 'choice' ? '选择' : (question.type === 'programming' ? '编程' : (question.type === 'short_answer' ? '简答' : (question.type || '未知'))) }}
                                             </span>
-                                            <span class="px-2 py-0.5 text-xs rounded-full mr-2" :class="{
-                                                'bg-green-200 text-green-800': question.difficulty === 'easy',
-                                                'bg-yellow-200 text-yellow-800': question.difficulty === 'medium',
-                                                'bg-red-200 text-red-800': question.difficulty === 'hard'
+                                            <span class="px-1.5 py-0.5 rounded-full mr-2" :class="{
+                                                'bg-green-100 text-green-700': question.difficulty === 'easy',
+                                                'bg-yellow-100 text-yellow-700': question.difficulty === 'medium',
+                                                'bg-red-100 text-red-700': question.difficulty === 'hard',
+                                                'bg-gray-100 text-gray-700': !question.difficulty
                                             }">
                                                 {{
                                                     question.difficulty === 'easy' ? '简单' :
-                                                        question.difficulty === 'medium' ? '中等' : '困难'
+                                                    question.difficulty === 'medium' ? '中等' :
+                                                    question.difficulty === 'hard' ? '困难' : '未设'
                                                 }}
                                             </span>
-                                            <span class="text-sm text-gray-500">{{ question.points }} 分</span>
+                                            <span class="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                                                分值: {{ typeof question.score === 'number' ? question.score : '未设' }} <!-- 使用 question.score 显示分值 -->
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
-                                <button class="text-blue-500 hover:text-blue-700 text-sm"
+                                <button class="text-blue-500 hover:text-blue-700 text-sm ml-2"
                                     @click="previewBankQuestion(question)">
                                     预览
                                 </button>
@@ -730,22 +870,87 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router'
-import { createAssignment } from '@/api/assignment'
-const router = useRouter()
-// 用户信息 - 使用模拟数据进行预览
-const user = ref({
-    id: 'teacher123',
-    username: 'teacher001',
-    name: '李教授',
-    role: 'teacher',
-    email: 'teacher001@example.com',
-    college: '计算机科学与技术学院',
-    avatar: '/placeholder.svg?height=40&width=40'
+import { useRouter } from 'vue-router';
+import { useCourseStore } from '@/stores/course';
+import { createAssignment, getQuestionBank } from '@/api/assignment';
+import { getCourseClasses } from '@/api/course';
+import { createQuestionInBank } from '@/api/assignment';
+// 只声明一次
+const router = useRouter(); // 确保 router 实例已创建
+const courseStore = useCourseStore();
+const classes = ref([]);
+const selectedClass = ref(null);
+
+// 获取当前课程的班级列表
+const fetchClasses = async () => {
+    const courseId = courseStore.currentCourseId;
+    if (courseId) {
+        try {
+            const response = await getCourseClasses(courseId);
+            // 正常处理 resolved promise
+            if (response && response.data && Array.isArray(response.data.data)) {
+                classes.value = response.data.data.map(cls => ({
+                    id: cls.id, 
+                    name: cls.name 
+                }));
+                if (classes.value.length === 0) {
+                    console.warn(`课程 ${courseId} 下没有班级。`);
+                } else {
+                    // 默认选中第一个班级 (如果存在)
+                    task.classId = classes.value[0].id;
+                }
+            } else {
+                // 如果 promise resolve 了，但响应结构不符合预期
+                const errorMsg = '获取班级失败：响应数据格式不正确';
+                console.error(errorMsg, response);
+                showMessage(errorMsg);
+                classes.value = [];
+            }
+        } catch (e) {
+            // 处理 rejected promise
+            console.warn('Entering catch block for getCourseClasses in fetchClasses. Error object:', e);
+            // 尝试更鲁棒地判断是否为“成功响应被当作错误拒绝”
+            if (e && e.status === 200 && e.data && e.data.code === 200) {
+                // 强烈怀疑这是“成功响应被当作错误拒绝”的情况
+                // 从“错误”对象中提取数据，确保 classes.value 是数组
+                const rawClasses = (e.data.data && Array.isArray(e.data.data)) ? e.data.data : [];
+                classes.value = rawClasses.map(cls => ({
+                    id: cls.id,
+                    name: cls.name
+                }));
+                
+                console.warn(`已从被拒绝的Promise中提取班级列表 (可能为空)。Course ID: ${courseId}, Raw e.data.data:`, e.data.data);
+                if (classes.value.length === 0) {
+                    console.warn(`课程 ${courseId} 下没有班级 (通过被拒绝的promise捕获)。`);
+                } else if (!task.classId && classes.value.length > 0) {
+                    // 如果之前没有选中班级，且现在有了班级列表，则默认选中第一个
+                    task.classId = classes.value[0].id;
+                }
+                // 在这种特定情况下，不应显示错误消息给用户
+            } else {
+                // 这看起来是真正的API错误或未预期的拒绝结构
+                const errorMsg = 'Failed to fetch classes or data format is incorrect';
+                console.error(errorMsg, e); 
+                showMessage(errorMsg); 
+                classes.value = []; 
+            }
+        }
+    } else {
+        const errorMsg = '无法加载班级：课程ID无效';
+        console.error(errorMsg);
+        showMessage(errorMsg);
+        classes.value = [];
+    }
+};
+
+onMounted(() => {
+    fetchClasses();
+    // 如果需要，在这里加载草稿或执行其他初始化操作
+    // 例如：loadDraftIfAny(); 
 });
 
-// 用户菜单显示状态
-const showUserMenu = ref(false);
+
+
 
 // 提示框状态
 const showAlert = ref(false);
@@ -773,7 +978,9 @@ const task = reactive({
     allowResubmit: true,
     description: '',
     status: 'draft', // draft, published
-    questions: []
+    questions: [],
+    classId: null,
+    courseId: courseStore.currentCourseId
 });
 
 // 预览模态框状态
@@ -793,12 +1000,56 @@ const selectedQuestions = ref([]);
 const showQuestionPreview = ref(false);
 const previewQuestion = ref(null);
 
-// 题库数据 - 使用模拟数据进行预览
+// 添加选择题弹窗相关数据和状态
+const newChoiceData = reactive({
+  title: '',
+  choices: ['', ''], 
+  correctAnswerText: '',
+  score: 0, 
+});
+const showAddChoiceModal = ref(false); // 控制添加选择题弹窗的显示
+const isSubmittingChoiceQuestion = ref(false); // 控制添加选择题时的提交状态，例如按钮loading
+const addChoiceFormRef = ref(null);
+
+// For Add Short Answer Question Modal
+const showAddShortAnswerModal = ref(false);
+const addShortAnswerFormRef = ref(null);
+const isSubmittingShortAnswer = ref(false);
+const newShortAnswerData = reactive({
+  title: '',
+  score: 0,
+  correctAnswer: '',
+});
+
+// For Add Coding Question Modal
+const showAddCodingModal = ref(false);
+const addCodingFormRef = ref(null);
+const isSubmittingCoding = ref(false);
+const newCodingData = reactive({
+  title: '',
+  score: 0,
+  correctAnswer: '',
+}); // 控制添加选择题时的提交状态，例如按钮loading
+
+// 题库数据
 const questionBank = ref([]);
+const bankError = ref(null); // For storing errors when fetching from question bank
+
+
+
 
 // 过滤后的题库
 const filteredQuestionBank = computed(() => {
-    return questionBank.value.filter(q => {
+    const bank = questionBank.value;
+    if (!Array.isArray(bank)) {
+        return []; // Ensure we always return an array
+    }
+    try {
+        return bank.filter(q => {
+            if (!q || typeof q !== 'object') { // Ensure q is a non-null object
+                console.warn('[TeacherCreateTask] filteredQuestionBank: Filtering out invalid item from questionBank:', q);
+                return false;
+            }
         // 类型过滤
         if (questionBankFilter.type && q.type !== questionBankFilter.type) {
             return false;
@@ -812,14 +1063,28 @@ const filteredQuestionBank = computed(() => {
         // 关键词搜索
         if (questionBankFilter.keyword) {
             const keyword = questionBankFilter.keyword.toLowerCase();
-            return q.text.toLowerCase().includes(keyword) ||
-                (q.description && q.description.toLowerCase().includes(keyword)) ||
-                (q.explanation && q.explanation.toLowerCase().includes(keyword));
+            const titleMatch = q.title && typeof q.title === 'string' && q.title.toLowerCase().includes(keyword);
+            const descriptionMatch = q.description && typeof q.description === 'string' && q.description.toLowerCase().includes(keyword);
+            // Assuming bank questions might not have 'explanation', or it might not always be a string
+            // const explanationMatch = q.explanation && typeof q.explanation === 'string' && q.explanation.toLowerCase().includes(keyword);
+            return titleMatch || descriptionMatch; // Adjust if explanation is also a primary search target
         }
 
         return true;
-    });
+        });
+    } catch (error) {
+        console.error('[TeacherCreateTask] Error during filteredQuestionBank computation:', error);
+        return []; // Fallback to empty array on any internal error
+    }
 });
+
+// UUID generator (simple version for demonstration)
+const uuidv4 = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
 
 // 添加题目
 const addQuestion = (type) => {
@@ -897,6 +1162,201 @@ const removeTestCase = (question, index) => {
     question.testCases.splice(index, 1);
 };
 
+
+// --- Add Choice Question Modal Logic ---
+const openAddChoiceModal = () => {
+    resetNewChoiceData();
+    showAddChoiceModal.value = true;
+};
+
+const openAddShortAnswerModal = () => {
+  resetNewShortAnswerData();
+  showAddShortAnswerModal.value = true;
+};
+
+const openAddCodingModal = () => {
+  resetNewCodingData();
+  showAddCodingModal.value = true;
+};
+
+const resetNewChoiceData = () => {
+    newChoiceData.title = '';
+    newChoiceData.choices = ['', '']; // Reset to two empty choices
+    newChoiceData.correctAnswerText = '';
+    newChoiceData.score = 0;
+    if (addChoiceFormRef.value) {
+        addChoiceFormRef.value.resetFields();
+    }
+};
+
+const resetNewShortAnswerData = () => {
+  newShortAnswerData.title = '';
+  newShortAnswerData.score = 0;
+  newShortAnswerData.correctAnswer = '';
+  if (addShortAnswerFormRef.value) {
+    addShortAnswerFormRef.value.clearValidate();
+  }
+};
+
+const resetNewCodingData = () => {
+  newCodingData.title = '';
+  newCodingData.score = 0;
+  newCodingData.correctAnswer = '';
+  if (addCodingFormRef.value) {
+    addCodingFormRef.value.clearValidate();
+  }
+};
+
+const addChoiceInput = () => {
+    if (newChoiceData.choices.length < 10) { // Limit max options, e.g., 10
+        newChoiceData.choices.push('');
+    } else {
+        showMessage('最多添加10个选项。', 'warning');
+    }
+};
+
+const removeChoiceInput = (index) => {
+    if (newChoiceData.choices.length > 2) {
+        const removedChoiceText = newChoiceData.choices[index];
+        newChoiceData.choices.splice(index, 1);
+        // If the removed choice was the selected correct answer, reset correctAnswerText
+        if (newChoiceData.correctAnswerText === removedChoiceText) {
+            newChoiceData.correctAnswerText = '';
+        }
+    } else {
+        showMessage('至少需要2个选项。', 'warning');
+    }
+};
+
+const handleAddChoiceQuestion = async () => {
+    // Validation (existing logic)
+    if (!newChoiceData.title.trim()) {
+        showMessage('题目标题不能为空。', 'error');
+        return;
+    }
+    if (newChoiceData.choices.some(c => !c.trim())) {
+        showMessage('选项内容不能为空。', 'error');
+        return;
+    }
+    // Ensure at least 2 choices
+    if (newChoiceData.choices.filter(c => c.trim()).length < 2) {
+        showMessage('至少需要2个有效选项。', 'error');
+        return;
+    }
+    // Check for duplicates only among non-empty trimmed choices
+    const trimmedChoices = newChoiceData.choices.map(c => c.trim()).filter(c => c);
+    if (new Set(trimmedChoices).size !== trimmedChoices.length) {
+        showMessage('有效选项内容不能重复。', 'error');
+        return;
+    }
+    if (!newChoiceData.correctAnswerText) {
+        showMessage('请选择一个正确答案。', 'error');
+        return;
+    }
+    const trimmedCorrectAnswerText = newChoiceData.correctAnswerText.trim();
+    if (!newChoiceData.choices.map(c => c.trim()).includes(trimmedCorrectAnswerText)) {
+        showMessage('选择的正确答案必须是有效选项之一。', 'error');
+        newChoiceData.correctAnswerText = ''; 
+        return;
+    }
+    if (newChoiceData.score === null || newChoiceData.score === undefined || newChoiceData.score < 0) {
+        showMessage('分值必须大于等于0。', 'error');
+        return;
+    }
+
+    isSubmittingChoiceQuestion.value = true;
+    try {
+        const payload = {
+            title: newChoiceData.title.trim(),
+            type: 'choice',
+            choices: newChoiceData.choices.map(c => c.trim()).filter(c => c), // Send only non-empty trimmed choices
+            correctAnswer: trimmedCorrectAnswerText,
+            score: Number(newChoiceData.score),
+            courseId: task.courseId, // Ensure question is associated with the current course in the bank
+        };
+
+        const newQuestion = await createQuestionInBank(payload); // API Call
+
+        if (newQuestion && newQuestion.id) {
+            ElNotification({
+              title: '成功',
+              message: '选择题已成功添加到题库！',
+              type: 'success',
+            });
+            showAddChoiceModal.value = false;
+            // resetNewChoiceData(); // destroy-on-close in el-dialog should handle this as openAddChoiceModal calls reset
+            // Optionally, if you need to refresh a list of questions from bank, do it here.
+        } else {
+            // This case might not be reached if API throws error for non-success
+            showMessage('添加题目失败，未收到有效响应。', 'error');
+        }
+    } catch (error) {
+        console.error('Error adding choice question to bank:', error);
+        showMessage(error.message || '添加题目到题库失败，请重试。', 'error');
+    } finally {
+        isSubmittingChoiceQuestion.value = false;
+    }
+};
+
+const handleAddShortAnswerQuestion = async () => {
+  if (!addShortAnswerFormRef.value) return;
+  try {
+    await addShortAnswerFormRef.value.validate();
+    isSubmittingShortAnswer.value = true;
+    const payload = {
+      title: newShortAnswerData.title.trim(),
+      type: 'short_answer',
+      choices: [],
+      correctAnswer: newShortAnswerData.correctAnswer.trim(),
+      score: Number(newShortAnswerData.score),
+      courseId: task.courseId,
+    };
+    await createQuestionInBank(payload);
+    ElNotification({
+      title: '成功',
+      message: '简答题已成功添加到题库！',
+      type: 'success',
+    });
+    showAddShortAnswerModal.value = false;
+  } catch (error) {
+    if (error === false) return; // Validation failed
+    console.error('Failed to add short answer question to bank:', error);
+    ElMessage.error(error.message || '添加到题库失败，请重试。');
+  } finally {
+    isSubmittingShortAnswer.value = false;
+  }
+};
+
+const handleAddCodingQuestion = async () => {
+  if (!addCodingFormRef.value) return;
+  try {
+    await addCodingFormRef.value.validate();
+    isSubmittingCoding.value = true;
+    const payload = {
+      title: newCodingData.title.trim(),
+      type: 'coding',
+      choices: [],
+      correctAnswer: newCodingData.correctAnswer.trim(),
+      score: Number(newCodingData.score),
+      courseId: task.courseId,
+    };
+    await createQuestionInBank(payload);
+    ElNotification({
+      title: '成功',
+      message: '编程题已成功添加到题库！',
+      type: 'success',
+    });
+    showAddCodingModal.value = false;
+  } catch (error) {
+    if (error === false) return; // Validation failed
+    console.error('Failed to add coding question to bank:', error);
+    ElMessage.error(error.message || '添加到题库失败，请重试。');
+  } finally {
+    isSubmittingCoding.value = false;
+  }
+};
+// --- End Add Choice Question Modal Logic ---
+
 // 格式化日期时间
 const formatDateTime = (dateTimeStr) => {
     if (!dateTimeStr) return '未设置';
@@ -904,15 +1364,26 @@ const formatDateTime = (dateTimeStr) => {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 };
 
-// 打开题库
-const openQuestionBank = () => {
+// 打开题库，自动加载题库数据
+const openQuestionBank = async () => {
+    bankError.value = null; // Clear previous errors
     showQuestionBank.value = true;
     loadingQuestionBank.value = true;
-
-    // 模拟加载数据
-    setTimeout(() => {
+    try {
+        // 可根据需要传递 courseId 过滤题库
+        const data = await getQuestionBank({ courseId: task.courseId });
+        if (Array.isArray(data)) {
+            questionBank.value = data.filter(item => item != null); // Filter out null or undefined items
+        } else {
+            questionBank.value = [];
+        }
+    } catch (e) {
+        showMessage(e.message || '获取题库失败');
+        questionBank.value = [];
+        bankError.value = e.message || '获取题库失败'; // Set error message
+    } finally {
         loadingQuestionBank.value = false;
-    }, 500);
+    }
 };
 
 // 切换题目选择状态
@@ -946,6 +1417,123 @@ const previewBankQuestion = (question) => {
     showQuestionPreview.value = true;
 };
 
+// 从题库添加单个题目到当前作业
+const addQuestionFromBank = (bankQuestion) => {
+    // Basic validation of bankQuestion structure
+    if (!bankQuestion || typeof bankQuestion.id === 'undefined' || typeof bankQuestion.title === 'undefined' || typeof bankQuestion.type === 'undefined') {
+        console.error('[TeacherCreateTask] addQuestionFromBank: Received invalid or incomplete bankQuestion object:', bankQuestion);
+        showMessage('无法添加题目：题目数据不完整。');
+        return;
+    }
+  // Check for duplicates based on bankId
+  const isDuplicate = task.questions.some(q => q.bankId === bankQuestion.id);
+  if (isDuplicate) {
+    showMessage(`题目 "${bankQuestion.title}" 已经添加过了。`);
+    return;
+  }
+
+    const newQuestion = {
+        id: uuidv4(), // Local unique ID
+        bankId: bankQuestion.id, // From API: id
+        text: bankQuestion.title || '', // From API: title. Ensure it's at least an empty string.
+        type: bankQuestion.type,       // From API: type
+        points: (Number(bankQuestion.score) || 0), // From API: score, converted to number (0 if NaN/undefined/null)
+        options: [], // Will be populated for choice questions
+        answer: null, // Initialize answer, will be set based on type
+        description: bankQuestion.description || '', // General description, if available
+        // Initialize programming specific fields, will be populated if type is PROGRAMMING
+        language: undefined,
+        initialCode: undefined,
+        solution: undefined,
+        testCases: undefined,
+        sampleAnswer: undefined,
+    };
+
+    if (bankQuestion.title === null || typeof bankQuestion.title === 'undefined') {
+        console.warn(`[TeacherCreateTask] Bank question (ID: ${bankQuestion.id}) is missing a title. Displayed text will be empty.`);
+    }
+    if (typeof bankQuestion.score !== 'number') {
+        console.warn(`[TeacherCreateTask] Bank question (ID: ${bankQuestion.id}) has a non-numeric or missing score. Defaulting to 0. Score was:`, bankQuestion.score);
+    }
+
+    // Map type-specific fields based on the actual API type strings: 'choice', 'short_answer', 'code'
+    if (bankQuestion.type === 'choice') {
+        newQuestion.answer = ''; // Initialize for single choice text match, will store the local option ID
+
+        if (Array.isArray(bankQuestion.choices) && bankQuestion.choices.length > 0) {
+            newQuestion.options = bankQuestion.choices.map((choiceText) => {
+                if (typeof choiceText !== 'string') {
+                    console.warn(`[TeacherCreateTask] 'choice' question (Bank ID: ${bankQuestion.id}, Title: "${bankQuestion.title}") has a non-string choice. Original choice data:`, choiceText);
+                }
+                return {
+                    id: uuidv4(), // Local unique ID for option
+                    text: String(choiceText || ''), // Ensure text is a string
+                };
+            });
+
+            const correctAnswerFromBank = bankQuestion.correctAnswer;
+            if (correctAnswerFromBank !== null && typeof correctAnswerFromBank !== 'undefined') {
+                if (typeof correctAnswerFromBank === 'string') {
+                    const correctOption = newQuestion.options.find(opt => opt.text === correctAnswerFromBank);
+                    if (correctOption) {
+                        newQuestion.answer = correctOption.id;
+                    } else {
+                        console.warn(`[TeacherCreateTask] 'choice' question (Bank ID: ${bankQuestion.id}, Title: "${bankQuestion.title}"): Correct answer text "${correctAnswerFromBank}" from bank does not match any option text. Options: [${newQuestion.options.map(o => `"${o.text}"`).join(', ')}].`);
+                        // newQuestion.answer remains as initialized (empty string)
+                    }
+                } else {
+                    console.warn(`[TeacherCreateTask] 'choice' question (Bank ID: ${bankQuestion.id}, Title: "${bankQuestion.title}"): Expected 'correctAnswer' for 'choice' type to be a string, but got ${typeof correctAnswerFromBank}:`, correctAnswerFromBank);
+                }
+            } else {
+                console.warn(`[TeacherCreateTask] 'choice' question (Bank ID: ${bankQuestion.id}, Title: "${bankQuestion.title}") is missing 'correctAnswer' from bank.`);
+            }
+        } else {
+            console.warn(`[TeacherCreateTask] 'choice' question (Bank ID: ${bankQuestion.id}, Title: "${bankQuestion.title}") has missing, empty, or non-array 'choices'. Actual 'choices':`, bankQuestion.choices);
+            newQuestion.options = []; // Ensure options are empty if bank data is invalid
+        }
+    } else if (bankQuestion.type === 'code') {
+        newQuestion.language = bankQuestion.language || 'JavaScript';
+        newQuestion.initialCode = bankQuestion.initialCode || '';
+        newQuestion.solution = bankQuestion.solution || '';
+        // For 'code' type, correctAnswer from bank might be a sample textual answer or part of solution description
+        newQuestion.sampleAnswer = bankQuestion.sampleAnswer || bankQuestion.correctAnswer || ''; 
+        
+        if (Array.isArray(bankQuestion.testCases)) {
+            try {
+                newQuestion.testCases = JSON.parse(JSON.stringify(bankQuestion.testCases));
+            } catch (e) {
+                console.error(`[TeacherCreateTask] 'code' question (Bank ID: ${bankQuestion.id}, Title: "${bankQuestion.title}"): Failed to parse/stringify testCases. Error:`, e, `Original testCases:`, bankQuestion.testCases);
+                newQuestion.testCases = [];
+            }
+        } else {
+            if (bankQuestion.testCases !== null && typeof bankQuestion.testCases !== 'undefined') {
+                 console.warn(`[TeacherCreateTask] 'code' question (Bank ID: ${bankQuestion.id}, Title: "${bankQuestion.title}"): 'testCases' from bank is not an array. Actual 'testCases':`, bankQuestion.testCases);
+            }
+            newQuestion.testCases = []; // Default to empty array if not a valid array
+        }
+    } else if (bankQuestion.type === 'short_answer') {
+        newQuestion.options = []; // No options for short answer
+        if (bankQuestion.correctAnswer !== null && typeof bankQuestion.correctAnswer !== 'undefined') {
+            if (typeof bankQuestion.correctAnswer === 'string') {
+                newQuestion.answer = bankQuestion.correctAnswer; // Store the model answer as a string
+            } else {
+                console.warn(`[TeacherCreateTask] 'short_answer' question (Bank ID: ${bankQuestion.id}, Title: "${bankQuestion.title}"): Expected 'correctAnswer' to be a string, but got type ${typeof bankQuestion.correctAnswer}. Value:`, bankQuestion.correctAnswer);
+                newQuestion.answer = ''; // Default if format is unexpected
+            }
+        } else {
+            newQuestion.answer = ''; // Default if no correctAnswer provided
+        }
+    } else {
+        console.warn(`[TeacherCreateTask] Bank question (ID: ${bankQuestion.id}, Title: "${bankQuestion.title}") has an unsupported or unrecognized type: "${bankQuestion.type}". Basic info mapped; type-specific content might be missing.`);
+        // Ensure fields for other types are initialized to prevent errors if UI expects them
+        newQuestion.options = [];
+        newQuestion.answer = null; // Or appropriate default for generic/unknown questions
+    }
+
+  task.questions.push(newQuestion);
+  showMessage(`题目 "${newQuestion.text}" 已成功添加。`);
+};
+
 // 导入所选题目
 const importSelectedQuestions = () => {
     if (selectedQuestions.value.length === 0) {
@@ -953,20 +1541,33 @@ const importSelectedQuestions = () => {
     }
 
     // 获取所选题目
-    const questionsToImport = questionBank.value.filter(q => selectedQuestions.value.includes(q.id));
+    // Ensure q and q.id exist before trying to include
+    const questionsToImport = questionBank.value.filter(q => q && q.id && selectedQuestions.value.includes(q.id));
 
-    // 添加到任务
-    questionsToImport.forEach(q => {
-        // 深拷贝题目，避免引用问题
-        const questionCopy = JSON.parse(JSON.stringify(q));
+    let successfullyProcessedCount = 0;
+    if (questionsToImport.length > 0) {
+        questionsToImport.forEach(bankQuestion => {
+            // Call addQuestionFromBank for each. It handles its own messaging for success/failure/duplicate.
+            // We assume addQuestionFromBank is robust and handles its logic correctly.
+            addQuestionFromBank(bankQuestion);
+            // Note: addQuestionFromBank might not add if it's a duplicate. 
+            // For a simple count of attempts, we increment here.
+            // A more accurate count of *newly added* questions would require addQuestionFromBank to return a status.
+            successfullyProcessedCount++; 
+        });
+    }
 
-        // 移除题库特有的字段
-        delete questionCopy.id;
-        delete questionCopy.difficulty;
-
-        // 添加到任务
-        task.questions.push(questionCopy);
-    });
+    // 后续的关闭弹窗、清空选择和总体提示逻辑会在此替换内容之后
+    // The original showMessage for overall import count will be handled by the next part of the replacement
+    // For now, this chunk focuses on the loop that processes questions.
+    // The original final showMessage might be removed or adapted depending on addQuestionFromBank's verbosity.
+    // The key change is using addQuestionFromBank in the loop.
+    // The rest of the function (closing modal, clearing selection, final message) should be preserved or adjusted.
+    // This replacement specifically targets the question processing loop.
+    // The user's snippet ended at '移除题库特有的字段', so we replace that block.
+    // The actual file likely has more lines for this old loop and then the modal closing logic.
+    // We are replacing the core logic of how questions are processed and added from the selection.
+    // The remnant old code that followed this comment (delete questionCopy, etc.) has been removed.
 
     // 关闭题库模态框
     showQuestionBank.value = false;
@@ -975,7 +1576,15 @@ const importSelectedQuestions = () => {
     selectedQuestions.value = [];
 
     // 显示提示
-    showMessage(`已导入 ${questionsToImport.length} 道题目`);
+    if (successfullyProcessedCount > 0) {
+        showMessage(`处理了 ${successfullyProcessedCount} 个题目的导入请求。详情请见各题目的添加状态。`);
+    } else if (selectedQuestions.value.length > 0 && questionsToImport.length === 0) {
+        showMessage('未能从题库中匹配到所选的题目，或题目已在作业中。');
+    } else if (selectedQuestions.value.length === 0 && questionsToImport.length === 0) {
+        // This case is already handled by the initial check in the function.
+        // showMessage('没有选择题目。'); 
+    }
+    // Note: selectedQuestions.value is cleared *after* this message block in the original function flow.
 };
 
 // 保存为草稿
@@ -1016,33 +1625,30 @@ const publishTask = async () => {
         showMessage('请输入任务标题');
         return;
     }
-
+    if (!task.classId) {
+        showMessage('请选择班级');
+        return;
+    }
     if (!task.openTime) {
         showMessage('请设置开始时间');
         return;
     }
-
     if (!task.closeTime) {
         showMessage('请设置截止时间');
         return;
     }
-
     if (task.questions.length === 0) {
         showMessage('请添加至少一道题目');
         return;
     }
-
     // 验证每道题目
     for (let i = 0; i < task.questions.length; i++) {
         const q = task.questions[i];
-
         if (!q.text) {
             showMessage(`第 ${i + 1} 题缺少题目内容`);
             return;
         }
-
         if (q.type === 'choice') {
-            // 验证选择题
             for (let j = 0; j < q.options.length; j++) {
                 if (!q.options[j]) {
                     showMessage(`第 ${i + 1} 题的选项 ${['A', 'B', 'C', 'D'][j]} 为空`);
@@ -1050,55 +1656,53 @@ const publishTask = async () => {
                 }
             }
         } else if (q.type === 'programming') {
-            // 验证编程题
             if (!q.description) {
                 showMessage(`第 ${i + 1} 题缺少题目描述`);
                 return;
             }
-
             if (!q.sampleAnswer) {
                 showMessage(`第 ${i + 1} 题缺少参考答案`);
                 return;
             }
-
             if (!q.testCases || q.testCases.length === 0) {
                 showMessage(`第 ${i + 1} 题缺少测试用例`);
                 return;
             }
         }
     }
-
-    // 在实际应用中，这里应该调用API发布任务
-    task.status = 'published';
-    console.log('发布任务', task);
-
-    showMessage('任务已发布');
-
-    // 发布成功后跳转回课程管理页面
-    setTimeout(() => {
-        goBackToCourseManagement();
-    }, 2000);
-
-    // assignmentData 结构需参考 openapi.yaml AssignmentCreateDto
+    // 合并 assignmentData，严格按接口字段
     const assignmentData = {
         title: task.title,
         description: task.description,
-        courseId: task.courseId, // 需有
-        openTime: task.openTime,
-        dueDate: task.closeTime,
-        allowResubmit: task.allowResubmit,
-        questionIds: task.questions.map(q => q.id) // 先保存题目到题库再布置
-    }
+        courseId: task.courseId,
+        openTime: new Date(task.openTime).toISOString(),
+        dueDate: new Date(task.closeTime).toISOString(),
+        allowResubmit: !!task.allowResubmit,
+        questionIds: (() => {
+            const ids = [];
+            for (const question of task.questions) {
+                if (question.bankId) {
+                    ids.push(question.bankId);
+                } else {
+                    // Log a warning for manually added questions not having a bankId
+                    // These will not be included in the questionIds sent to the backend via this field.
+                    // The backend might need a different mechanism if these are to be created/linked.
+                    console.warn(`Question with localId "${question.id}" and title "${question.text}" is manually added or does not have a bankId, and will not be included in 'questionIds'.`);
+                }
+            }
+            return ids;
+        })()
+    };
     try {
-        const classId = task.classId // 需有
-        await createAssignment(classId, assignmentData)
-        alert('布置作业成功')
-        // 跳转或刷新
+        await createAssignment(task.classId, assignmentData);
+        showMessage('布置作业成功');
+        setTimeout(() => {
+            goBackToCourseManagement();
+        }, 1500);
     } catch (e) {
-        alert(e.message || '布置作业失败')
+        showMessage(e.message || '布置作业失败');
     }
 };
-
 
 // 返回课程管理
 const goBackToCourseManagement = () => {
@@ -1108,18 +1712,23 @@ const goBackToCourseManagement = () => {
         }
     }
 
-    // 在实际应用中，这里应该跳转回课程管理页面
-    console.log('返回课程管理页面');
+    router.back(); // 实现返回上一页功能
 };
 
+// 班级筛选相关
+
+
+
+
 // 组件挂载时
-onMounted(() => {
+onMounted(async () => {
     // 设置默认开始时间为当前时间
     const now = new Date();
     task.openTime = new Date(now.getTime()).toISOString().slice(0, 16);
-
     // 设置默认截止时间为一周后
     const oneWeekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     task.closeTime = oneWeekLater.toISOString().slice(0, 16);
+
+    // 注意：获取班级信息的逻辑已移至 fetchClasses 函数，并在另一个 onMounted 中调用
 });
 </script>

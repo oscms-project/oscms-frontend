@@ -24,3 +24,7 @@ export function getAssignmentSubmissions(classId, assignmentId) {
 export function submitAssignment(assignmentId, data) {
   return axios.post(`/assignments/${assignmentId}/submissions`, data)
 }
+
+export function createQuestion(data) {
+  return axios.post('/questions', data);
+}
