@@ -23,38 +23,13 @@
                 </svg>
                 <span class="font-medium">做题时长: {{ formatTime(elapsedTime) }}</span>
             </div>
-
-            <!-- 用户信息 -->
-            <div class="relative flex flex-col items-end" @mouseenter="showUserMenu = true"
-                @mouseleave="showUserMenu = false">
-                <img :src="user.avatar || '/placeholder.svg?height=40&width=40'" alt="用户头像"
-                    class="w-10 h-10 rounded-full border-2 border-gray-200" />
-                <div class="text-right mt-1">
-                    <p class="text-sm font-medium">{{ user.name }}</p>
-                    <p class="text-xs text-gray-600">{{ user.username }}</p>
-                    <p class="text-xs text-gray-600">{{ user.college }}</p>
-                </div>
-                <div v-if="showUserMenu"
-                    class="absolute right-0 top-10 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
-                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">个人资料</a>
-                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">设置</a>
-                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">退出登录</a>
-                </div>
-            </div>
-        </div>
-
-        <!-- 中央提示框 -->
-        <div v-if="showAlert" class="fixed inset-0 flex items-center justify-center z-50">
-            <div class="bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg">
-                {{ alertMessage }}
-            </div>
         </div>
 
         <!-- 错题重做标题 -->
         <div class="bg-white rounded-lg shadow-md p-6 mb-6">
             <div class="flex justify-between items-center">
                 <div>
-                    <h1 class="text-2xl font-bold">{{ exercise.title }} - 错题重做</h1>
+                    <h1 class="text-2xl font-bold">{{ exercise.title }} 错题重做</h1>
                     <p class="text-sm text-gray-500 mt-1">仅显示上次做错的题目，共 {{ incorrectQuestions.length }} 题</p>
                 </div>
                 <div class="flex items-center">
@@ -71,19 +46,19 @@
 
         <!-- 题目内容 -->
         <div v-if="incorrectQuestions.length > 0" class="bg-white rounded-lg shadow-md p-6 mb-6">
-            <div v-if="exercise.type === 'choice'">
+            <div v-if="currentQuestion.type === 'choice'">
                 <!-- 选择题 -->
                 <div class="mb-6">
                     <div class="flex items-start">
                         <span class="font-medium mr-2">{{ currentQuestionIndex + 1 }}.</span>
                         <div>
-                            <div class="font-medium">{{ currentQuestion.text }}</div>
-                            <div class="text-sm text-gray-500 mt-1">{{ currentQuestion.points }} 分</div>
+                            <div class="font-medium">{{ currentQuestion.title }}</div>
+                            <div class="text-sm text-gray-500 mt-1">{{ currentQuestion.score }} 分</div>
                         </div>
                     </div>
 
                     <div class="ml-6 space-y-2 mt-4">
-                        <div v-for="(option, oIndex) in currentQuestion.options" :key="oIndex"
+                        <div v-for="(choice, oIndex) in currentQuestion.choices" :key="oIndex"
                             class="flex items-center p-3 rounded-lg cursor-pointer hover:bg-gray-50"
                             :class="{ 'bg-green-50 border border-green-200': newAnswers[currentQuestionIndex] === oIndex }"
                             @click="!questionSubmitted[currentQuestionIndex] && selectAnswer(oIndex)">
@@ -91,7 +66,7 @@
                                 :class="{ 'bg-green-500 border-green-500 text-white': newAnswers[currentQuestionIndex] === oIndex, 'border-gray-300': newAnswers[currentQuestionIndex] !== oIndex }">
                                 {{ ['A', 'B', 'C', 'D'][oIndex] }}
                             </div>
-                            <div>{{ option }}</div>
+                            <div>{{ choice }}</div>
                         </div>
                     </div>
                 </div>
@@ -103,8 +78,8 @@
                     <div class="flex items-start">
                         <span class="font-medium mr-2">{{ currentQuestionIndex + 1 }}.</span>
                         <div>
-                            <div class="font-medium">{{ currentQuestion.text }}</div>
-                            <div class="text-sm text-gray-500 mt-1">{{ currentQuestion.points }} 分</div>
+                            <div class="font-medium">{{ currentQuestion.title }}</div>
+                            <div class="text-sm text-gray-500 mt-1">{{ currentQuestion.score }} 分</div>
                         </div>
                     </div>
 
@@ -115,10 +90,10 @@
                         <div class="border rounded-lg overflow-hidden">
                             <div class="bg-gray-100 px-4 py-2 border-b flex justify-between items-center">
                                 <span>{{ currentQuestion.language }}</span>
-                                <div class="text-sm text-gray-500">请在此编写代码</div>
+                                <div class="text-sm text-gray-500">请在此作答</div>
                             </div>
                             <textarea v-model="newCodeAnswers[currentQuestionIndex]"
-                                class="w-full p-4 font-mono text-sm h-64 focus:outline-none" placeholder="在此编写代码..."
+                                class="w-full p-4 font-mono text-sm h-64 focus:outline-none" placeholder="在此作答..."
                                 @copy="detectCopy" @paste="detectPaste" @cut="detectCut"
                                 :disabled="questionSubmitted[currentQuestionIndex]"></textarea>
                         </div>
@@ -164,7 +139,7 @@
                 
                 <div class="mb-4">
                     <div class="font-medium text-gray-700">正确答案:</div>
-                    <div v-if="exercise.type === 'choice'" 
+                    <div v-if="currentQuestion.type === 'choice'" 
                          class="mt-2 px-4 py-2 bg-green-100 border border-green-200 rounded text-green-800 font-bold">
                         {{ formatCorrectAnswer(getCurrentQuestionCorrectAnswer) }}
                     </div>
@@ -236,22 +211,6 @@ const router = useRouter();
 const courseStore = useCourseStore();
 const userStore = useUserStore();
 
-
-
-// 用户信息 - 使用模拟数据进行预览
-const user = ref({
-    id: '12345',
-    username: 'student001',
-    name: '张三',
-    role: 'student',
-    email: 'student001@example.com',
-    college: '计算机科学与技术学院',
-    avatar: '/placeholder.svg?height=40&width=40'
-});
-
-// 用户菜单显示状态
-const showUserMenu = ref(false);
-
 // 提示框状态
 const showAlert = ref(false);
 const alertMessage = ref('');
@@ -267,8 +226,6 @@ const showMessage = (message) => {
     }, 2000);
 };
 
-
-
 // 获取练习和提交信息
 const exercise = ref({});
 const previousSubmission = ref({});
@@ -276,52 +233,46 @@ const loading = ref(true);
 const questionSubmitted = ref([]);
 
 onMounted(async () => {
+    loading.value = true;
+    // 从 store 获取练习ID和提交ID
+    // 改为使用currentSubmissionId
+    const exerciseId = courseStore.currentExerciseId;
+    const submissionId = courseStore.currentSubmissionId;
     
-        loading.value = true;
-        // 从 store 获取练习ID和提交ID
-        // 改为使用currentSubmissionId
-        const exerciseId = courseStore.currentExerciseId;
-        const submissionId = courseStore.currentSubmissionId;
-        
-        // 验证ID是否存在
-        if (!exerciseId || !submissionId) {
-            throw new Error('练习信息不完整');
-        }
-        
-        // 获取练习详情和提交详情
-        const [questions, submission] = await Promise.all([
-            getAssignmentQuestions(exerciseId),
-            getSubmissionDetail(submissionId)
-        ]);
-        
-        if (!submission?.assignment) {
-            throw new Error('无法获取练习信息');
-        }
-
-        exercise.value = {
-            ...submission.assignment,
-            questions
-        };
-        previousSubmission.value = submission;
-        
-        // 初始化题目提交状态跟踪数组
-        setTimeout(() => {
-            questionSubmitted.value = new Array(incorrectQuestionIndices.value.length).fill(false);
-        }, 100);
-        
-        // 启动计时器
-        startTime.value = Date.now();
-        timerInterval = setInterval(updateTimer, 1000);
-        
-        // 添加防作弊监听
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        window.addEventListener('blur', handleWindowBlur);
-        document.addEventListener('contextmenu', (e) => e.preventDefault());
-        document.addEventListener('copy', detectCopy);
-        document.addEventListener('paste', detectPaste);
+    // 验证ID是否存在
+    if (!exerciseId || !submissionId) {
+        throw new Error('练习信息不完整');
+    }
+    
+    // 获取练习详情和提交详情
+    const [questions, submission] = await Promise.all([
+        getAssignmentQuestions(exerciseId),
+        getSubmissionDetail(submissionId)
+    ]);
+    
+    exercise.value = {
+        ...submission.assignment,
+        questions
+    };
+    previousSubmission.value = submission;
+    
+    // 初始化题目提交状态跟踪数组
+    setTimeout(() => {
+        questionSubmitted.value = new Array(incorrectQuestionIndices.value.length).fill(false);
+    }, 100);
+    
+    // 启动计时器
+    startTime.value = Date.now();
+    timerInterval = setInterval(updateTimer, 1000);
+    
+    // 添加防作弊监听
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleWindowBlur);
+    document.addEventListener('contextmenu', (e) => e.preventDefault());
+    document.addEventListener('copy', detectCopy);
+    document.addEventListener('paste', detectPaste);
   
-        loading.value = false;
-    
+    loading.value = false;
 });
 
 // 错题索引计算 - 使用correct字段
@@ -352,8 +303,13 @@ const currentQuestionIndex = ref(0);
 
 // 当前题目
 const currentQuestion = computed(() => {
-    if (incorrectQuestions.value.length === 0) return null;
-    return incorrectQuestions.value[currentQuestionIndex.value];
+    if (incorrectQuestions.value.length > 0 && currentQuestionIndex.value >= 0 && currentQuestionIndex.value < incorrectQuestions.value.length) {
+        const questionToDisplay = incorrectQuestions.value[currentQuestionIndex.value];
+        console.log('Current question to display:', JSON.parse(JSON.stringify(questionToDisplay))); // Log a deep copy
+        return questionToDisplay;
+    }
+    console.log('Current question to display: null (no incorrect questions or index out of bounds)');
+    return null;
 });
 
 // 新的答案
@@ -420,13 +376,13 @@ const nextQuestion = () => {
 // 提交当前题目答案
 const submitCurrentQuestion = () => {
     // 检查当前题目是否已回答
-    if (exercise.value.type === 'choice' && newAnswers.value[currentQuestionIndex.value] === null) {
+    if (currentQuestion.value.type === 'choice' && newAnswers.value[currentQuestionIndex.value] === null) {
         showMessage('请先选择答案');
         return;
     }
     
-    if (exercise.value.type !== 'choice' && !newCodeAnswers.value[currentQuestionIndex.value]?.trim()) {
-        showMessage('请先编写代码');
+    if (currentQuestion.value.type !== 'choice' && !newCodeAnswers.value[currentQuestionIndex.value]?.trim()) {
+        showMessage('请先作答');
         return;
     }
     
@@ -458,7 +414,7 @@ const confirmSubmit = () => {
 
 // 返回反馈页面
 const goBackToFeedback = () => {
-    router.push({ name: 'ExerciseFeedback' });
+    router.back();
 };
 
 // 确认退出
@@ -522,22 +478,6 @@ const detectCut = (event) => {
     showMessage('检测到剪切操作！请不要在考试期间剪切内容。');
 };
 
-// 初始化新答案和代码答案数组
-onMounted(() => {
-  if (incorrectQuestions.value && incorrectQuestions.value.length > 0) {
-    if (exercise.value.type === 'choice') {
-      newAnswers.value = new Array(incorrectQuestions.value.length).fill(null);
-    } else {
-      // 查找原始代码答案并填充
-      newCodeAnswers.value = incorrectQuestionIndices.value.map(index => {
-        // 从提交中查找对应题目的代码答案
-        const questionId = exercise.value.questions[index]?.id;
-        const answer = previousSubmission.value.answers.find(a => a.questionId === questionId);
-        return answer?.codeResponse || '';
-      });
-    }
-  }
-});
 
 // 组件卸载时
 onUnmounted(() => {

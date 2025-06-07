@@ -75,7 +75,7 @@
             <span class="text-sm text-gray-500 ml-2">({{ question.score }}分)</span>
           </div>
           <div class="text-sm text-gray-500">
-            {{ question.type === 'choice' ? '选择题' : '简答题' }}
+            {{ question.type === 'choice' ? '选择题' : (question.type === 'short_answer' ? '简答题' : (question.type === 'coding' ? '编程题' : '未知题型')) }}
           </div>
         </div>
 
@@ -87,14 +87,14 @@
             @click="selectAnswer(qIndex, choice)">
             <div class="w-6 h-6 rounded-full flex items-center justify-center border mr-2"
               :class="{ 'bg-green-500 border-green-500 text-white': answers[qIndex] === choice, 'border-gray-300': answers[qIndex] !== choice }">
-              {{ choice }}
+              {{ String.fromCharCode(65 + cIndex) }}
             </div>
             <div>{{ choice }}</div>
           </div>
         </div>
 
         <!-- 简答题 -->
-        <div v-if="question.type === 'short_answer'" class="mt-2">
+        <div v-if="question.type === 'short_answer' || question.type === 'coding'" class="mt-2">
           <textarea
             v-model="answers[qIndex]"
             class="w-full p-4 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 min-h-[120px]"

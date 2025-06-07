@@ -8,7 +8,7 @@
     <div class="user-info">
       <span class="user-name">{{ user.name }}</span>
       <span class="user-id">{{ user.id }}</span>
-      <div class="avatar">
+      <div class="avatar" @click="handleAvatarClick">
         <img src="@/assets/head.png" alt="用户头像" />
       </div>
     </div>
@@ -19,6 +19,12 @@
 const props = defineProps({
   user: Object
 });
+
+const emit = defineEmits(['avatarClick']);
+
+const handleAvatarClick = () => {
+  emit('avatarClick');
+};
 </script>
 
 <style scoped>
@@ -76,5 +82,8 @@ const props = defineProps({
   width: 32px;
   height: 32px;
   border-radius: 50%;
+}
+.avatar {
+  cursor: pointer;
 }
 </style>

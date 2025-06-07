@@ -138,7 +138,7 @@
                                 'bg-red-500 border-red-500 text-white': choice === question.studentAnswer && choice !== question.correctAnswer,
                                 'border-gray-300': choice !== question.studentAnswer && choice !== question.correctAnswer
                             }">
-                            {{ choice }}
+                            {{ String.fromCharCode(65 + cIndex) }}
                         </div>
                         <div>{{ choice }}</div>
                     </div>

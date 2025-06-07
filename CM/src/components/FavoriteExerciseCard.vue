@@ -2,7 +2,7 @@
   <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300 ease-in-out">
     <div class="p-6">
       <div class="flex justify-between items-start mb-3">
-        <h3 class="text-xl font-semibold text-gray-800 leading-tight truncate" :title="exercise.title || '题目加载中...'">
+        <h3 class="text-xl font-semibold text-gray-800 leading-tight" :title="exercise.title || '题目加载中...'">
           {{ exercise.title || '题目加载中...' }}
         </h3>
         <button 
@@ -16,36 +16,56 @@
         </button>
       </div>
 
-      <p v-if="exercise.description" class="text-gray-600 text-sm mb-4 h-10 overflow-hidden text-ellipsis">
+      <p v-if="exercise.description" class="text-gray-600 text-sm mb-4">
         {{ exercise.description }}
       </p>
-      <p v-else class="text-gray-400 text-sm italic mb-4 h-10">
+      <p v-else class="text-gray-400 text-sm italic mb-4">
         暂无题目描述。
       </p>
 
-      <div class="flex flex-wrap gap-2 mb-6">
+      <div class="flex flex-wrap gap-2 mb-4">
         <span 
           v-if="exercise.type"
           class="px-3 py-1 text-xs font-medium rounded-full"
-          :class="typeBadgeClass(exercise.type)"
+          :class="typeBadgeClass" 
         >
-          {{ exercise.type === 'choice' ? '选择题' : exercise.type === 'programming' ? '编程题' : exercise.type || '未知类型' }}
+          {{ formattedExerciseType }}
         </span>
         <span 
           v-if="exercise.difficulty"
           class="px-3 py-1 text-xs font-medium rounded-full"
-          :class="difficultyBadgeClass(exercise.difficulty)"
+          :class="difficultyBadgeClass"
         >
           {{ exercise.difficulty === 'easy' ? '简单' : exercise.difficulty === 'medium' ? '中等' : exercise.difficulty === 'hard' ? '困难' : exercise.difficulty || '未知难度' }}
         </span>
+        <span
+          v-if="exercise.score !== null && exercise.score !== undefined"
+          class="px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-700"
+        >
+          分值: {{ exercise.score }}
+        </span>
       </div>
 
-      <button 
-        @click="$emit('view-exercise', exercise.id)"
-        class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-semibold py-2.5 px-4 rounded-lg shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-opacity-75 transition-all duration-300 ease-in-out transform hover:-translate-y-0.5"
-      >
-        查看题目
-      </button>
+      <!-- Choices (if applicable) -->
+      <div v-if="isChoiceType && exercise.choices && exercise.choices.length" class="mb-4">
+        <h4 class="text-sm font-semibold text-gray-700 mb-1">选项:</h4>
+        <ul class="list-none pl-0 space-y-1 text-sm">
+          <li v-for="(choice, index) in exercise.choices" :key="choice.id || index" 
+              class="p-1.5 rounded bg-gray-50 border border-gray-100">
+            <span class="font-medium text-gray-600">{{ choice.label || String.fromCharCode(65 + index) }}.</span> {{ choice.text || choice.content }}
+          </li>
+        </ul>
+      </div>
+
+      <!-- Correct Answer -->
+      <div v-if="exercise.correctAnswer !== null && exercise.correctAnswer !== undefined" class="mb-4">
+        <h4 class="text-sm font-semibold text-gray-700 mb-1">正确答案:</h4>
+        <div class="p-1.5 rounded bg-green-50 text-green-800 text-sm border border-green-200 whitespace-pre-wrap">
+          {{ formattedCorrectAnswer }}
+        </div>
+      </div>
+
+      <!-- "View Exercise" button removed -->
     </div>
   </div>
 </template>
@@ -53,34 +73,66 @@
 <script setup>
 import { computed } from 'vue';
 
-defineProps({
+const props = defineProps({
   exercise: {
     type: Object,
     required: true,
-    default: () => ({ // Default structure for placeholder/loading state
+    default: () => ({
       id: null,
-      title: '加载中...', 
+      title: '加载中...',
       description: '',
-      type: '',
-      difficulty: ''
+      type: '', // e.g., SINGLE_CHOICE, MULTIPLE_CHOICE, SHORT_ANSWER, CODING
+      difficulty: '', // e.g., easy, medium, hard
+      score: null,
+      choices: [], // Array of objects: { id, label, text/content }
+      correctAnswer: null // String or Array of strings (for MULTIPLE_CHOICE)
     })
   }
 });
 
-defineEmits(['remove-favorite', 'view-exercise']);
+defineEmits(['remove-favorite']);
 
-const typeBadgeClass = computed(() => (type) => {
+const formattedExerciseType = computed(() => {
+  const type = props.exercise.type;
+  switch (type) {
+    case 'choice': // General fallback or if API uses this
+    case 'SINGLE_CHOICE':
+      return '单选题';
+    case 'MULTIPLE_CHOICE':
+      return '多选题';
+    case 'programming': // General fallback
+    case 'CODING':
+      return '编程题';
+    case 'SHORT_ANSWER':
+      return '简答题';
+    case 'FILL_IN_BLANK':
+      return '填空题';
+    default:
+      return props.exercise.type || '未知类型';
+  }
+});
+
+const typeBadgeClass = computed(() => {
+  const type = props.exercise.type;
   switch (type) {
     case 'choice':
+    case 'SINGLE_CHOICE':
+    case 'MULTIPLE_CHOICE':
       return 'bg-sky-100 text-sky-700';
     case 'programming':
+    case 'CODING':
       return 'bg-emerald-100 text-emerald-700';
+    case 'SHORT_ANSWER':
+      return 'bg-amber-100 text-amber-700';
+    case 'FILL_IN_BLANK':
+      return 'bg-purple-100 text-purple-700';
     default:
       return 'bg-gray-100 text-gray-700';
   }
 });
 
-const difficultyBadgeClass = computed(() => (difficulty) => {
+const difficultyBadgeClass = computed(() => {
+  const difficulty = props.exercise.difficulty;
   switch (difficulty) {
     case 'easy':
       return 'bg-green-100 text-green-700';
@@ -92,6 +144,40 @@ const difficultyBadgeClass = computed(() => (difficulty) => {
       return 'bg-gray-100 text-gray-700';
   }
 });
+
+const isChoiceType = computed(() => {
+  const type = props.exercise.type;
+  return type === 'choice' || type === 'SINGLE_CHOICE' || type === 'MULTIPLE_CHOICE';
+});
+
+const formattedCorrectAnswer = computed(() => {
+  const exercise = props.exercise;
+  if (exercise.correctAnswer === null || exercise.correctAnswer === undefined) return '未提供';
+
+  if (isChoiceType.value) {
+    const answers = Array.isArray(exercise.correctAnswer) ? exercise.correctAnswer : [exercise.correctAnswer];
+    if (exercise.choices && exercise.choices.length > 0) {
+      const answerTexts = answers.map(ans => {
+        // Attempt to find choice by label (e.g., 'A'), id, or even direct text match if label/id is not the answer key
+        const choice = exercise.choices.find(c => 
+          String(c.label).toUpperCase() === String(ans).toUpperCase() || 
+          String(c.id) === String(ans) ||
+          (c.text && String(c.text).trim() === String(ans).trim()) || // Less common, but possible
+          (c.content && String(c.content).trim() === String(ans).trim()) // Alias for text
+        );
+        return choice ? `${choice.label || ans}. ${choice.text || choice.content}` : ans;
+      });
+      return answerTexts.join('; ');
+    }
+    return answers.join(', '); // Fallback if choices are not detailed or don't match
+  }
+  // For non-choice questions, correctAnswer might be a string or an array of strings (e.g. fill-in-the-blank)
+  if (Array.isArray(exercise.correctAnswer)) {
+    return exercise.correctAnswer.join('; ');
+  }
+  return String(exercise.correctAnswer);
+});
+
 </script>
 
 <style scoped>

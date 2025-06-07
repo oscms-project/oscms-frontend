@@ -131,10 +131,27 @@ export function getAssignmentSubmissions(classId, assignmentId) {
 }
 
 /**
+ * 获取某班级下某作业的全部提交记录
+ * @param {string} classId 班级ID
+ * @param {string} assignmentId 作业ID
+ * @returns {Promise<ApiResponse<Submission[]>>} 提交记录列表
+ */
+export function getAssignmentSubmissionsList(classId, assignmentId) {
+    return axios
+        .get(`/classes/${classId}/assignments/${assignmentId}/submissions`)
+        .then(res => {
+            if (res.data && res.data.code === 200) {
+                return res.data.data;
+            } else {
+                throw new Error(res.data?.message || '获取提交列表失败');
+            }
+        });
+}
+/**
  * 教师批改主观题
- * @param {string} submissionId
- * @param {Array} grades 形如 [{ questionId, score, feedback }]
- * @returns {Promise<Object>} 更新后的提交详情
+ * @param {string} submissionId 提交记录ID
+ * @param {Array<{questionId: string, score: number, feedback?: string}>} grades 批改结果
+ * @returns {Promise<ApiResponse<Submission>>} 更新后的提交记录
  */
 export function gradeSubmission(submissionId, grades) {
     return axios
@@ -147,6 +164,7 @@ export function gradeSubmission(submissionId, grades) {
             }
         });
 }
+
 
 /**
  * 创建新题目到题库

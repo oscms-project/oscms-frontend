@@ -254,7 +254,7 @@
               </div>
             </div>
             <div class="exercise-actions">
-              <button class="btn btn-sm btn-primary">
+              <button class="btn btn-sm btn-primary" @click="navigateToGrading(exercise)">
                 <i class="i-lucide-check-square mr-1"></i>
                 批改
               </button>
@@ -1761,6 +1761,13 @@ const goBack = () => {
     router.push('/teacher/home'); 
   }
 }
+const navigateToGrading = (exercise) => {
+  courseStore.navigateToGrading(
+    exercise,
+    selectedClass.value?.id,
+    selectedClass.value?.name
+  );
+};
 </script>
 
 <style scoped>

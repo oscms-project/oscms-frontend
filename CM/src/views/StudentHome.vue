@@ -1,7 +1,7 @@
 <template>
   <div class="student-homepage">
     <!-- 页眉用户信息组件区域 -->
-    <BaseHeader :user="studentInfo" />
+    <BaseHeader :user="studentInfo" @avatar-click="navigateToUserProfile" />
     <!-- 轮播图区域 -->
     <BaseCarousel />
 
@@ -147,6 +147,10 @@ const studentInfo = ref({
   id: userStore.userId,
   avatar: userStore.avatar
 });
+
+const navigateToUserProfile = () => {
+  router.push('/teacher/profile'); // Assuming '/teacher-profile' is the path to TeacherProfile.vue
+};
 
 // 课程详情页导航函数
 const navigateToCourseDetail = (course) => {

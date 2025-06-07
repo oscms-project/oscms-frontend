@@ -1,7 +1,7 @@
 <template>
   <div class="teacher-homepage">
     <!-- 页眉用户信息组件区域 -->
-    <BaseHeader :user="teacherInfo" />
+    <BaseHeader :user="teacherInfo" @avatar-click="navigateToTeacherProfile" />
     <!-- 轮播图区域 -->
     <BaseCarousel />
 
@@ -107,6 +107,10 @@ import BaseWindow from '@/components/BaseWindow.vue'
 const userStore = useUserStore();
 const courseStore = useCourseStore();
 const router = useRouter(); // 添加路由器
+
+const navigateToTeacherProfile = () => {
+  router.push('/teacher/profile'); // Assuming '/teacher-profile' is the path to TeacherProfile.vue
+};
 const teacherInfo = ref({
   // 使用store中的信息初始化
   name: userStore.name,

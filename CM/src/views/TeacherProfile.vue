@@ -7,12 +7,9 @@
           <button @click="goBack" class="p-2.5 bg-white bg-opacity-20 rounded-full hover:bg-opacity-30 transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50" title="返回上一页">
             <ArrowLeftIcon class="w-5 h-5" />
           </button>
-          <h1 class="text-2xl font-bold tracking-tight">教师课程平台</h1>
+          <h1 class="text-2xl font-bold tracking-tight">个人信息</h1>
         </div>
         <div class="flex items-center space-x-4">
-          <button class="p-2.5 bg-white bg-opacity-20 rounded-full hover:bg-opacity-30 transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50">
-            <bell-icon class="w-5 h-5" />
-          </button>
         </div>
       </div>
     </header>
@@ -34,31 +31,25 @@
               </div>
 
               <!-- 头像和基本信息 -->
-              <div class="relative px-6 pb-6 flex flex-col items-center">
-                <div class="w-28 h-28 rounded-full bg-gradient-to-br from-blue-500 to-blue-300 p-1 shadow-xl transform -translate-y-1/2 mb-10">
-                  <div class="w-full h-full rounded-full bg-white p-0.5 overflow-hidden">
-                    <img :src="teacher.avatar" alt="教师头像" class="w-full h-full object-cover rounded-full" />
-                  </div>
-                </div>
+              <div class="relative px-8 pt-6 pb-8 flex flex-col items-center">
 
-                <div class="text-center -mt-6">
+
+                <div class="text-center">
                   <h2 class="text-xl font-bold text-gray-800">{{ teacher.name }}</h2>
                   <p class="text-blue-600 font-medium">{{ teacher.title }}</p>
-                  <div class="mt-2 inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    {{ teacher.department }}
-                  </div>
+
                 </div>
               </div>
             </div>
 
             <!-- 导航菜单 -->
-            <nav class="px-4 pb-6 space-y-2">
+            <nav class="px-4 pb-6 space-y-3">
               <button
                 v-for="(item, index) in navItems"
                 :key="index"
                 @click="activeTab = item.id"
                 :class="[
-                  'w-full text-left px-5 py-3.5 rounded-xl flex items-center space-x-3.5 transition-all duration-300',
+                  'w-full text-left px-5 py-4 rounded-xl flex items-center space-x-3.5 transition-all duration-300',
                   activeTab === item.id
                     ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-md transform scale-102'
                     : 'text-gray-700 hover:bg-blue-50'
@@ -81,83 +72,87 @@
                   <user-icon class="w-6 h-6 mr-2 text-blue-600" />
                   个人信息
                 </h3>
-                <button
-                  @click="isEditing = !isEditing"
-                  class="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl hover:from-blue-700 hover:to-blue-600 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 flex items-center"
-                >
-                  <pencil-icon v-if="!isEditing" class="w-4 h-4 mr-2" />
-                  <check-icon v-else class="w-4 h-4 mr-2" />
-                  {{ isEditing ? '保存修改' : '编辑资料' }}
-                </button>
               </div>
 
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div class="space-y-6">
-                  <div class="group">
-                    <label class="block text-sm font-medium text-gray-600 mb-2 group-hover:text-blue-600 transition-colors">姓名</label>
-                    <input
-                      v-if="isEditing"
-                      v-model="teacher.name"
-                      class="w-full p-3.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
-                    />
-                    <p v-else class="p-3.5 bg-blue-50 rounded-xl text-gray-800 border border-blue-100">{{ teacher.name }}</p>
-                  </div>
-
-                  <div class="group">
-                    <label class="block text-sm font-medium text-gray-600 mb-2 group-hover:text-blue-600 transition-colors">职称</label>
-                    <input
-                      v-if="isEditing"
-                      v-model="teacher.title"
-                      class="w-full p-3.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
-                    />
-                    <p v-else class="p-3.5 bg-blue-50 rounded-xl text-gray-800 border border-blue-100">{{ teacher.title }}</p>
-                  </div>
-
-                  <div class="group">
-                    <label class="block text-sm font-medium text-gray-600 mb-2 group-hover:text-blue-600 transition-colors">手机号码</label>
-                    <input
-                      v-if="isEditing"
-                      v-model="teacher.phone"
-                      class="w-full p-3.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
-                    />
-                    <p v-else class="p-3.5 bg-blue-50 rounded-xl text-gray-800 border border-blue-100">{{ teacher.phone }}</p>
+              <div v-if="isLoading" class="text-center py-10">
+                <p class="text-gray-500">正在加载用户信息...</p>
+              </div>
+              <div v-else-if="teacher && teacher.id" class="space-y-6">
+                <div class="group p-4 bg-blue-50 rounded-xl border border-blue-100">
+                  <label class="block text-sm font-medium text-gray-500 mb-1">用户ID</label>
+                  <div class="flex items-center">
+                    <FingerprintIcon class="w-5 h-5 mr-2 text-blue-500" />
+                    <p class="text-lg text-gray-800">{{ teacher.id }}</p>
                   </div>
                 </div>
 
-                <div class="space-y-6">
-                  <div class="group">
-                    <label class="block text-sm font-medium text-gray-600 mb-2 group-hover:text-blue-600 transition-colors">邮箱</label>
-                    <input
-                      v-if="isEditing"
-                      v-model="teacher.email"
-                      class="w-full p-3.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
-                    />
-                    <p v-else class="p-3.5 bg-blue-50 rounded-xl text-gray-800 border border-blue-100">{{ teacher.email }}</p>
-                  </div>
-
-                  <div class="group">
-                    <label class="block text-sm font-medium text-gray-600 mb-2 group-hover:text-blue-600 transition-colors">所属院系</label>
-                    <select
-                      v-if="isEditing"
-                      v-model="teacher.department"
-                      class="w-full p-3.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
-                    >
-                      <option v-for="dept in departments" :key="dept" :value="dept">{{ dept }}</option>
-                    </select>
-                    <p v-else class="p-3.5 bg-blue-50 rounded-xl text-gray-800 border border-blue-100">{{ teacher.department }}</p>
-                  </div>
-
-                  <div class="group">
-                    <label class="block text-sm font-medium text-gray-600 mb-2 group-hover:text-blue-600 transition-colors">研究方向</label>
-                    <textarea
-                      v-if="isEditing"
-                      v-model="teacher.research"
-                      rows="3"
-                      class="w-full p-3.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
-                    ></textarea>
-                    <p v-else class="p-3.5 bg-blue-50 rounded-xl text-gray-800 border border-blue-100">{{ teacher.research }}</p>
+                <div class="group p-4 bg-blue-50 rounded-xl border border-blue-100">
+                  <label class="block text-sm font-medium text-gray-500 mb-1">用户名</label>
+                  <div class="flex items-center">
+                    <UserIcon class="w-5 h-5 mr-2 text-blue-500" />
+                    <p class="text-lg text-gray-800">{{ teacher.name }}</p>
                   </div>
                 </div>
+
+                <div class="group p-4 bg-blue-50 rounded-xl border border-blue-100">
+                  <label class="block text-sm font-medium text-gray-500 mb-1">角色</label>
+                  <div class="flex items-center">
+                    <ShieldIcon class="w-5 h-5 mr-2 text-blue-500" />
+                    <p class="text-lg text-gray-800">{{ teacher.title }}</p>
+                  </div>
+                </div>
+
+                <div class="group p-4 bg-blue-50 rounded-xl border border-blue-100">
+                  <label class="block text-sm font-medium text-gray-500 mb-1">邮箱</label>
+                  <div class="flex items-center justify-between">
+                    <div v-if="!isEditingEmail" class="flex items-center">
+                      <MailIcon class="w-5 h-5 mr-2 text-blue-500" />
+                      <p class="text-lg text-gray-800">{{ teacher.email }}</p>
+                    </div>
+                    <div v-else class="flex-grow mr-2">
+                      <input
+                        type="email"
+                        v-model="editableEmail"
+                        class="w-full px-3 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-base"
+                        :disabled="isSavingEmail"
+                        placeholder="请输入新邮箱地址"
+                      />
+                      <p v-if="emailError" class="text-xs text-red-600 mt-1">{{ emailError }}</p>
+                    </div>
+                    <div class="flex items-center space-x-2 flex-shrink-0">
+                      <button
+                        v-if="!isEditingEmail"
+                        @click="startEditEmail"
+                        class="p-1.5 text-blue-600 hover:text-blue-800 transition-colors rounded-full hover:bg-blue-100"
+                        title="编辑邮箱"
+                      >
+                        <PencilIcon class="w-5 h-5" />
+                      </button>
+                      <template v-if="isEditingEmail">
+                        <button
+                          @click="saveEmail"
+                          :disabled="isSavingEmail"
+                          class="p-1.5 text-green-600 hover:text-green-800 disabled:text-gray-400 disabled:bg-gray-100 transition-colors rounded-full hover:bg-green-100"
+                          title="保存"
+                        >
+                          <SaveIcon v-if="!isSavingEmail" class="w-5 h-5" />
+                          <LoaderIcon v-else class="w-5 h-5 animate-spin" />
+                        </button>
+                        <button
+                          @click="cancelEditEmail"
+                          :disabled="isSavingEmail"
+                          class="p-1.5 text-red-600 hover:text-red-800 disabled:text-gray-400 disabled:bg-gray-100 transition-colors rounded-full hover:bg-red-100"
+                          title="取消"
+                        >
+                          <XIcon class="w-5 h-5" />
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="text-center py-10">
+                <p class="text-gray-500">无法加载用户信息。</p>
               </div>
             </div>
 
@@ -196,84 +191,6 @@
                 </div>
               </div>
             </div>
-
-            <!-- 教学概况 Tab -->
-            <div v-if="activeTab === 'teaching'" class="p-8">
-              <div class="flex items-center mb-8">
-                <book-open-icon class="w-6 h-6 mr-2 text-blue-600" />
-                <h3 class="text-2xl font-bold text-gray-800">教学概况</h3>
-              </div>
-
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div class="bg-gradient-to-br from-blue-600 to-blue-400 rounded-2xl p-6 text-white shadow-lg transform transition-transform duration-300 hover:scale-105">
-                  <div class="flex items-center justify-between">
-                    <div>
-                      <p class="text-blue-100 font-medium mb-1">当前课程</p>
-                      <div class="text-4xl font-bold">{{ teacher.stats.courseCount }}</div>
-                    </div>
-                    <div class="bg-white bg-opacity-20 p-3 rounded-xl">
-                      <book-icon class="w-8 h-8 text-white" />
-                    </div>
-                  </div>
-                  <div class="mt-4 text-sm text-blue-100">
-                    本学期共开设 {{ teacher.stats.courseCount }} 门课程
-                  </div>
-                </div>
-
-                <div class="bg-gradient-to-br from-blue-500 to-blue-300 rounded-2xl p-6 text-white shadow-lg transform transition-transform duration-300 hover:scale-105">
-                  <div class="flex items-center justify-between">
-                    <div>
-                      <p class="text-blue-100 font-medium mb-1">学生总数</p>
-                      <div class="text-4xl font-bold">{{ teacher.stats.studentCount }}</div>
-                    </div>
-                    <div class="bg-white bg-opacity-20 p-3 rounded-xl">
-                      <users-icon class="w-8 h-8 text-white" />
-                    </div>
-                  </div>
-                  <div class="mt-4 text-sm text-blue-100">
-                    共有 {{ teacher.stats.studentCount }} 名学生选修您的课程
-                  </div>
-                </div>
-              </div>
-
-              <div class="bg-white rounded-2xl shadow-lg border border-blue-100 overflow-hidden">
-                <div class="p-6 border-b border-blue-100 bg-gradient-to-r from-blue-50 to-white">
-                  <h4 class="font-semibold text-gray-800 flex items-center">
-                    <calendar-icon class="w-5 h-5 mr-2 text-blue-600" />
-                    本学期课程
-                  </h4>
-                </div>
-                <div class="overflow-x-auto">
-                  <table class="min-w-full">
-                    <thead>
-                      <tr class="bg-gradient-to-r from-gray-50 to-white">
-                        <th class="py-4 px-6 text-left text-sm font-semibold text-gray-600">课程名称</th>
-                        <th class="py-4 px-6 text-left text-sm font-semibold text-gray-600">学生人数</th>
-                        <th class="py-4 px-6 text-left text-sm font-semibold text-gray-600">课时</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="(course, index) in teacher.courses" :key="index"
-                          class="border-t border-gray-100 hover:bg-blue-50 transition-colors duration-150">
-                        <td class="py-4 px-6 text-gray-800 font-medium">{{ course.name }}</td>
-                        <td class="py-4 px-6 text-gray-800">
-                          <div class="flex items-center">
-                            <users-icon class="w-4 h-4 text-blue-500 mr-2" />
-                            {{ course.students }}
-                          </div>
-                        </td>
-                        <td class="py-4 px-6 text-gray-800">
-                          <div class="flex items-center">
-                            <clock-icon class="w-4 h-4 text-blue-500 mr-2" />
-                            {{ course.hours }}
-                          </div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
           </div>
         </main>
       </div>
@@ -284,42 +201,15 @@
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 transform transition-all duration-300 scale-100">
         <div class="flex justify-between items-center mb-6">
           <h3 class="text-xl font-bold text-gray-800 flex items-center">
-            <key-icon class="w-5 h-5 mr-2 text-blue-600" />
+            <KeyIcon class="w-5 h-5 mr-2 text-blue-600" />
             修改密码
           </h3>
           <button @click="closePasswordModal" class="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100 transition-colors">
-            <x-icon class="h-6 w-6" />
+            <XIcon class="h-6 w-6" />
           </button>
         </div>
 
         <form @submit.prevent="handleChangePassword" class="space-y-5">
-          <div class="group">
-            <label for="currentPassword" class="block text-sm font-medium text-gray-600 mb-2 group-hover:text-blue-600 transition-colors">当前密码</label>
-            <div class="relative">
-              <input
-                :type="showCurrentPassword ? 'text' : 'password'"
-                id="currentPassword"
-                v-model="passwordForm.currentPassword"
-                class="w-full p-3.5 pl-11 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
-                :class="{'border-red-500 ring-1 ring-red-500': passwordErrors.currentPassword}"
-                placeholder="请输入当前密码"
-                required
-              />
-              <lock-icon class="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <button
-                type="button"
-                @click="showCurrentPassword = !showCurrentPassword"
-                class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-600"
-              >
-                <eye-icon v-if="!showCurrentPassword" class="h-5 w-5" />
-                <eye-off-icon v-else class="h-5 w-5" />
-              </button>
-            </div>
-            <p v-if="passwordErrors.currentPassword" class="mt-2 text-sm text-red-600 flex items-center">
-              <alert-circle-icon class="h-4 w-4 mr-1" />
-              {{ passwordErrors.currentPassword }}
-            </p>
-          </div>
 
           <div class="group">
             <label for="newPassword" class="block text-sm font-medium text-gray-600 mb-2 group-hover:text-blue-600 transition-colors">新密码</label>
@@ -333,18 +223,18 @@
                 placeholder="请输入新密码"
                 required
               />
-              <key-icon class="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <KeyIcon class="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
               <button
                 type="button"
                 @click="showNewPassword = !showNewPassword"
                 class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-600"
               >
-                <eye-icon v-if="!showNewPassword" class="h-5 w-5" />
-                <eye-off-icon v-else class="h-5 w-5" />
+                <EyeIcon v-if="!showNewPassword" class="h-5 w-5" />
+                <EyeOffIcon v-else class="h-5 w-5" />
               </button>
             </div>
             <p v-if="passwordErrors.newPassword" class="mt-2 text-sm text-red-600 flex items-center">
-              <alert-circle-icon class="h-4 w-4 mr-1" />
+              <AlertCircleIcon class="h-4 w-4 mr-1" />
               {{ passwordErrors.newPassword }}
             </p>
 
@@ -364,29 +254,29 @@
               <ul class="mt-3 text-sm text-gray-600 space-y-2">
                 <li class="flex items-center" :class="{'text-green-600': hasMinLength}">
                   <div class="w-5 h-5 mr-2 flex items-center justify-center">
-                    <check-icon v-if="hasMinLength" class="h-4 w-4" />
-                    <x-icon v-else class="h-4 w-4 text-gray-400" />
+                    <CheckIcon v-if="hasMinLength" class="h-4 w-4" />
+                    <XIcon v-else class="h-4 w-4 text-gray-400" />
                   </div>
                   至少8个字符
                 </li>
                 <li class="flex items-center" :class="{'text-green-600': hasUpperCase}">
                   <div class="w-5 h-5 mr-2 flex items-center justify-center">
-                    <check-icon v-if="hasUpperCase" class="h-4 w-4" />
-                    <x-icon v-else class="h-4 w-4 text-gray-400" />
+                    <CheckIcon v-if="hasUpperCase" class="h-4 w-4" />
+                    <XIcon v-else class="h-4 w-4 text-gray-400" />
                   </div>
                   至少包含一个大写字母
                 </li>
                 <li class="flex items-center" :class="{'text-green-600': hasLowerCase}">
                   <div class="w-5 h-5 mr-2 flex items-center justify-center">
-                    <check-icon v-if="hasLowerCase" class="h-4 w-4" />
-                    <x-icon v-else class="h-4 w-4 text-gray-400" />
+                    <CheckIcon v-if="hasLowerCase" class="h-4 w-4" />
+                    <XIcon v-else class="h-4 w-4 text-gray-400" />
                   </div>
                   至少包含一个小写字母
                 </li>
                 <li class="flex items-center" :class="{'text-green-600': hasNumber}">
                   <div class="w-5 h-5 mr-2 flex items-center justify-center">
-                    <check-icon v-if="hasNumber" class="h-4 w-4" />
-                    <x-icon v-else class="h-4 w-4 text-gray-400" />
+                    <CheckIcon v-if="hasNumber" class="h-4 w-4" />
+                    <XIcon v-else class="h-4 w-4 text-gray-400" />
                   </div>
                   至少包含一个数字
                 </li>
@@ -406,18 +296,18 @@
                 placeholder="请再次输入新密码"
                 required
               />
-              <check-icon class="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <CheckIcon class="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
               <button
                 type="button"
                 @click="showConfirmPassword = !showConfirmPassword"
                 class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-600"
               >
-                <eye-icon v-if="!showConfirmPassword" class="h-5 w-5" />
-                <eye-off-icon v-else class="h-5 w-5" />
+                <EyeIcon v-if="!showConfirmPassword" class="h-5 w-5" />
+                <EyeOffIcon v-else class="h-5 w-5" />
               </button>
             </div>
             <p v-if="passwordErrors.confirmPassword" class="mt-2 text-sm text-red-600 flex items-center">
-              <alert-circle-icon class="h-4 w-4 mr-1" />
+              <AlertCircleIcon class="h-4 w-4 mr-1" />
               {{ passwordErrors.confirmPassword }}
             </p>
           </div>
@@ -429,7 +319,7 @@
               :disabled="isSubmitting"
             >
               <div class="flex items-center justify-center">
-                <loader-icon v-if="isSubmitting" class="animate-spin h-5 w-5 mr-2" />
+                <LoaderIcon v-if="isSubmitting" class="animate-spin h-5 w-5 mr-2" />
                 <span>{{ isSubmitting ? '提交中...' : '确认修改' }}</span>
               </div>
             </button>
@@ -444,36 +334,42 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
+  ArrowLeftIcon,
   BellIcon,
+  UserCircleIcon,
+  // LockClosedIcon, // Removed as it caused build error, replaced with LockIcon
   UserIcon,
   LockIcon,
-  BookOpenIcon,
-  PencilIcon,
-  CheckIcon,
-  XIcon,
+  KeyIcon,
+  AlertCircleIcon,
   EyeIcon,
   EyeOffIcon,
-  ArrowLeftIcon,
-  AlertCircleIcon,
-  KeyIcon,
-  BookIcon,
-  UsersIcon,
-  CalendarIcon,
-  ClockIcon,
-  LoaderIcon
-} from 'lucide-vue-next'
-import { getTeacherProfile, updateTeacherProfile, getTeacherCourses, changePassword } from '@/api/teacher'
-import { useUserStore } from '@/stores/user' // 假设你有一个用户store来存储当前用户信息
+  FingerprintIcon,
+  ShieldIcon,
+  MailIcon,
+  XIcon,        // For modal close
+  CheckIcon,    // For password criteria & input
+  LoaderIcon,  // For submitting state
+  PencilIcon, // For editing email
+  SaveIcon    // For saving email
+} from 'lucide-vue-next';
+import { useUserStore } from '@/stores/user';
+import { getUser, updateUser } from '@/api/user'; // updateUser for password change
 
 const router = useRouter()
-const userStore = useUserStore()
+const userStore = useUserStore();
+
+// Refs for email editing
+const isEditingEmail = ref(false);
+const editableEmail = ref('');
+const emailError = ref('');
+const isSavingEmail = ref(false);
 
 // 导航项
-const navItems = [
-  { id: 'profile', name: '个人信息', icon: UserIcon },
-  { id: 'security', name: '账号安全', icon: LockIcon },
-  { id: 'teaching', name: '教学概况', icon: BookOpenIcon },
-]
+const navItems = ref([
+  { id: 'profile', name: '个人信息', icon: UserCircleIcon },
+  { id: 'security', name: '账号安全', icon: LockIcon } // Replaced LockClosedIcon with LockIcon
+])
 
 // 所属院系列表
 const departments = [
@@ -488,138 +384,131 @@ const departments = [
 
 // 教师信息
 const teacher = ref({
-  // 静态数据（用于测试）
-  /* 
-  name: '张教授',
-  title: '副教授',
-  avatar: '/placeholder.svg?height=200&width=200',
-  email: 'zhang.professor@university.edu',
-  phone: '13800138000',
-  department: '计算机科学与技术学院',
-  research: '人工智能、机器学习、自然语言处理',
-  passwordLastUpdated: '2023-09-15',
-  stats: {
-    courseCount: 4,
-    studentCount: 210
-  },
-  courses: [
-    { name: '数据结构', students: 65, hours: 48 },
-    { name: '算法分析', students: 42, hours: 32 },
-    { name: '机器学习导论', students: 56, hours: 48 },
-    { name: '自然语言处理', students: 47, hours: 32 }
-  ]
-  */
-
-  // 动态数据（实际使用）
-  name: '',
-  title: '',
-  avatar: '/placeholder.svg?height=200&width=200',
+  id: null,
+  name: '', // Will store username
+  title: '', // Will store role
   email: '',
-  phone: '',
+  // department, phone, researchInterests, officeHours are kept for potential future use
+  // but not actively managed by the current API calls in this component.
+  // Consider removing if they are definitively not needed or managed elsewhere.
   department: '',
-  research: '',
-  passwordLastUpdated: '',
-  stats: {
-    courseCount: 0,
-    studentCount: 0
-  },
-  courses: []
+  phone: '',
+  researchInterests: [],
+  officeHours: '',
+  passwordLastUpdated: '' // For password change feature, will be updated on successful change
 })
 
 // 页面状态
 const activeTab = ref('profile')
-const isEditing = ref(false)
-const isLoading = ref(false)
+// const isEditing = ref(false) // Removed
+const isLoading = ref(true) // Set to true initially for loading user profile
 
 // 加载教师信息
+const validateEmailFormat = (email) => {
+  if (!email) return '邮箱不能为空';
+  // Basic email regex, consider a more robust one if needed
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) return '请输入有效的邮箱地址';
+  return '';
+};
+
+const startEditEmail = () => {
+  isEditingEmail.value = true;
+  editableEmail.value = teacher.value.email;
+  emailError.value = ''; // Clear previous errors
+};
+
+const cancelEditEmail = () => {
+  isEditingEmail.value = false;
+  emailError.value = '';
+  // Optionally reset editableEmail to teacher.value.email if needed, though not strictly necessary if not saved
+};
+
+const saveEmail = async () => {
+  emailError.value = validateEmailFormat(editableEmail.value);
+  if (emailError.value) {
+    return; // Validation failed
+  }
+
+  if (editableEmail.value === teacher.value.email) {
+    isEditingEmail.value = false; // No change, just exit edit mode
+    return;
+  }
+
+  isSavingEmail.value = true;
+  try {
+    const payload = { email: editableEmail.value };
+    // Assuming userStore.userId holds the ID of the user whose email is being changed
+    const response = await updateUser(userStore.userId, payload);
+
+    if (response && response.data && response.data.code === 200) {
+      teacher.value.email = editableEmail.value; // Update local display
+      isEditingEmail.value = false; // Exit edit mode
+      alert('邮箱更新成功！');
+      // Optionally, if the backend returns the full updated user object:
+      // userStore.setUser(response.data.data); // Update user store
+      // teacher.value = { ...teacher.value, ...response.data.data }; // Update local teacher ref
+    } else {
+      // Handle specific API error messages
+      emailError.value = (response && response.data && response.data.message) || '更新邮箱失败，请重试。';
+      alert(emailError.value);
+    }
+  } catch (error) {
+    console.error('保存邮箱失败:', error);
+    const backendError = error.response && error.response.data && error.response.data.message;
+    emailError.value = backendError || '保存邮箱时发生网络或服务器错误，请稍后重试。';
+    alert(emailError.value);
+  } finally {
+    isSavingEmail.value = false;
+  }
+};
+
 const loadTeacherProfile = async () => {
+  isLoading.value = true;
   try {
-    isLoading.value = true
-    const userId = userStore.userId
-    const [profileResponse, coursesResponse] = await Promise.all([
-      getTeacherProfile(userId),
-      getTeacherCourses(userId)
-    ])
-
-    // 更新教师基本信息
-    const profileData = profileResponse.data
-    teacher.value = {
-      ...teacher.value,
-      name: profileData.username,
-      email: profileData.email,
-      department: profileData.department || '',
-      title: profileData.title || '',
-      phone: profileData.phone || '',
-      research: profileData.research || ''
+    const userId = userStore.userId;
+    if (!userId) {
+      console.error('User ID not found in store.');
+      // TODO: Display error to user that userId is missing
+      teacher.value.id = null; // Ensure teacher object reflects error state
+      isLoading.value = false;
+      return;
     }
 
-    // 更新课程信息
-    const coursesData = coursesResponse.data
-    teacher.value.courses = coursesData.map(course => ({
-      name: course.name,
-      students: course.studentCount || 0,
-      hours: course.hours || 0
-    }))
-
-    // 更新统计信息
-    teacher.value.stats.courseCount = teacher.value.courses.length
-    teacher.value.stats.studentCount = teacher.value.courses.reduce((total, course) => total + course.students, 0)
-
-  } catch (error) {
-    console.error('加载教师信息失败:', error)
-    // 这里可以添加错误提示
+    // Fetch user info from /users/{userId} using the getUser function
+    // getUser is expected to return a response where response.data is the actual payload from server
+    // And the server returns { code: 200, message: "success", data: { id, username, role, email } }
+    const response = await getUser(userId);
     
-    // 如果加载失败，使用静态数据（用于测试）
-    /* 
-    teacher.value = {
-      name: '张教授',
-      title: '副教授',
-      avatar: '/placeholder.svg?height=200&width=200',
-      email: 'zhang.professor@university.edu',
-      phone: '13800138000',
-      department: '计算机科学与技术学院',
-      research: '人工智能、机器学习、自然语言处理',
-      passwordLastUpdated: '2023-09-15',
-      stats: {
-        courseCount: 4,
-        studentCount: 210
-      },
-      courses: [
-        { name: '数据结构', students: 65, hours: 48 },
-        { name: '算法分析', students: 42, hours: 32 },
-        { name: '机器学习导论', students: 56, hours: 48 },
-        { name: '自然语言处理', students: 47, hours: 32 }
-      ]
-    }
-    */
-  } finally {
-    isLoading.value = false
-  }
-}
+    // Check if response and response.data and response.data.data are valid
+    if (response && response.data && response.data.data && response.data.code === 200) {
+      const userInfo = response.data.data;
+      teacher.value.id = userInfo.id;
+      teacher.value.name = userInfo.username; // Display username as name
+      teacher.value.title = userInfo.role;    // Display role as title
+      teacher.value.email = userInfo.email;
 
-// 保存教师信息
-const saveTeacherProfile = async () => {
-  try {
-    isLoading.value = true
-    const userId = userStore.userId
-    const updateData = {
-      email: teacher.value.email,
-      title: teacher.value.title,
-      phone: teacher.value.phone,
-      department: teacher.value.department,
-      research: teacher.value.research
+      // Clear fields not provided by this API endpoint
+      teacher.value.phone = '';
+      teacher.value.department = ''; // Department display in sidebar is removed
+      teacher.value.research = '';
+      // courses and stats fields are removed from teacher object
+      // passwordLastUpdated can be kept or managed separately if needed
+    } else {
+      console.error('Failed to fetch user info or data is not in expected format:', response);
+      teacher.value.id = null; // Indicate data loading failure
+      // TODO: Display error to user based on response message or generic error
     }
-
-    await updateTeacherProfile(userId, updateData)
-    isEditing.value = false
-    // 这里可以添加成功提示
   } catch (error) {
-    console.error('更新教师信息失败:', error)
-    // 这里可以添加错误提示
+    console.error('加载教师信息失败:', error);
+    teacher.value.id = null; // Indicate data loading failure
+    // TODO: Display a generic error message to the user
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-}
+};
+
+// saveTeacherProfile function removed as editing these fields is removed.
 
 // 返回上一页
 const goBack = () => {
@@ -635,14 +524,12 @@ const isSubmitting = ref(false)
 
 // 密码表单数据
 const passwordForm = reactive({
-  currentPassword: '',
   newPassword: '',
   confirmPassword: ''
 })
 
 // 密码错误信息
 const passwordErrors = reactive({
-  currentPassword: '',
   newPassword: '',
   confirmPassword: ''
 })
@@ -711,13 +598,11 @@ const closePasswordModal = () => {
 
 // 重置密码表单
 const resetPasswordForm = () => {
-  passwordForm.currentPassword = ''
   passwordForm.newPassword = ''
   passwordForm.confirmPassword = ''
-  passwordErrors.currentPassword = ''
   passwordErrors.newPassword = ''
   passwordErrors.confirmPassword = ''
-  showCurrentPassword.value = false
+  // showCurrentPassword.value = false; // No longer needed
   showNewPassword.value = false
   showConfirmPassword.value = false
 }
@@ -727,15 +612,8 @@ const validatePasswordForm = () => {
   let isValid = true
 
   // 重置错误信息
-  passwordErrors.currentPassword = ''
   passwordErrors.newPassword = ''
   passwordErrors.confirmPassword = ''
-
-  // 验证当前密码
-  if (!passwordForm.currentPassword) {
-    passwordErrors.currentPassword = '请输入当前密码'
-    isValid = false
-  }
 
   // 验证新密码
   if (!passwordForm.newPassword) {
@@ -747,10 +625,8 @@ const validatePasswordForm = () => {
   } else if (passwordStrength.value < 3) {
     passwordErrors.newPassword = '密码强度不足，请设置更复杂的密码'
     isValid = false
-  } else if (passwordForm.newPassword === passwordForm.currentPassword) {
-    passwordErrors.newPassword = '新密码不能与当前密码相同'
-    isValid = false
   }
+  
 
   // 验证确认密码
   if (!passwordForm.confirmPassword) {
@@ -769,12 +645,17 @@ const handleChangePassword = async () => {
   if (!validatePasswordForm()) return
 
   try {
-    isSubmitting.value = true
-    const userId = userStore.userId
-    await changePassword(userId, {
-      currentPassword: passwordForm.currentPassword,
-      newPassword: passwordForm.newPassword
-    })
+    isSubmitting.value = true;
+    const userId = userStore.userId;
+    // The backend API for PUT /users/{userId} expects the new password directly,
+    // and other user details like email. The currentPassword is for client-side validation
+    // or a dedicated 'change-password' endpoint which might validate oldPassword on the server.
+    // For this updateUser endpoint, we send the new password as 'password'.
+    const payload = {
+      email: teacher.value.email, // Send existing email
+      password: passwordForm.newPassword // Send new password
+    };
+    await updateUser(userId, payload);
 
     // 更新密码最后修改时间
     teacher.value.passwordLastUpdated = new Date().toLocaleDateString()
@@ -785,20 +666,19 @@ const handleChangePassword = async () => {
     // 关闭弹窗
     closePasswordModal()
   } catch (error) {
-    console.error('修改密码失败:', error)
-    alert('修改密码失败，请稍后重试')
+    console.error('修改密码失败:', error.response ? error.response.data : error.message);
+    // Display more specific error from backend if available
+    const errorMessage = error.response && error.response.data && error.response.data.message 
+                       ? error.response.data.message 
+                       : '修改密码失败，请稍后重试。';
+    alert(errorMessage);
   } finally {
     isSubmitting.value = false
   }
 }
 
 // 监听编辑状态变化
-watch(isEditing, (newValue) => {
-  if (!newValue) {
-    // 如果退出编辑模式，重新加载数据
-    loadTeacherProfile()
-  }
-})
+// Watch for isEditing removed as isEditing is removed.
 
 // 页面加载时获取数据
 onMounted(() => {
