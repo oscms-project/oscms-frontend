@@ -1,18 +1,20 @@
 import { defineStore } from 'pinia'
+import { useLocalStorage } from '@vueuse/core'
 import { ref } from 'vue'
 
 export const useCourseStore = defineStore('course', () => {
+  // 使用useLocalStorage替换普通ref，实现持久化
   // 当前选中的课程ID
-  const currentCourseId = ref('')
+  const currentCourseId = useLocalStorage('cm-current-course-id', '')
   // 选中的在线练习id
-  const currentExerciseId = ref('')
+  const currentExerciseId = useLocalStorage('cm-current-exercise-id', '')
   // 当前提交ID
-  const currentSubmissionId = ref('')
+  const currentSubmissionId = useLocalStorage('cm-current-submission-id', '')
   // 错题重做相关状态
-  const retryExerciseId = ref('')
-  const retrySubmissionId = ref('')
+  const retryExerciseId = useLocalStorage('cm-retry-exercise-id', '')
+  const retrySubmissionId = useLocalStorage('cm-retry-submission-id', '')
 
-  // 设置当前课程ID的方法
+  // 设置当前课程ID的方法 - 函数保持不变
   function setCurrentCourseId(courseId) {
     currentCourseId.value = courseId
   }

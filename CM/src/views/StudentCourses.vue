@@ -184,6 +184,7 @@
   <div class="content-header">
     <h3>💻 在线练习</h3>
     <button class="practice-report-btn" @click="navigateToExerciseReport">练习报告</button>
+    <button class="favorite-btn" @click="navigateToFavorites">题目收藏</button>
   </div>
   <div class="practice-list">
     <div class="practice-item" v-for="practice in onlinePractices" :key="practice.id">
@@ -202,12 +203,10 @@
         >开始做题</button>
         <button
           class="action-btn secondary" 
-          :disabled="practice.wrongCount === 0 || practice.attempts === 0"
           @click="retryWrongQuestions(practice)"
         >错题重做</button>
         <button 
           class="action-btn tertiary" 
-          :disabled="practice.attempts === 0"
           @click="viewLastRecord(practice)"
         >查看上次练习记录</button>
       </div>
@@ -228,6 +227,8 @@ import { getMaterials } from '@/api/materials';
 import { getStudentClassInCourse } from '@/api/class'; // 新增
 // 添加这个导入
 import { getClassAssignments } from '@/api/class';
+import { getStudentAssignmentSummary } from '@/api/class';
+import { getAssignmentSubmissions } from '@/api/exercise';
 import { useRouter } from 'vue-router';
 const router = useRouter();
 
@@ -247,9 +248,9 @@ const currentSubmissionId = ref('');
 const showAlert = ref(false);
 const alertMessage = ref('');
 
-function setCurrentSubmissionId(id) {
-  currentSubmissionId.value = id;
-}
+// function setCurrentSubmissionId(id) {
+//   currentSubmissionId.value = id;
+// }
 
 
 // 假设班级ID可以从课程详情或其他API获得，这里先用courseId代替
@@ -278,48 +279,133 @@ const navigateToExerciseReport = () => {
 };
 
 
-const retryWrongQuestions = (practice) => {
-  console.log('点击错题重做按钮，练习数据:', practice);
-  
-  // 检查是否有练习记录
-  if (practice.attempts === 0) {
-    console.log('没有练习记录，attempts:', practice.attempts);
-    showMessage('您还没有开始过这个练习，无法重做错题');
-    return;
-  }
-  
-  // 检查是否有错题
-  if (practice.wrongCount === 0) {
-    console.log('没有错题，wrongCount:', practice.wrongCount);
-    showMessage('恭喜！您没有错题需要重做');
-    return;
-  }
-
-  console.log('准备跳转到错题重做页面，练习ID:', practice.id, '最后提交ID:', practice.lastSubmissionId);
-  // 使用store保存练习ID和最近一次提交ID
-  courseStore.setRetryInfo(practice.id, practice.lastSubmissionId);
-  
-  // 跳转到错题重做页面
-  router.push('/retry');
+const navigateToFavorites = () => {
+  // 跳转到题目收藏页面
+  router.push('/favourite');
 };
 
-const viewLastRecord = (practice) => {
-  console.log('点击查看上次练习记录按钮，练习数据:', practice);
-  
-  // 确保只有当有练习记录时才能点击
-  if (practice.attempts === 0) {
-    console.log('没有练习记录，attempts:', practice.attempts);
-    showMessage('您还没有开始过这个练习');
-    return;
+const retryWrongQuestions = async (practice) => {
+  try {
+    // 1. 确保班级ID存在
+    if (!classId.value) {
+      console.log("查询学生班级，学生ID:", userStore.userId, "课程ID:", courseId.value);
+      const classRes = await getStudentClassInCourse(userStore.userId, courseId.value);
+      console.log("班级信息API返回:", classRes);
+      
+      if (classRes.data && classRes.data.data && classRes.data.data.id) {
+        classId.value = classRes.data.data.id;
+        console.log("获取到班级ID:", classId.value);
+      } else {
+        showAlert.value = true;
+        alertMessage.value = "未找到您在此课程中的班级信息";
+        setTimeout(() => { showAlert.value = false; }, 2000);
+        return;
+      }
+    }
+
+    // 2. 使用获取到的班级ID查询练习提交
+    console.log("查询练习提交，班级ID:", classId.value, "练习ID:", practice.id);
+    const submissions = await getAssignmentSubmissions(classId.value, practice.id);
+    console.log("获取练习提交记录:", submissions);
+    
+    // 检查API返回数据格式
+    if (!submissions.data || !submissions.data.data) {
+      showAlert.value = true;
+      alertMessage.value = "获取练习提交记录失败";
+      setTimeout(() => { showAlert.value = false; }, 2000);
+      return;
+    }
+    
+    // 从所有提交中查找当前用户的提交记录
+    const studentSubmission = submissions.data.data.find(
+      submission => submission.studentId === userStore.userId
+    );
+    console.log('找到的学生提交记录:', studentSubmission);
+    
+    // 如果未找到提交记录，提示练习未完成
+    if (!studentSubmission || !studentSubmission.id) {
+      showAlert.value = true;
+      alertMessage.value = "该练习未完成，暂无错题可做！";
+      setTimeout(() => { showAlert.value = false; }, 2000);
+      return;
+    }
+    
+    // 保存练习ID和提交ID到store
+   courseStore.setCurrentExerciseId(practice.id);
+    courseStore.setCurrentSubmissionId(studentSubmission.id);
+    // 使用路由名称跳转
+    console.log("即将跳转到错题重做页面...");
+try {
+  router.push('/retry'); // 尝试直接用路径跳转
+  console.log("路由跳转指令已执行");
+} catch (e) {
+  console.error("路由跳转失败:", e);
+}
+    router.push('/retry');
+    
+  } catch (error) {
+    console.error('获取练习提交记录失败:', error);
+    showAlert.value = true;
+    alertMessage.value = "获取练习记录失败，请稍后再试";
+    setTimeout(() => { showAlert.value = false; }, 2000);
   }
-  
-  console.log('准备跳转到反馈页面，练习ID:', practice.id, '最后提交ID:', practice.lastSubmissionId);
-  // 使用store保存练习ID
-  courseStore.setCurrentExerciseId(practice.id);
-  courseStore.setCurrentSubmissionId(practice.lastSubmissionId);
-  
-  // 跳转到练习反馈页面
-  router.push('/feedback');
+};
+const viewLastRecord = async (practice) => {
+  try {
+    if (!classId.value) {
+      console.log("查询学生班级，学生ID:", userStore.userId, "课程ID:", courseId.value);
+      const classRes = await getStudentClassInCourse(userStore.userId, courseId.value);
+      console.log("班级信息API返回:", classRes);
+      
+      if (classRes.data && classRes.data.data && classRes.data.data.id) {
+        classId.value = classRes.data.data.id;
+        console.log("获取到班级ID:", classId.value);
+      } else {
+        showAlert.value = true;
+        alertMessage.value = "未找到您在此课程中的班级信息";
+        setTimeout(() => { showAlert.value = false; }, 2000);
+        return;
+      }
+    }
+    // 使用正确的API获取班级中该练习的所有提交记录
+    const submissions = await getAssignmentSubmissions(classId.value, practice.id);
+    console.log('获取练习提交记录:', submissions);
+    
+    // 检查API返回数据格式
+    if (!submissions.data || !submissions.data.data) {
+      showAlert.value = true;
+      alertMessage.value = "获取练习提交记录失败";
+      setTimeout(() => { showAlert.value = false; }, 2000);
+      return;
+    }
+    
+    // 从所有提交中查找当前用户的提交记录
+    const studentSubmission = submissions.data.data.find(
+      submission => submission.studentId === userStore.userId
+    );
+    console.log('找到的学生提交记录:', studentSubmission);
+    
+    // 如果未找到提交记录，提示练习未完成
+    if (!studentSubmission || !studentSubmission.id) {
+      showAlert.value = true;
+      alertMessage.value = "该练习未完成，暂无练习记录！";
+      setTimeout(() => { showAlert.value = false; }, 2000);
+      return;
+    }
+    
+    // 保存练习ID和提交ID到store
+    courseStore.setCurrentExerciseId(practice.id);
+    courseStore.setCurrentSubmissionId(studentSubmission.id);
+    
+    // 使用路由名称跳转
+    router.push({ name: 'ExerciseFeedback' });
+    
+  } catch (error) {
+    console.error('获取练习提交记录失败:', error);
+    showAlert.value = true;
+    alertMessage.value = "获取练习记录失败，请稍后再试";
+    setTimeout(() => { showAlert.value = false; }, 2000);
+  }
 };
 
 // 添加加载状态和错误处理
@@ -1117,5 +1203,23 @@ label {
   font-size: 14px;
   font-weight: 500;
   color: #4b5563;
+}
+.header-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.favorite-btn {
+  background: #4caf50;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.favorite-btn:hover {
+  background: #388e3c;
 }
 </style>
