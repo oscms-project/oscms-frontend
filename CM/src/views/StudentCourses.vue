@@ -281,7 +281,7 @@ const navigateToExerciseReport = () => {
 
 const navigateToFavorites = () => {
   // 跳转到题目收藏页面
-  router.push('/favourite');
+  router.push('/favorites');
 };
 
 const retryWrongQuestions = async (practice) => {

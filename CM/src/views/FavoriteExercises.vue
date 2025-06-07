@@ -48,20 +48,26 @@
         </div>
         <h2 class="text-3xl font-semibold text-gray-700 mb-3">空空如也</h2>
         <p class="text-gray-500 mb-8 text-lg">您还没有收藏任何题目哦！</p>
-        <button @click="goToQuestionBank" class="px-8 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105">
-          去题库逛逛
-        </button>
       </div>
 
       <!-- Content: Favorite Exercises Grid -->
       <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-        <FavoriteExerciseCard 
+        <!--
+      <FavoriteExerciseCard 
           v-for="exercise in favorites" 
           :key="exercise.id" 
           :exercise="exercise"
           @remove-favorite="handleRemoveFavorite"
           @view-exercise="handleViewExercise"
         />
+      -->
+      <div v-if="favorites.length > 0">
+        <p>收藏题目数量: {{ favorites.length }}</p>
+        <p>第一个题目ID: {{ favorites[0] && favorites[0].id }}</p> 
+      </div>
+      <div v-else>
+        <p>收藏夹数据已加载，但列表为空（这应该由空状态处理，但作为测试）。</p>
+      </div>
       </div>
     </div>
   </div>
@@ -123,11 +129,6 @@ const handleViewExercise = (exerciseId) => {
   alert(`模拟查看题目 ID: ${exerciseId}。请实现跳转逻辑。`);
 };
 
-const goToQuestionBank = () => {
-  // Placeholder: Navigate to the question bank page
-  // Example: router.push('/question-bank');
-  alert('模拟跳转到题库页面。请实现跳转逻辑。');
-};
 
 onMounted(() => {
   fetchFavorites();
