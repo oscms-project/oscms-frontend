@@ -1231,36 +1231,36 @@ const removeChoiceInput = (index) => {
 const handleAddChoiceQuestion = async () => {
     // Validation (existing logic)
     if (!newChoiceData.title.trim()) {
-        showMessage('题目标题不能为空。', 'error');
+        ElMessageNotification.error('题目标题不能为空。');
         return;
     }
     if (newChoiceData.choices.some(c => !c.trim())) {
-        showMessage('选项内容不能为空。', 'error');
+        ElMessageNotification.error('选项内容不能为空。');
         return;
     }
     // Ensure at least 2 choices
     if (newChoiceData.choices.filter(c => c.trim()).length < 2) {
-        showMessage('至少需要2个有效选项。', 'error');
+        ElMessageNotification.error('至少需要2个有效选项。');
         return;
     }
     // Check for duplicates only among non-empty trimmed choices
     const trimmedChoices = newChoiceData.choices.map(c => c.trim()).filter(c => c);
     if (new Set(trimmedChoices).size !== trimmedChoices.length) {
-        showMessage('有效选项内容不能重复。', 'error');
+        ElMessageNotification.error('有效选项内容不能重复。');
         return;
     }
     if (!newChoiceData.correctAnswerText) {
-        showMessage('请选择一个正确答案。', 'error');
+        ElMessageNotification.error('请选择一个正确答案。');
         return;
     }
     const trimmedCorrectAnswerText = newChoiceData.correctAnswerText.trim();
     if (!newChoiceData.choices.map(c => c.trim()).includes(trimmedCorrectAnswerText)) {
-        showMessage('选择的正确答案必须是有效选项之一。', 'error');
+        ElMessageNotification.error('选择的正确答案必须是有效选项之一。');
         newChoiceData.correctAnswerText = ''; 
         return;
     }
     if (newChoiceData.score === null || newChoiceData.score === undefined || newChoiceData.score < 0) {
-        showMessage('分值必须大于等于0。', 'error');
+        ElMessageNotification.error('分值必须大于等于0。');
         return;
     }
 
@@ -1288,11 +1288,11 @@ const handleAddChoiceQuestion = async () => {
             // Optionally, if you need to refresh a list of questions from bank, do it here.
         } else {
             // This case might not be reached if API throws error for non-success
-            showMessage('添加题目失败，未收到有效响应。', 'error');
+            ElMessageNotification.error('添加题目失败，未收到有效响应。');
         }
     } catch (error) {
         console.error('Error adding choice question to bank:', error);
-        showMessage(error.message || '添加题目到题库失败，请重试。', 'error');
+        ElMessageNotification.error(error.message || '添加题目到题库失败，请重试。');
     } finally {
         isSubmittingChoiceQuestion.value = false;
     }
@@ -1577,12 +1577,12 @@ const importSelectedQuestions = () => {
 
     // 显示提示
     if (successfullyProcessedCount > 0) {
-        showMessage(`处理了 ${successfullyProcessedCount} 个题目的导入请求。详情请见各题目的添加状态。`);
+        ElMessageNotification.success(`处理了 ${successfullyProcessedCount} 个题目的导入请求。详情请见各题目的添加状态。`);
     } else if (selectedQuestions.value.length > 0 && questionsToImport.length === 0) {
-        showMessage('未能从题库中匹配到所选的题目，或题目已在作业中。');
+        ElMessageNotification.error('未能从题库中匹配到所选的题目，或题目已在作业中。');
     } else if (selectedQuestions.value.length === 0 && questionsToImport.length === 0) {
         // This case is already handled by the initial check in the function.
-        // showMessage('没有选择题目。'); 
+        // ElMessageNotification.success('选择题添加成功！'); 
     }
     // Note: selectedQuestions.value is cleared *after* this message block in the original function flow.
 };
@@ -1690,17 +1690,17 @@ const publishTask = async () => {
                     console.warn(`Question with localId "${question.id}" and title "${question.text}" is manually added or does not have a bankId, and will not be included in 'questionIds'.`);
                 }
             }
-            return ids;
+            return ids; // Corrected placement
         })()
     };
     try {
         await createAssignment(task.classId, assignmentData);
-        showMessage('布置作业成功');
+        ElMessageNotification.success('布置作业成功');
         setTimeout(() => {
             goBackToCourseManagement();
         }, 1500);
     } catch (e) {
-        showMessage(e.message || '布置作业失败');
+        ElMessageNotification.error(e.message || '布置作业失败'); // Changed to .error
     }
 };
 

@@ -8,7 +8,6 @@
             <ArrowLeftIcon class="icon" />
           </button>
           <h1 class="course-title">{{ localCourseName }} <span class="icon"><i class="i-lucide-external-link"></i></span></h1>
-          <p class="course-meta">{{ courseStudents }}人 | {{ courseDuration }}</p>
         </div>
         <div class="course-stats">
           <div class="stat-item">

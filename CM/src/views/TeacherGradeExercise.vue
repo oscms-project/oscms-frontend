@@ -62,10 +62,6 @@
             <div class="flex justify-between items-center mb-4">
                 <h1 class="text-2xl font-bold">{{ exercise.title }}</h1>
                 <div class="flex space-x-3">
-                    <button class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm"
-                        @click="generateFeedbackReport">
-                        生成反馈报告
-                    </button>
                     <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm"
                         @click="saveGrades">
                         保存评分
@@ -402,10 +398,9 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import { getAssignmentSubmissionsList, getSubmissionDetail, gradeSubmission, getAssignmentQuestions } from '@/api/assignment';
+import { getAssignmentSubmissions, getSubmissionDetail, gradeSubmission, getAssignmentQuestions } from '@/api/assignment';
 import { useCourseStore } from '@/stores/course';
 import { useUserStore } from '@/stores/user';
-import headImage from '@/assets/head.jpg';
 import axios from 'axios';
 
 const router = useRouter();
@@ -417,13 +412,10 @@ const loading = ref(false);
 
 // 用户信息
 const user = ref({
-    id: userStore.userId || 'teacher123',
-    username: userStore.username || 'teacher001',
-    name: userStore.name || '李教授',
-    role: 'teacher',
-    email: userStore.email || 'teacher001@example.com',
-    college: userStore.college || '计算机科学与技术学院',
-    avatar: headImage || '/placeholder.svg?height=40&width=40'
+    id: userStore.userId,
+    username: userStore.username,
+    role: userStore.role,
+    avatar: userStore.avatar || '/placeholder.svg?height=40&width=40'
 });
 
 const showUserMenu = ref(false);
@@ -678,20 +670,59 @@ defineExpose({
 // 选中提交，拉取详情
 const selectSubmissionHandler = async (submission) => {
     try {
-        const detail = await axios.get(`/submissions/${submission.submissionId || submission.id}`);
+        const detailResponse = await axios.get(`/submissions/${submission.submissionId || submission.id}`);
+        const detailData = detailResponse.data.data; // API返回的原始提交详情
+        console.log('获取到提交详情:', detailData);
+        const numSubjectiveQuestions = subjectiveQuestions.value.length;
+        const newQuestionScores = new Array(numSubjectiveQuestions).fill(0);
+        const newFeedback = new Array(numSubjectiveQuestions).fill('');
+        const studentAnswersForDisplay = new Array(numSubjectiveQuestions);
+
+        subjectiveQuestions.value.forEach((sq, index) => {
+            const studentAnswer = (detailData.answers || []).find(ans => ans.questionId === sq.id);
+
+            if (studentAnswer && (studentAnswer.questionType === 'short_answer' || studentAnswer.questionType === 'coding')) {
+                newQuestionScores[index] = studentAnswer.score || 0;
+                newFeedback[index] = studentAnswer.feedback || '';
+                studentAnswersForDisplay[index] = {
+                    questionId: studentAnswer.questionId,
+                    response: studentAnswer.response || '',
+                    questionType: studentAnswer.questionType,
+                    score: studentAnswer.score || 0,
+                    correct: studentAnswer.correct || false
+                };
+            } else {
+                // 如果没有找到对应的主观题答案，或者类型不匹配（理论上subjectiveQuestions已筛选，但作为保险）
+                newQuestionScores[index] = 0;
+                newFeedback[index] = '';
+                studentAnswersForDisplay[index] = {
+                    questionId: sq.id,
+                    response: '', // 或 '未作答'
+                    questionType: sq.type, // 使用主观题本身的类型
+                    score: 0,
+                    correct: false
+                };
+            }
+        });
+
         selectedSubmission.value = {
-            ...detail.data.data,
-            questionScores: new Array(questions.value.length).fill(0),
-            feedback: new Array(questions.value.length).fill(''),
+            submissionId: detailData.id,
+            assignmentId: detailData.assignmentId,
+            studentId: detailData.studentId,
+            autoScore: detailData.autoScore || 0,
+            manualScore: detailData.manualScore || 0, // 将在保存评分时更新
+            totalScore: detailData.totalScore || 0,   // 将在保存评分时更新
+            status: detailData.status,
+            submittedAt: detailData.submittedAt,
+            overallFeedback: detailData.overallFeedback || '',
+            
+            answers: studentAnswersForDisplay, // 用于模板显示的、与主观题对齐的答案列表
+            questionScores: newQuestionScores,   // 用于v-model的、与主观题对齐的分数列表
+            feedback: newFeedback,               // 用于v-model的、与主观题对齐的评语列表
+            // 如果需要，可以保留从API获取的原始完整答案列表，例如：
+            // originalRawAnswers: detailData.answers || [] 
         };
         
-        // 如果已经有评分，填充到表单中
-        if (detail.data.data.answers) {
-            detail.data.data.answers.forEach((answer, index) => {
-                selectedSubmission.value.questionScores[index] = answer.score || 0;
-                selectedSubmission.value.feedback[index] = answer.feedback || '';
-            });
-        }
     } catch (error) {
         console.error('获取提交详情失败:', error);
         showMessage('获取提交详情失败');
@@ -747,6 +778,7 @@ const updateStats = () => {
 
 const saveCurrentGrade = async () => {
     if (!selectedSubmission.value) return;
+    console.log('选中的提交:', selectedSubmission.value);
 
     // 构建评分数据
     const grades = subjectiveQuestions.value.map((question, index) => ({
@@ -757,8 +789,8 @@ const saveCurrentGrade = async () => {
 
     try {
         loading.value = true;
-        const response = await gradeSubmission(selectedSubmission.value.id, grades);
-
+        const response = await gradeSubmission(selectedSubmission.value.submissionId, grades);
+        console.log('批改提交响应:', selectedSubmission.value);
         // 计算人工评分总和
         const manualScore = grades.reduce((sum, grade) => sum + grade.score, 0);
         const autoScore = selectedSubmission.value.autoScore || 0;
@@ -784,6 +816,7 @@ const saveCurrentGrade = async () => {
         // 清空当前选中的提交
         selectedSubmission.value = null;
     } catch (error) {
+        console.log('kadsdsasadsadas:', selectedSubmission.value);
         console.error('保存评分失败:', error);
         showMessage('提交批改失败，请重试');
     } finally {

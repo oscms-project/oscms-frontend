@@ -132,7 +132,7 @@ import { useRouter } from 'vue-router';
 const router = useRouter();
 //api中封装的方法
 import { getUser, getUserCourses } from '@/api/user'
-import { getStudentClasses, getStudentAssignmentSummary } from '@/api/class';
+import { getStudentClasses, getStudentAssignmentSummary , enrollClassById} from '@/api/class';
 //component中封装的组件
 import BaseCarousel from '@/components/BaseCarousel.vue'
 import BaseHeader from '@/components/BaseHeader.vue'
@@ -167,23 +167,33 @@ const showJoinCourseModal = ref(false);
 const courseCode = ref('');
 
 // 加入课程方法
-const joinCourse = () => {
+const joinCourse = async () => {
   if (!courseCode.value) {
-    alert('请输入课程代码');
+    alert('请输入班级ID');
     return;
   }
- // 这里可以添加实际的加入课程API调用
-  console.log('加入课程:', courseCode.value);
   
-  // 模拟加入成功
-  alert(`成功加入课程: ${courseCode.value}`);
-  
-  // 重置并关闭弹窗
-  courseCode.value = '';
-  showJoinCourseModal.value = false;
-  
-  // 刷新课程列表
-  fetchStudentCourses();
+  try {
+    // 发送实际的API请求
+    const res = await enrollClassById(courseCode.value, userStore.userId);
+    
+    if (res.data && res.data.code === 200) {
+      alert('成功加入课程！');
+      
+      // 重置并关闭弹窗
+      courseCode.value = '';
+      showJoinCourseModal.value = false;
+      
+      // 刷新课程列表和进度数据
+      fetchStudentCoursesList();
+      fetchStudentCourses();
+    } else {
+      alert(res.data?.message || '加入课程失败，请检查班级ID');
+    }
+  } catch (error) {
+    console.error('加入课程失败:', error);
+    alert(error.response?.data?.message || '加入课程失败，请稍后再试');
+  }
 };
 
 

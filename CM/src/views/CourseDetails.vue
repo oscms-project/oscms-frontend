@@ -15,7 +15,7 @@
           <i class="i-lucide-plus-circle mr-1"></i>
           创建班级
         </button>
-        <button class="btn btn-default" @click="navigateToClassManagement">
+        <button class="btn btn-default d-flex align-items-center justify-content-center" @click="navigateToClassManagement">
           <i class="i-lucide-users mr-1"></i>
           班级和练习管理
         </button>
@@ -133,22 +133,19 @@
               <button class="btn-icon" title="预览" v-if="canPreview(resource.type)" @click="previewResource(resource)">
                 <i class="i-lucide-eye"></i>
               </button>
-              <button class="btn btn-primary btn-sm resource-action-btn" title="下载" @click="downloadResource(resource)">
+              <button class="btn btn-primary btn-sm resource-action-btn d-flex align-items-center justify-content-center" title="下载" @click="downloadResource(resource)">
                 <i class="i-lucide-download mr-1"></i> 下载
               </button>
-              <button class="btn btn-danger btn-sm resource-action-btn" title="删除" @click="confirmDeleteResource(resource)">
+              <button class="btn btn-danger btn-sm resource-action-btn d-flex align-items-center justify-content-center" title="删除" @click="confirmDeleteResource(resource)">
                 <i class="i-lucide-trash-2 mr-1"></i> 删除
               </button>
             </div>
           </div>
           <div class="resource-info">
             <h3 class="resource-title">{{ resource.filename }}</h3>
-            <p class="resource-meta">
-              <span class="resource-size">{{ formatFileSize(resource.size) }}</span>
-            </p>
             <p class="resource-date">
               <i class="i-lucide-calendar mr-1"></i>
-              {{ resource.updatedAt}}
+              {{ formatResourceDate(resource.updatedAt) }}
             </p>
             <p class="resource-description" v-if="resource.description">{{ resource.description }}</p>
             <p class="resource-visibility" v-if="resource.hasOwnProperty('visibleForClasses')">
@@ -975,26 +972,26 @@
 
   <!-- Create Class Modal -->
   <div v-if="showCreateClassModal" class="modal-overlay" @click="closeCreateClassModal">
-    <div class="modal-content" @click.stop>
-      <div class="modal-header">
+    <div class="modal-content modal-content-lg" @click.stop>
+      <div class="modal-header px-4 pt-4 pb-3">
         <h3>创建新班级</h3>
         <button class="btn-close" @click="closeCreateClassModal">
           <i class="i-lucide-x"></i>
         </button>
       </div>
-      <div class="modal-body">
-        <div class="form-group">
+      <div class="modal-body p-4">
+        <div class="form-group mb-4">
           <label for="newClassName">班级名称</label>
-          <input type="text" id="newClassName" v-model="newClassName" placeholder="请输入班级名称">
+          <input type="text" id="newClassName" v-model="newClassName" placeholder="请输入班级名称" class="form-control form-control-lg">
         </div>
-        <div class="form-group">
-          <label for="newClassCode">班级邀请码</label>
-          <input type="text" id="newClassCode" v-model="newClassCode" placeholder="请输入班级邀请码">
+        <div class="form-group mb-4">
+          <label for="newClassCode">班级代码</label>
+          <input type="text" id="newClassCode" v-model="newClassCode" placeholder="请输入班级邀请码" class="form-control form-control-lg">
         </div>
       </div>
-      <div class="modal-footer">
-        <button class="btn btn-default" @click="closeCreateClassModal">取消</button>
-        <button class="btn btn-primary" @click="handleCreateClass">创建</button>
+      <div class="modal-footer p-4">
+        <button class="btn btn-default btn-lg" @click="closeCreateClassModal">取消</button>
+        <button class="btn btn-primary btn-lg ml-3" @click="handleCreateClass">创建</button>
       </div>
     </div>
   </div>
@@ -1959,7 +1956,14 @@ const uploadResource = async () => {
       formData.append('visibleForClasses', classId.toString());
     });
   } else if (resourcePermissions.value.visibility === 'all') {
-    // If visibility is 'all', OpenAPI suggests not sending 'visibleForClasses' implies all classes.
+    // If visibility is 'all', add all class IDs for the current course.
+    // Assuming 'courseDetails.value.classInfoList' holds the array of class objects for the current course,
+    // and each class object has a 'classId' property.
+    if (courseDetails.value && courseDetails.value.classInfoList && Array.isArray(courseDetails.value.classInfoList)) {
+      courseDetails.value.classInfoList.forEach(classItem => {
+        formData.append('visibleForClasses', classItem.classId.toString());
+      });
+    }
     } else {
     // If 'specific' but no classes selected, OpenAPI says "若为空列表则均不可见".
     // How to send an "empty list" for a multi-value field in FormData can be backend-specific.
@@ -2244,6 +2248,18 @@ const getLanguageName = (language) => {
     default:
       return '其他';
   }
+};
+
+// 格式化资源更新日期
+const formatResourceDate = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
 };
 
 // 格式化文件大小
@@ -2990,7 +3006,7 @@ const getVisibleClassNames = (resource) => {
     return '所有人可见';
   }
   if (resource.visibleForClasses.length === 0) {
-    return '仅创建者可见'; // Corresponds to "若为空列表则均不可见"
+    return '所有人可见'; // Corresponds to "若为空列表则均不可见"
   }
   if (availableClassesForPermissions.value && availableClassesForPermissions.value.length > 0) {
     const classNames = resource.visibleForClasses

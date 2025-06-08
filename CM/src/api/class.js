@@ -38,3 +38,8 @@ export function getStudentAssignmentSummary(classId, studentId) {
 export function getStudentClasses(studentId) {
   return axios.get(`/users/${studentId}/classes/info`);
 }
+
+// 学生加入班级
+export function enrollClassById(classId) {
+  return axios.post(`/classes/${classId}/enroll`);
+}
