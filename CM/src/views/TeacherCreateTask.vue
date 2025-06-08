@@ -1278,11 +1278,12 @@ const handleAddChoiceQuestion = async () => {
         const newQuestion = await createQuestionInBank(payload); // API Call
 
         if (newQuestion && newQuestion.id) {
-            ElNotification({
-              title: '成功',
-              message: '选择题已成功添加到题库！',
-              type: 'success',
-            });
+            // ElNotification({
+            //   title: '成功',
+            //   message: '选择题已成功添加到题库！',
+            //   type: 'success',
+            // });
+            showMessage('选择题已成功添加到题库！');
             showAddChoiceModal.value = false;
             // resetNewChoiceData(); // destroy-on-close in el-dialog should handle this as openAddChoiceModal calls reset
             // Optionally, if you need to refresh a list of questions from bank, do it here.
@@ -1312,11 +1313,8 @@ const handleAddShortAnswerQuestion = async () => {
       courseId: task.courseId,
     };
     await createQuestionInBank(payload);
-    ElNotification({
-      title: '成功',
-      message: '简答题已成功添加到题库！',
-      type: 'success',
-    });
+    // 
+    showMessage('简答题已成功添加到题库！');
     showAddShortAnswerModal.value = false;
   } catch (error) {
     if (error === false) return; // Validation failed
@@ -1341,11 +1339,12 @@ const handleAddCodingQuestion = async () => {
       courseId: task.courseId,
     };
     await createQuestionInBank(payload);
-    ElNotification({
-      title: '成功',
-      message: '编程题已成功添加到题库！',
-      type: 'success',
-    });
+    // ElNotification({
+    //   title: '成功',
+    //   message: '编程题已成功添加到题库！',
+    //   type: 'success',
+    // });
+     showMessage('编程题已成功添加到题库！');
     showAddCodingModal.value = false;
   } catch (error) {
     if (error === false) return; // Validation failed
@@ -1695,7 +1694,7 @@ const publishTask = async () => {
     };
     try {
         await createAssignment(task.classId, assignmentData);
-        ElMessageNotification.success('布置作业成功');
+         showMessage('布置作业成功');
         setTimeout(() => {
             goBackToCourseManagement();
         }, 1500);

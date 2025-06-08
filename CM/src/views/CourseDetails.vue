@@ -136,9 +136,6 @@
               <button class="btn btn-primary btn-sm resource-action-btn d-flex align-items-center justify-content-center" title="下载" @click="downloadResource(resource)">
                 <i class="i-lucide-download mr-1"></i> 下载
               </button>
-              <button class="btn btn-danger btn-sm resource-action-btn d-flex align-items-center justify-content-center" title="删除" @click="confirmDeleteResource(resource)">
-                <i class="i-lucide-trash-2 mr-1"></i> 删除
-              </button>
             </div>
           </div>
           <div class="resource-info">
@@ -989,10 +986,10 @@
           <input type="text" id="newClassCode" v-model="newClassCode" placeholder="请输入班级邀请码" class="form-control form-control-lg">
         </div>
       </div>
-      <div class="modal-footer p-4">
-        <button class="btn btn-default btn-lg" @click="closeCreateClassModal">取消</button>
-        <button class="btn btn-primary btn-lg ml-3" @click="handleCreateClass">创建</button>
-      </div>
+     <div class="modal-footer p-4" style="display: flex; justify-content: space-between;">
+  <button class="btn btn-default btn-lg" @click="closeCreateClassModal">取消</button>
+  <button class="btn btn-primary btn-lg" @click="handleCreateClass">创建</button>
+</div>
     </div>
   </div>
 </template>
@@ -1666,19 +1663,19 @@ const confirmDeleteChapter = (idOfChapterToMark) => {
 };
 
 // 确认删除小节
-const confirmDeleteSection = (chapterId, sectionId) => {
-  currentChapterId.value = chapterId;
-  sectionToDelete.value = sectionId;
-  deleteType.value = 'section';
-  showDeleteConfirmation.value = true;
-};
+// const confirmDeleteSection = (chapterId, sectionId) => {
+//   currentChapterId.value = chapterId;
+//   sectionToDelete.value = sectionId;
+//   deleteType.value = 'section';
+//   showDeleteConfirmation.value = true;
+// };
 
 // 确认删除资源
-const confirmDeleteResource = (resource) => {
-  resourceToDelete.value = resource.id;
-  deleteType.value = 'resource';
-  showDeleteConfirmation.value = true;
-};
+// const confirmDeleteResource = (resource) => {
+//   resourceToDelete.value = resource.id;
+//   deleteType.value = 'resource';
+//   showDeleteConfirmation.value = true;
+// };
 
 // 执行删除操作
 const confirmDelete = async () => {
@@ -1959,11 +1956,27 @@ const uploadResource = async () => {
     // If visibility is 'all', add all class IDs for the current course.
     // Assuming 'courseDetails.value.classInfoList' holds the array of class objects for the current course,
     // and each class object has a 'classId' property.
-    if (courseDetails.value && courseDetails.value.classInfoList && Array.isArray(courseDetails.value.classInfoList)) {
-      courseDetails.value.classInfoList.forEach(classItem => {
-        formData.append('visibleForClasses', classItem.classId.toString());
-      });
+   if (availableClassesForPermissions.value && availableClassesForPermissions.value.length > 0) {
+    console.log("使用所有班级可见权限，添加班级列表:", availableClassesForPermissions.value);
+    availableClassesForPermissions.value.forEach(classItem => {
+      formData.append('visibleForClasses', classItem.id.toString());
+    });
+  } else {
+    console.warn("所有人可见选项被选中，但没有可用的班级列表");
+    // 可能需要重新获取班级列表
+    try {
+      const classesRes = await getCourseClasses(courseId.value);
+      if (classesRes.data && classesRes.data.data && classesRes.data.data.length > 0) {
+        classesRes.data.data.forEach(classItem => {
+          formData.append('visibleForClasses', classItem.id.toString());
+        });
+      } else {
+        console.warn("尝试重新获取班级列表，但没有结果");
+      }
+    } catch (err) {
+      console.error("重新获取班级列表失败:", err);
     }
+  }
     } else {
     // If 'specific' but no classes selected, OpenAPI says "若为空列表则均不可见".
     // How to send an "empty list" for a multi-value field in FormData can be backend-specific.

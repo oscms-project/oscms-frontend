@@ -11,10 +11,10 @@
               <i class="i-lucide-file-plus mr-1"></i>
               发布练习
             </button>
-            <button class="btn btn-light-blue" @click="openCreateClassModal">
+            <!-- <button class="btn btn-light-blue" @click="openCreateClassModal">
               <i class="i-lucide-plus-circle mr-1"></i>
               创建班级
-            </button>
+            </button> -->
             <button class="btn btn-default" @click="navigateToClassManagement">
               <i class="i-lucide-users mr-1"></i>
               班级和练习管理
@@ -136,9 +136,9 @@
                   <button class="btn btn-primary btn-sm resource-action-btn" title="下载" @click="downloadResource(resource)">
                     <i class="i-lucide-download mr-1"></i> 下载
                   </button>
-                  <button class="btn btn-danger btn-sm resource-action-btn" title="删除" @click="confirmDeleteResource(resource)">
+                  <!-- <button class="btn btn-danger btn-sm resource-action-btn" title="删除" @click="confirmDeleteResource(resource)">
                     <i class="i-lucide-trash-2 mr-1"></i> 删除
-                  </button>
+                  </button> -->
                 </div>
               </div>
               <div class="resource-info">
@@ -1951,20 +1951,34 @@
       }
     
       // 4. Add visibleForClasses (optional)
-      if (resourcePermissions.value.visibility === 'specific' && resourcePermissions.value.selectedClasses.length > 0) {
-        resourcePermissions.value.selectedClasses.forEach(classId => {
-          formData.append('visibleForClasses', classId.toString());
+     if (resourcePermissions.value.visibility === 'specific' && resourcePermissions.value.selectedClasses.length > 0) {
+  resourcePermissions.value.selectedClasses.forEach(classId => {
+    formData.append('visibleForClasses', classId.toString());
+  });
+} else if (resourcePermissions.value.visibility === 'all') {
+  // If visibility is 'all', add all class IDs for the current course.
+  if (availableClassesForPermissions.value && availableClassesForPermissions.value.length > 0) {
+    console.log("使用所有班级可见权限，添加班级列表:", availableClassesForPermissions.value);
+    availableClassesForPermissions.value.forEach(classItem => {
+      formData.append('visibleForClasses', classItem.id.toString());
+    });
+  } else {
+    console.warn("所有人可见选项被选中，但没有可用的班级列表");
+    // 可能需要重新获取班级列表
+    try {
+      const classesRes = await getCourseClasses(courseId.value);
+      if (classesRes.data && classesRes.data.data && classesRes.data.data.length > 0) {
+        classesRes.data.data.forEach(classItem => {
+          formData.append('visibleForClasses', classItem.id.toString());
         });
-      } else if (resourcePermissions.value.visibility === 'all') {
-        // If visibility is 'all', add all class IDs for the current course.
-        // Assuming 'courseDetails.value.classInfoList' holds the array of class objects for the current course,
-        // and each class object has a 'classId' property.
-        if (courseDetails.value && courseDetails.value.classInfoList && Array.isArray(courseDetails.value.classInfoList)) {
-          courseDetails.value.classInfoList.forEach(classItem => {
-            formData.append('visibleForClasses', classItem.classId.toString());
-          });
-        }
-        } else {
+      } else {
+        console.warn("尝试重新获取班级列表，但没有结果");
+      }
+    } catch (err) {
+      console.error("重新获取班级列表失败:", err);
+    }
+  }
+} else {
         // If 'specific' but no classes selected, OpenAPI says "若为空列表则均不可见".
         // How to send an "empty list" for a multi-value field in FormData can be backend-specific.
         // Often, not sending the field or sending a specific marker is how this is handled.

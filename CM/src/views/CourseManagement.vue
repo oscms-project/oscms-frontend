@@ -34,14 +34,14 @@
           班级：{{ selectedClass ? selectedClass.name : '全部' }}
           <i class="i-lucide-chevron-down ml-1"></i>
         </button>
-        <button class="btn btn-primary">
+        <!-- <button class="btn btn-primary">
           <i class="i-lucide-file-plus mr-1"></i>
           发布作业
-        </button>
-        <button class="btn btn-default">
+        </button> -->
+        <!-- <button class="btn btn-default">
           <i class="i-lucide-download mr-1"></i>
           导出成绩
-        </button>
+        </button> -->
       </div>
       <div v-if="selectedClass" class="class-invitation-code">
         班级邀请码: <span class="invitation-code-value">{{ selectedClass.id }}</span>
@@ -403,10 +403,10 @@
                   <i class="i-lucide-search search-icon"></i>
                   <input type="text" placeholder="搜索学生" v-model="statsSearchQuery">
                 </div>
-                <button class="btn btn-sm btn-outline">
+                <!-- <button class="btn btn-sm btn-outline">
                   <i class="i-lucide-download mr-1"></i>
                   导出名单
-                </button>
+                </button> -->
               </div>
 
               <div class="data-table">
@@ -462,10 +462,10 @@
                     <i class="i-lucide-mail mr-1"></i>
                     发送提醒
                   </button>
-                  <button class="btn btn-sm btn-outline">
+                  <!-- <button class="btn btn-sm btn-outline">
                     <i class="i-lucide-download mr-1"></i>
                     导出名单
-                  </button>
+                  </button> -->
                 </div>
               </div>
 
