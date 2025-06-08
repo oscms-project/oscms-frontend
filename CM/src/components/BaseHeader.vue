@@ -8,7 +8,7 @@
     <div class="user-info">
       <span class="user-name">{{ user.name }}</span>
       <span class="user-id">{{ user.id }}</span>
-      <div class="avatar">
+      <div class="avatar" @click="handleAvatarClick">
         <img src="@/assets/head.jpg" alt="用户头像" />
       </div>
     </div>
@@ -23,7 +23,8 @@ const props = defineProps({
 const emit = defineEmits(['avatarClick']);
 
 const handleAvatarClick = () => {
-  emit('avatarClick');
+  console.log("BaseHeader.vue: Avatar clicked, emitting avatarClick event."); // 新增日志
+  emit('avatar-click');
 };
 </script>
 

@@ -7,7 +7,7 @@
           <div class="logo-circle"></div>
           <span class="university-name">北京航空航天大学 | 智慧教育</span>
         </div>
-        <div class="user-info">
+        <div class="user-info" @click="navigateToUserProfile" style="cursor: pointer;">
   <img :src="headImage" alt="用户头像" class="avatar" />
   <div class="user-details">
     <div class="username">{{ userStore.name }}</div>
@@ -281,7 +281,8 @@ const navigateToExerciseReport = () => {
 
 const navigateToFavorites = () => {
   // 跳转到题目收藏页面
-  router.push('/favourites');
+  console.log("跳转到题目收藏页面")
+  router.push('/favorites');
 };
 
 const retryWrongQuestions = async (practice) => {
@@ -640,6 +641,11 @@ const getFileIcon = (filename) => {
     default: return '📁';
   }
 };
+const navigateToUserProfile = () => {
+  console.log("点击用户头像/信息，直接跳转到教师个人中心页面: /teacher/profile");
+  router.push({ name: 'TeacherProfile' });
+};
+
 onMounted(() => {
   fetchAllCourseInfo()
 })

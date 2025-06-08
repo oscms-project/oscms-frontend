@@ -149,7 +149,8 @@ const studentInfo = ref({
 });
 
 const navigateToUserProfile = () => {
-  router.push('/teacher/profile'); // Assuming '/teacher-profile' is the path to TeacherProfile.vue
+  console.log("StudentHome.vue: navigateToUserProfile called. Attempting to navigate to TeacherProfile.");
+  router.push({ name: 'TeacherProfile' }); // 使用命名路由
 };
 
 // 课程详情页导航函数

@@ -5,7 +5,6 @@
     <div class="container header-content">
       <div class="course-info">
         <h1 class="course-title">{{ courseName }}</h1>
-        <p class="course-meta">{{ courseStudents }}{{ courseDuration }}</p>
       </div>
       <div class="action-buttons">
         <button class="btn btn-light-blue" @click="goToTeacherCreateTask">
@@ -134,14 +133,11 @@
               <button class="btn-icon" title="预览" v-if="canPreview(resource.type)" @click="previewResource(resource)">
                 <i class="i-lucide-eye"></i>
               </button>
-              <button class="btn-icon" title="下载" @click="downloadResource(resource)">
-                <i class="i-lucide-download"></i>
+              <button class="btn btn-primary btn-sm resource-action-btn" title="下载" @click="downloadResource(resource)">
+                <i class="i-lucide-download mr-1"></i> 下载
               </button>
-              <button class="btn-icon" title="编辑" @click="editResource(resource)">
-                <i class="i-lucide-edit"></i>
-              </button>
-              <button class="btn-icon danger" title="删除" @click="confirmDeleteResource(resource)">
-                <i class="i-lucide-trash-2"></i>
+              <button class="btn btn-danger btn-sm resource-action-btn" title="删除" @click="confirmDeleteResource(resource)">
+                <i class="i-lucide-trash-2 mr-1"></i> 删除
               </button>
             </div>
           </div>

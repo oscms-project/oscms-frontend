@@ -1,7 +1,7 @@
 <template>
   <div class="teacher-homepage">
     <!-- 页眉用户信息组件区域 -->
-    <BaseHeader :user="teacherInfo" />
+    <BaseHeader :user="teacherInfo" @avatar-click="navigateToUserProfile" />
     <!-- 轮播图区域 -->
     <BaseCarousel />
 
@@ -49,6 +49,11 @@ import headImage from '@/assets/head.jpg';
 const userStore = useUserStore();
 const courseStore = useCourseStore();
 const router = useRouter(); // 添加路由器
+
+const navigateToUserProfile = () => {
+  console.log("TaHome.vue: navigateToUserProfile called. Attempting to navigate to TeacherProfile.");
+  router.push({ name: 'TeacherProfile' });
+};
 const teacherInfo = ref({
   // 使用store中的信息初始化
   name: userStore.name,
