@@ -9,12 +9,6 @@ jobs:
   build-and-deploy-local:
     # 指定在自托管运行器上运行
     runs-on: self-hosted
-    env:
-      # 强制 Git 走 HTTP/1.1，避免部分网络设备/代理对 HTTP/2 的兼容问题
-      GIT_HTTP_VERSION: HTTP/1.1
-      # 遇到问题时保留详细日志
-      GIT_TRACE: '1'
-      GIT_CURL_VERBOSE: '1'
 
     # 为所有步骤设置默认 shell
     defaults:
@@ -22,43 +16,11 @@ jobs:
         shell: cmd
 
     steps:
-      - name: Force Git HTTP/1.1 globally (Windows)
-        shell: cmd
-        run: |
-          git config --global http.version HTTP/1.1
-          git config --global http.sslbackend schannel
-          git config --global http.lowSpeedLimit 1
-          git config --global http.lowSpeedTime 600
-
-      # 预检: 诊断到 github.com 的网络连通性和 git 可用性
-      - name: Network Diagnostics (github.com)
-        shell: cmd
-        env:
-          GIT_TRACE: '1'
-          GIT_CURL_VERBOSE: '1'
-        run: |
-          echo Checking DNS for github.com ...
-          nslookup github.com
-          echo.
-          echo Testing TCP 443 to github.com ...
-          powershell -Command "Test-NetConnection github.com -Port 443"
-          echo.
-          echo Curl HEAD to https://api.github.com ...
-          curl -I https://api.github.com
-          echo.
-          echo Git version and ls-remote on current repo ...
-          git --version
-          git ls-remote https://github.com/%GITHUB_REPOSITORY%.git
-
       # 步骤 1: 检出代码（推荐使用官方 actions/checkout）
       - name: Checkout Repository
         uses: actions/checkout@v4
-        timeout-minutes: 3
         with:
-          fetch-depth: 1 # 浅克隆以减少时间；需要完整历史时改为 0
-          persist-credentials: false # 避免在 runner 上持久化凭据导致交互/卡住
-          clean: true
-          submodules: false
+          fetch-depth: 1 # 获取完整历史，如果需要的话
 
       # 步骤 2: 设置 Node.js 环境
       - name: Set up Node.js
