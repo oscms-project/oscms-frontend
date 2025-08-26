@@ -17,29 +17,32 @@ jobs:
         shell: C:\Program Files\Git\bin\bash.exe -e {0}
 
     steps:
+      # --- 新增步骤 1: 使用 PowerShell 获取 Home 目录路径 ---
+      - name: Get User Home Directory Path
+        id: get_home_dir # 给这个步骤一个ID，以便后续引用其输出
+        run: echo "home_path=$($env:USERPROFILE -replace '\\', '/')" >> $env:GITHUB_OUTPUT
+        shell: powershell # 明确指定这个步骤使用 PowerShell
+
+      # --- 修改步骤 2: 使用上一步获取到的路径来操作 known_hosts ---
+      - name: Add GitHub.com SSH key to known_hosts
+        run: |
+          # 从上一步的输出中读取 home_path 变量
+          # 语法是 ${{ steps.get_home_dir.outputs.home_path }}
+          USER_HOME="${{ steps.get_home_dir.outputs.home_path }}"
+          SSH_DIR="$USER_HOME/.ssh"
+          KNOWN_HOSTS_FILE="$SSH_DIR/known_hosts"
+          
+          echo "User home directory resolved to: $USER_HOME"
+          
+          mkdir -p "$SSH_DIR"
+          ssh-keyscan github.com >> "$KNOWN_HOSTS_FILE"
+          
+          echo "Successfully added github.com to known_hosts at $KNOWN_HOSTS_FILE"
       # 步骤 1: 设置 SSH 环境 (用于免密 git clone)
       - name: Setup SSH Agent
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }} # 确保已在 GitHub Secrets 中设置
-
-      - name: Add GitHub.com SSH key to known_hosts
-        run: |
-          # 使用 $HOME 环境变量代替 ~
-          SSH_DIR="$HOME/.ssh"
-          KNOWN_HOSTS_FILE="$SSH_DIR/known_hosts"
-          
-          # 创建 .ssh 目录 (如果不存在)
-          mkdir -p "$SSH_DIR"
-          
-          # 使用 ssh-keyscan 获取密钥并追加
-          echo "Scanning github.com and adding to $KNOWN_HOSTS_FILE"
-          ssh-keyscan github.com >> "$KNOWN_HOSTS_FILE"
-          
-          # (可选) 验证一下文件内容
-          echo "Content of known_hosts:"
-          cat "$KNOWN_HOSTS_FILE"
-
 
       # 步骤 2: 手动克隆仓库
       - name: Manually Clone Repository via SSH
