@@ -1,85 +1,90 @@
-# oscms-frontend/.github/workflows/ci-cd.yml
-
 name: Frontend CI & Local Deploy (Local Only)
 
 on:
   push:
-    branches: [ "master", "dev" ]
-  workflow_dispatch:
+    branches: [ "master", "dev" ] # 在推送到 master 或 dev 分支时触发
+  workflow_dispatch: # 允许手动触发
 
 jobs:
   build-and-deploy-local:
+    # 指定在自托管运行器上运行
     runs-on: self-hosted
 
+    # 为此 Job 下的所有 'run' 步骤设置默认 shell 为 bash
+    # 这确保了命令和语法的一致性
+    defaults:
+      run:
+        shell: bash
+
     steps:
-       # --- 新增步骤：准备 SSH 环境 ---
+      # 步骤 1: 设置 SSH 环境 (用于免密 git clone)
       - name: Setup SSH Agent
         uses: webfactory/ssh-agent@v0.9.0
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          
-      - name: Add GitHub.com to known_hosts
-        run: ssh-keyscan github.com >> ~/.ssh/known_hosts
-        shell: bash
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }} # 确保已在 GitHub Secrets 中设置
 
-      # --- 替换 checkout 步骤 ---
-      # 我们不再使用 actions/checkout@v4，而是手动执行 git clone
+      - name: Add GitHub.com SSH key to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      # 步骤 2: 手动克隆仓库
       - name: Manually Clone Repository via SSH
         run: |
-          # ${{ github.repository }} 的值是 "chengchengcheng521/oscms-frontend"
+          # 克隆仓库到当前工作目录
           git clone git@github.com:${{ github.repository }}.git .
-          # git checkout ${{ github.sha }} # 检出触发工作流的具体 commit
-        shell: bash
+          # 检出触发工作流的具体 commit，确保代码是正确的版本
+          git checkout ${{ github.sha }}
 
+      # 步骤 3: 设置 Node.js 环境
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
 
+      # 步骤 4: 安装依赖
       - name: Install Dependencies
         run: npm install
 
+      # 步骤 5: 构建前端静态文件
       - name: Build Static Files for Production
         run: npm run build
 
-      # 镜像名称和标签
+      # 步骤 6: 设置镜像名称和标签，并保存到 GitHub Actions 环境变量
       - name: Set Image Name and Tag
-        id: image_meta
         run: |
           # 镜像名称必须与 K8s Deployment YAML 中的名称匹配
           IMAGE_NAME="course-management-frontend"
-          IMAGE_TAG=${{ github.sha }}
-          echo "IMAGE_NAME_WITH_TAG=$IMAGE_NAME:$IMAGE_TAG" >> $env:GITHUB_ENV
-          echo "IMAGE_NAME_LATEST=$IMAGE_NAME:latest" >> $env:GITHUB_ENV
-        shell: powershell
+          # 使用 Commit SHA 的前8位作为更短的标签，方便查看
+          IMAGE_TAG=$(echo ${{ github.sha }} | cut -c1-8)
+          
+          # 使用 Bash 语法将变量写入 $GITHUB_ENV 文件，供后续步骤使用
+          echo "IMAGE_NAME_WITH_TAG=$IMAGE_NAME:$IMAGE_TAG" >> $GITHUB_ENV
+          echo "IMAGE_NAME_LATEST=$IMAGE_NAME:latest" >> $GITHUB_ENV
 
-      # 只在本地构建 Docker 镜像，不推送
+      # 步骤 7: 在本地构建 Docker 镜像
       - name: Build Docker Image Locally
         run: |
           echo "Building image: ${{ env.IMAGE_NAME_LATEST }} and ${{ env.IMAGE_NAME_WITH_TAG }}"
+          # 同时打上 latest 标签和唯一的 commit 标签
           docker build -t ${{ env.IMAGE_NAME_LATEST }} -t ${{ env.IMAGE_NAME_WITH_TAG }} -f Dockerfile .
-        shell: powershell
-
-      # 部署到本地 Kubernetes
+          
+      # 步骤 8: 部署到本地 Kubernetes
       - name: Prepare K8s Manifest and Deploy
         run: |
-          echo "Applying static K8s configurations (ConfigMaps, Secrets, etc.)..."
-          # 假设同事提供的所有 YAML 在一个名为 'k8s-manifests.yaml' 的文件中
-          # 如果是多个文件，可以 kubectl apply -f k8s/
-          # 注意：应用 Secrets, Ingress 等可能需要您的本地 K8s 环境有相应的控制器 (如 Nginx Ingress Controller, Cert-Manager)
-          # 对于纯本地开发，您可能只需要 apply Deployment, Service, ConfigMap
-          kubectl apply -f k8s/your-full-config-file.yaml
+          # 假设您的 K8s 配置文件都在 'k8s/' 目录下
+          echo "Applying all K8s manifests from k8s/ directory..."
+          kubectl apply -f k8s/
           
-          echo "Patching Deployment for local-only workflow..."
-          # --- 关键修改步骤 ---
-          # 1. 使用 kubectl patch 动态修改 imagePullPolicy
-          # 这是一个比 sed 更健壮的方式
+          echo "Patching Deployment to use local image pull policy..."
+          # 使用 kubectl patch 动态修改 imagePullPolicy
           kubectl patch deployment/course-management-frontend -p '{"spec":{"template":{"spec":{"containers":[{"name":"frontend","imagePullPolicy":"IfNotPresent"}]}}}}'
 
-          # 2. 使用 kubectl set image 更新镜像标签
+          echo "Updating Deployment with new image: ${{ env.IMAGE_NAME_WITH_TAG }}"
+          # 使用 kubectl set image 更新镜像标签
           kubectl set image deployment/course-management-frontend frontend=${{ env.IMAGE_NAME_WITH_TAG }}
           
-          echo "Checking deployment status..."
+          echo "Waiting for deployment rollout to finish..."
+          # 检查部署的滚动更新状态，超时时间设为2分钟
           kubectl rollout status deployment/course-management-frontend --timeout=120s
-        shell: powershell
