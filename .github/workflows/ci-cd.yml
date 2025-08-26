@@ -16,49 +16,13 @@ jobs:
         shell: cmd
 
     steps:
-      # --- 新增步骤 1: 强制清理工作目录 ---
-      - name: Clean Workspace
-        # 这个步骤会在克隆代码之前，确保工作目录是空的
-        # 它会删除当前目录下的所有文件和文件夹
-        run: |
-          # PowerShell 语法，更强大和可靠
-          Get-ChildItem -Path . -Recurse | Remove-Item -Force -Recurse
-          Write-Host "Workspace cleaned successfully."
-        shell: powershell # 强制使用 PowerShell，它的 Remove-Item 更可靠
-
-      # --- 步骤 2: 设置 SSH 环境 (保持不变) ---
-      - name: Setup SSH Agent
-        uses: webfactory/ssh-agent@v0.9.0
+      # 步骤 1: 检出代码（推荐使用官方 actions/checkout）
+      - name: Checkout Repository
+        uses: actions/checkout@v4
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          fetch-depth: 0 # 获取完整历史，如果需要的话
 
-      # 步骤 3: 添加 GitHub 到 known_hosts (保持不变)
-      - name: Add GitHub to known_hosts
-        shell: powershell
-        run: |
-          $sshDir = "$env:USERPROFILE\.ssh"
-          if (-not (Test-Path $sshDir)) { New-Item -Path $sshDir -ItemType Directory -Force }
-          ssh-keyscan github.com | Out-File -FilePath "$sshDir\known_hosts" -Append
-          Write-Host "Successfully added github.com to known_hosts"
-
-      # 步骤 4: 手动克隆仓库 (保持不变)
-      - name: Clone Repository via SSH
-        shell: cmd
-        run: |
-          echo Cloning repository via SSH...
-          git clone git@github.com:${{ github.repository }}.git .
-          if %errorlevel% neq 0 (
-            echo Git clone failed!
-            exit /b 1
-          )
-          git checkout ${{ github.sha }}
-          if %errorlevel% neq 0 (
-            echo Git checkout failed!
-            exit /b 1
-          )
-          echo Repository cloned successfully
-
-      # 步骤 4: 设置 Node.js 环境
+      # 步骤 2: 设置 Node.js 环境
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -66,13 +30,13 @@ jobs:
           cache: 'npm'
           cache-dependency-path: './CM/package-lock.json'
 
-      # 步骤 5: 切换到 CM 目录并安装依赖
+      # 步骤 3: 切换到 CM 目录并安装依赖
       - name: Install Dependencies
         shell: cmd
         working-directory: ./CM
         run: npm install
 
-      # 步骤 6: 检查可用的 npm 脚本
+      # 步骤 4: 检查可用的 npm 脚本
       - name: Check Available NPM Scripts
         shell: cmd
         working-directory: ./CM
@@ -88,7 +52,7 @@ jobs:
             exit /b 1
           )
 
-      # 步骤 7: 构建前端静态文件（带脚本检查）
+      # 步骤 5: 构建前端静态文件（带脚本检查）
       - name: Build Static Files for Production
         shell: cmd
         working-directory: ./CM
@@ -112,7 +76,7 @@ jobs:
             )
           )
 
-      # 步骤 8: 设置镜像名称和标签
+      # 步骤 6: 设置镜像名称和标签
       - name: Set Image Name and Tag
         shell: cmd
         run: |
@@ -124,7 +88,7 @@ jobs:
           echo IMAGE_NAME=%IMAGE_NAME%>> %GITHUB_ENV%
           echo IMAGE_TAG=%IMAGE_TAG%>> %GITHUB_ENV%
 
-      # 步骤 9: 在本地构建 Docker 镜像
+      # 步骤 7: 在本地构建 Docker 镜像
       - name: Build Docker Image Locally
         shell: cmd
         working-directory: ./CM
@@ -135,7 +99,7 @@ jobs:
           echo Verifying built images:
           docker images | findstr %IMAGE_NAME%
 
-      # 步骤 10: 验证 kubectl 连接
+      # 步骤 8: 验证 kubectl 连接
       - name: Verify kubectl Connection
         shell: cmd
         run: |
@@ -143,7 +107,7 @@ jobs:
           kubectl cluster-info
           kubectl get nodes
 
-      # 步骤 11: 部署到本地 Kubernetes
+      # 步骤 9: 部署到本地 Kubernetes
       - name: Deploy to Local Kubernetes
         shell: cmd
         working-directory: ./CM
@@ -174,7 +138,7 @@ jobs:
             exit /b 1
           )
 
-      # 步骤 12: 验证部署结果
+      # 步骤 10: 验证部署结果
       - name: Verify Deployment
         shell: cmd
         run: |
