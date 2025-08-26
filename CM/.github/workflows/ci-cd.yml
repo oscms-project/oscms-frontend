@@ -1,0 +1,69 @@
+# oscms-frontend/.github/workflows/ci-cd.yml
+
+name: Frontend CI & Local Deploy (Local Only)
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy-local:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Static Files for Production
+        run: npm run build
+
+      # 镜像名称和标签
+      - name: Set Image Name and Tag
+        id: image_meta
+        run: |
+          # 镜像名称必须与 K8s Deployment YAML 中的名称匹配
+          IMAGE_NAME="course-management-frontend"
+          IMAGE_TAG=${{ github.sha }}
+          echo "IMAGE_NAME_WITH_TAG=$IMAGE_NAME:$IMAGE_TAG" >> $env:GITHUB_ENV
+          echo "IMAGE_NAME_LATEST=$IMAGE_NAME:latest" >> $env:GITHUB_ENV
+        shell: pwsh
+
+      # 只在本地构建 Docker 镜像，不推送
+      - name: Build Docker Image Locally
+        run: |
+          echo "Building image: ${{ env.IMAGE_NAME_LATEST }} and ${{ env.IMAGE_NAME_WITH_TAG }}"
+          docker build -t ${{ env.IMAGE_NAME_LATEST }} -t ${{ env.IMAGE_NAME_WITH_TAG }} -f Dockerfile .
+        shell: pwsh
+
+      # 部署到本地 Kubernetes
+      - name: Prepare K8s Manifest and Deploy
+        run: |
+          echo "Applying static K8s configurations (ConfigMaps, Secrets, etc.)..."
+          # 假设同事提供的所有 YAML 在一个名为 'k8s-manifests.yaml' 的文件中
+          # 如果是多个文件，可以 kubectl apply -f k8s/
+          # 注意：应用 Secrets, Ingress 等可能需要您的本地 K8s 环境有相应的控制器 (如 Nginx Ingress Controller, Cert-Manager)
+          # 对于纯本地开发，您可能只需要 apply Deployment, Service, ConfigMap
+          kubectl apply -f k8s/your-full-config-file.yaml
+          
+          echo "Patching Deployment for local-only workflow..."
+          # --- 关键修改步骤 ---
+          # 1. 使用 kubectl patch 动态修改 imagePullPolicy
+          # 这是一个比 sed 更健壮的方式
+          kubectl patch deployment/course-management-frontend -p '{"spec":{"template":{"spec":{"containers":[{"name":"frontend","imagePullPolicy":"IfNotPresent"}]}}}}'
+
+          # 2. 使用 kubectl set image 更新镜像标签
+          kubectl set image deployment/course-management-frontend frontend=${{ env.IMAGE_NAME_WITH_TAG }}
+          
+          echo "Checking deployment status..."
+          kubectl rollout status deployment/course-management-frontend --timeout=120s
+        shell: pwsh

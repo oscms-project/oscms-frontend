@@ -1,0 +1,22 @@
+{
+  "dependencies": {
+    "@vueuse/core": "^13.3.0",
+    "axios": "^1.9.0",
+    "element-plus": "^2.10.1",
+    "html2canvas": "^1.4.1",
+    "html2pdf.js": "^0.10.3",
+    "json-server": "^1.0.0-beta.3",
+    "jspdf": "^3.0.1",
+    "lucide-vue-next": "^0.511.0",
+    "pinia": "^3.0.3",
+    "vue-router": "^4.5.1"
+  },
+  "devDependencies": {
+    "@vue/test-utils": "^2.4.6",
+    "autoprefixer": "^10.4.21",
+    "msw": "^2.9.0",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^4.1.7",
+    "vitest": "^3.2.1"
+  }
+}
