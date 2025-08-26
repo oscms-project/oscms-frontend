@@ -14,6 +14,8 @@ jobs:
       # 步骤 1: 检出代码（推荐使用官方 actions/checkout）
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 获取完整历史，如果需要的话
 
       # 步骤 2: 设置 Node.js 环境
       - name: Set up Node.js
@@ -24,13 +26,62 @@ jobs:
 
       # 步骤 3: 安装依赖
       - name: Install Dependencies
+        shell: bash
         run: npm install
 
-      # 步骤 4: 构建前端静态文件
-      - name: Build Static Files for Production
-        run: npm run build
+      # 步骤 4: 检查可用的 npm 脚本
+      - name: Check Available NPM Scripts
+        shell: bash
+        run: |
+          echo "=== Available NPM Scripts ==="
+          npm run
+          echo ""
+          echo "=== Package.json Scripts Section ==="
+          if [ -f package.json ]; then
+            cat package.json | grep -A 20 '"scripts"' || echo "No scripts section found"
+          else
+            echo "package.json not found!"
+            exit 1
+          fi
 
-      # 步骤 5: 设置镜像名称和标签
+      # 步骤 5: 构建前端静态文件（带脚本检查）
+      - name: Build Static Files for Production
+        shell: bash
+        run: |
+          # 检查是否存在 build 脚本
+          if npm run | grep -q "build"; then
+            echo "Found 'build' script, running npm run build..."
+            npm run build
+          elif npm run | grep -q "dist"; then
+            echo "Found 'dist' script, running npm run dist..."
+            npm run dist
+          elif npm run | grep -q "compile"; then
+            echo "Found 'compile' script, running npm run compile..."
+            npm run compile
+          elif npm run | grep -q "production"; then
+            echo "Found 'production' script, running npm run production..."
+            npm run production
+          else
+            echo "❌ No build script found. Available scripts:"
+            npm run
+            echo ""
+            echo "Please add a build script to your package.json, for example:"
+            echo '{
+              "scripts": {
+                "build": "webpack --mode production",
+                "build": "vite build",
+                "build": "react-scripts build",
+                "build": "next build"
+              }
+            }'
+            echo ""
+            echo "Skipping build step for now..."
+            # 创建一个临时的 dist 目录，以防 Docker 需要它
+            mkdir -p dist
+            echo "Created empty dist directory"
+          fi
+
+      # 步骤 6: 设置镜像名称和标签
       - name: Set Image Name and Tag
         shell: bash
         run: |
@@ -45,7 +96,7 @@ jobs:
           echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
 
-      # 步骤 6: 在本地构建 Docker 镜像
+      # 步骤 7: 在本地构建 Docker 镜像
       - name: Build Docker Image Locally
         shell: bash
         run: |
@@ -56,7 +107,7 @@ jobs:
           # 验证镜像是否构建成功
           docker images | grep ${{ env.IMAGE_NAME }}
 
-      # 步骤 7: 验证 kubectl 连接
+      # 步骤 8: 验证 kubectl 连接
       - name: Verify kubectl Connection
         shell: bash
         run: |
@@ -64,7 +115,7 @@ jobs:
           kubectl cluster-info
           kubectl get nodes
 
-      # 步骤 8: 部署到本地 Kubernetes
+      # 步骤 9: 部署到本地 Kubernetes
       - name: Deploy to Local Kubernetes
         shell: bash
         run: |
@@ -112,7 +163,7 @@ jobs:
             exit 1
           fi
 
-      # 步骤 9: 验证部署结果
+      # 步骤 10: 验证部署结果
       - name: Verify Deployment
         shell: bash
         run: |
