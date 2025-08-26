@@ -12,6 +12,24 @@ jobs:
     runs-on: self-hosted
 
     steps:
+      - name: Add GitHub.com SSH key to known_hosts
+        # 这个步骤会在运行器的 HOME 目录下创建 .ssh/known_hosts 文件并添加 github.com 的密钥
+        # 这样后续的 git fetch (由 actions/checkout 调用) 就能跳过交互式的主机密钥验证
+        run: |
+          # 确保 .ssh 目录存在
+          $sshDir = "$HOME\.ssh"
+          if (-not (Test-Path $sshDir)) {
+            New-Item -ItemType Directory -Path $sshDir | Out-Null
+            echo "Created directory: $sshDir"
+          }
+          
+          # 获取 github.com 的 SSH 主机密钥并追加到 known_hosts
+          # ssh-keyscan.exe 包含在 Git for Windows 中
+          echo "Scanning github.com SSH host key..."
+          ssh-keyscan.exe github.com | Out-File -FilePath "$sshDir\known_hosts" -Append -Encoding ascii
+          
+          echo "Successfully added github.com to known_hosts."
+        shell: pwsh # 明确使用 PowerShell
       - name: Checkout repository
         uses: actions/checkout@v4
 
