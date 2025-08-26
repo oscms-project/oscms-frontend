@@ -29,7 +29,7 @@ jobs:
           ssh-keyscan.exe github.com | Out-File -FilePath "$sshDir\known_hosts" -Append -Encoding ascii
           
           echo "Successfully added github.com to known_hosts."
-        shell: pwsh # 明确使用 PowerShell
+        shell: powershell # 明确使用 PowerShell
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -54,14 +54,14 @@ jobs:
           IMAGE_TAG=${{ github.sha }}
           echo "IMAGE_NAME_WITH_TAG=$IMAGE_NAME:$IMAGE_TAG" >> $env:GITHUB_ENV
           echo "IMAGE_NAME_LATEST=$IMAGE_NAME:latest" >> $env:GITHUB_ENV
-        shell: pwsh
+        shell: powershell
 
       # 只在本地构建 Docker 镜像，不推送
       - name: Build Docker Image Locally
         run: |
           echo "Building image: ${{ env.IMAGE_NAME_LATEST }} and ${{ env.IMAGE_NAME_WITH_TAG }}"
           docker build -t ${{ env.IMAGE_NAME_LATEST }} -t ${{ env.IMAGE_NAME_WITH_TAG }} -f Dockerfile .
-        shell: pwsh
+        shell: powershell
 
       # 部署到本地 Kubernetes
       - name: Prepare K8s Manifest and Deploy
@@ -84,4 +84,4 @@ jobs:
           
           echo "Checking deployment status..."
           kubectl rollout status deployment/course-management-frontend --timeout=120s
-        shell: pwsh
+        shell: powershell
