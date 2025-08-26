@@ -14,7 +14,7 @@ jobs:
     # 这确保了命令和语法的一致性
     defaults:
       run:
-        shell: bash
+        shell: C:\Program Files\Git\bin\bash.exe -e {0}
 
     steps:
       # 步骤 1: 设置 SSH 环境 (用于免密 git clone)
