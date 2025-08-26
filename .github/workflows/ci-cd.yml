@@ -10,97 +10,131 @@ jobs:
     # 指定在自托管运行器上运行
     runs-on: self-hosted
 
-    # 为此 Job 下的所有 'run' 步骤设置默认 shell 为 bash
-    # 这确保了命令和语法的一致性
-    defaults:
-      run:
-        shell: C:\Program Files\Git\bin\bash.exe -e {0}
-
     steps:
-      # --- 新增步骤 1: 使用 PowerShell 获取 Home 目录路径 ---
-      - name: Get User Home Directory Path
-        id: get_home_dir # 给这个步骤一个ID，以便后续引用其输出
-        run: echo "home_path=$($env:USERPROFILE -replace '\\', '/')" >> $env:GITHUB_OUTPUT
-        shell: powershell # 明确指定这个步骤使用 PowerShell
+      # 步骤 1: 检出代码（推荐使用官方 actions/checkout）
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-      # --- 修改步骤 2: 使用上一步获取到的路径来操作 known_hosts ---
-      - name: Add GitHub.com SSH key to known_hosts
-        run: |
-          # 从上一步的输出中读取 home_path 变量
-          # 语法是 ${{ steps.get_home_dir.outputs.home_path }}
-          USER_HOME="${{ steps.get_home_dir.outputs.home_path }}"
-          SSH_DIR="$USER_HOME/.ssh"
-          KNOWN_HOSTS_FILE="$SSH_DIR/known_hosts"
-          
-          echo "User home directory resolved to: $USER_HOME"
-          
-          mkdir -p "$SSH_DIR"
-          ssh-keyscan github.com >> "$KNOWN_HOSTS_FILE"
-          
-          echo "Successfully added github.com to known_hosts at $KNOWN_HOSTS_FILE"
-      # 步骤 1: 设置 SSH 环境 (用于免密 git clone)
-      - name: Setup SSH Agent
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }} # 确保已在 GitHub Secrets 中设置
-
-      # 步骤 2: 手动克隆仓库
-      - name: Manually Clone Repository via SSH
-        run: |
-          # 克隆仓库到当前工作目录
-          git clone git@github.com:${{ github.repository }}.git .
-          # 检出触发工作流的具体 commit，确保代码是正确的版本
-          git checkout ${{ github.sha }}
-
-      # 步骤 3: 设置 Node.js 环境
+      # 步骤 2: 设置 Node.js 环境
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
 
-      # 步骤 4: 安装依赖
+      # 步骤 3: 安装依赖
       - name: Install Dependencies
         run: npm install
 
-      # 步骤 5: 构建前端静态文件
+      # 步骤 4: 构建前端静态文件
       - name: Build Static Files for Production
         run: npm run build
 
-      # 步骤 6: 设置镜像名称和标签，并保存到 GitHub Actions 环境变量
+      # 步骤 5: 设置镜像名称和标签
       - name: Set Image Name and Tag
+        shell: bash
         run: |
           # 镜像名称必须与 K8s Deployment YAML 中的名称匹配
           IMAGE_NAME="course-management-frontend"
           # 使用 Commit SHA 的前8位作为更短的标签，方便查看
           IMAGE_TAG=$(echo ${{ github.sha }} | cut -c1-8)
           
-          # 使用 Bash 语法将变量写入 $GITHUB_ENV 文件，供后续步骤使用
+          # 将变量写入 GITHUB_ENV 文件，供后续步骤使用
           echo "IMAGE_NAME_WITH_TAG=$IMAGE_NAME:$IMAGE_TAG" >> $GITHUB_ENV
           echo "IMAGE_NAME_LATEST=$IMAGE_NAME:latest" >> $GITHUB_ENV
+          echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
 
-      # 步骤 7: 在本地构建 Docker 镜像
+      # 步骤 6: 在本地构建 Docker 镜像
       - name: Build Docker Image Locally
+        shell: bash
         run: |
           echo "Building image: ${{ env.IMAGE_NAME_LATEST }} and ${{ env.IMAGE_NAME_WITH_TAG }}"
           # 同时打上 latest 标签和唯一的 commit 标签
           docker build -t ${{ env.IMAGE_NAME_LATEST }} -t ${{ env.IMAGE_NAME_WITH_TAG }} -f Dockerfile .
           
+          # 验证镜像是否构建成功
+          docker images | grep ${{ env.IMAGE_NAME }}
+
+      # 步骤 7: 验证 kubectl 连接
+      - name: Verify kubectl Connection
+        shell: bash
+        run: |
+          echo "Checking kubectl connection..."
+          kubectl cluster-info
+          kubectl get nodes
+
       # 步骤 8: 部署到本地 Kubernetes
-      - name: Prepare K8s Manifest and Deploy
+      - name: Deploy to Local Kubernetes
+        shell: bash
         run: |
           # 假设您的 K8s 配置文件都在 'k8s/' 目录下
           echo "Applying all K8s manifests from k8s/ directory..."
           kubectl apply -f k8s/
           
-          echo "Patching Deployment to use local image pull policy..."
-          # 使用 kubectl patch 动态修改 imagePullPolicy
-          kubectl patch deployment/course-management-frontend -p '{"spec":{"template":{"spec":{"containers":[{"name":"frontend","imagePullPolicy":"IfNotPresent"}]}}}}'
-
-          echo "Updating Deployment with new image: ${{ env.IMAGE_NAME_WITH_TAG }}"
-          # 使用 kubectl set image 更新镜像标签
-          kubectl set image deployment/course-management-frontend frontend=${{ env.IMAGE_NAME_WITH_TAG }}
+          echo "Waiting for resources to be ready..."
+          sleep 5
           
-          echo "Waiting for deployment rollout to finish..."
-          # 检查部署的滚动更新状态，超时时间设为2分钟
-          kubectl rollout status deployment/course-management-frontend --timeout=120s
+          # 检查 deployment 是否存在
+          if kubectl get deployment course-management-frontend > /dev/null 2>&1; then
+            echo "Deployment exists, updating..."
+            
+            echo "Patching Deployment to use local image pull policy..."
+            # 使用 kubectl patch 动态修改 imagePullPolicy
+            kubectl patch deployment/course-management-frontend -p '{
+              "spec": {
+                "template": {
+                  "spec": {
+                    "containers": [
+                      {
+                        "name": "frontend",
+                        "imagePullPolicy": "IfNotPresent"
+                      }
+                    ]
+                  }
+                }
+              }
+            }'
+
+            echo "Updating Deployment with new image: ${{ env.IMAGE_NAME_WITH_TAG }}"
+            # 使用 kubectl set image 更新镜像标签
+            kubectl set image deployment/course-management-frontend frontend=${{ env.IMAGE_NAME_WITH_TAG }}
+            
+            echo "Waiting for deployment rollout to finish..."
+            # 检查部署的滚动更新状态，超时时间设为3分钟
+            kubectl rollout status deployment/course-management-frontend --timeout=180s
+            
+            # 显示部署状态
+            kubectl get pods -l app=course-management-frontend
+          else
+            echo "Deployment not found. Please check your k8s manifests."
+            kubectl get deployments
+            exit 1
+          fi
+
+      # 步骤 9: 验证部署结果
+      - name: Verify Deployment
+        shell: bash
+        run: |
+          echo "=== Deployment Summary ==="
+          kubectl get deployment course-management-frontend -o wide
+          echo ""
+          echo "=== Pod Status ==="
+          kubectl get pods -l app=course-management-frontend -o wide
+          echo ""
+          echo "=== Service Status ==="
+          kubectl get svc -l app=course-management-frontend || echo "No services found with label app=course-management-frontend"
+          
+          # 检查 Pod 是否都在运行状态
+          READY_PODS=$(kubectl get pods -l app=course-management-frontend --no-headers | grep "Running" | wc -l)
+          TOTAL_PODS=$(kubectl get pods -l app=course-management-frontend --no-headers | wc -l)
+          
+          echo "Ready Pods: $READY_PODS/$TOTAL_PODS"
+          
+          if [ "$READY_PODS" -eq "$TOTAL_PODS" ] && [ "$TOTAL_PODS" -gt "0" ]; then
+            echo "✅ Deployment successful! All pods are running."
+          else
+            echo "❌ Some pods are not running. Please check the logs."
+            kubectl describe pods -l app=course-management-frontend
+            exit 1
+          fi
