@@ -10,6 +10,11 @@ jobs:
     # 指定在自托管运行器上运行
     runs-on: self-hosted
 
+    # 为所有步骤设置默认 shell
+    defaults:
+      run:
+        shell: cmd
+
     steps:
       # 步骤 1: 检出代码（推荐使用官方 actions/checkout）
       - name: Checkout Repository
@@ -23,169 +28,127 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
+          cache-dependency-path: './CM/package-lock.json'
 
-      # 步骤 3: 安装依赖
+      # 步骤 3: 切换到 CM 目录并安装依赖
       - name: Install Dependencies
-        shell: bash
+        shell: cmd
+        working-directory: ./CM
         run: npm install
 
       # 步骤 4: 检查可用的 npm 脚本
       - name: Check Available NPM Scripts
-        shell: bash
+        shell: cmd
+        working-directory: ./CM
         run: |
-          echo "=== Available NPM Scripts ==="
+          echo === Available NPM Scripts ===
           npm run
-          echo ""
-          echo "=== Package.json Scripts Section ==="
-          if [ -f package.json ]; then
-            cat package.json | grep -A 20 '"scripts"' || echo "No scripts section found"
-          else
-            echo "package.json not found!"
-            exit 1
-          fi
+          echo.
+          echo === Package.json Check ===
+          if exist package.json (
+            findstr /C:"\"scripts\"" package.json
+          ) else (
+            echo package.json not found!
+            exit /b 1
+          )
 
       # 步骤 5: 构建前端静态文件（带脚本检查）
       - name: Build Static Files for Production
-        shell: bash
+        shell: cmd
+        working-directory: ./CM
         run: |
-          # 检查是否存在 build 脚本
-          if npm run | grep -q "build"; then
-            echo "Found 'build' script, running npm run build..."
+          npm run | findstr "build" >nul
+          if %errorlevel% equ 0 (
+            echo Found 'build' script, running npm run build...
             npm run build
-          elif npm run | grep -q "dist"; then
-            echo "Found 'dist' script, running npm run dist..."
-            npm run dist
-          elif npm run | grep -q "compile"; then
-            echo "Found 'compile' script, running npm run compile..."
-            npm run compile
-          elif npm run | grep -q "production"; then
-            echo "Found 'production' script, running npm run production..."
-            npm run production
-          else
-            echo "❌ No build script found. Available scripts:"
-            npm run
-            echo ""
-            echo "Please add a build script to your package.json, for example:"
-            echo '{
-              "scripts": {
-                "build": "webpack --mode production",
-                "build": "vite build",
-                "build": "react-scripts build",
-                "build": "next build"
-              }
-            }'
-            echo ""
-            echo "Skipping build step for now..."
-            # 创建一个临时的 dist 目录，以防 Docker 需要它
-            mkdir -p dist
-            echo "Created empty dist directory"
-          fi
+          ) else (
+            npm run | findstr "dist" >nul
+            if %errorlevel% equ 0 (
+              echo Found 'dist' script, running npm run dist...
+              npm run dist
+            ) else (
+              echo No build script found. Available scripts:
+              npm run
+              echo.
+              echo Creating empty dist directory...
+              if not exist dist mkdir dist
+              echo Skipping build step for now...
+            )
+          )
 
       # 步骤 6: 设置镜像名称和标签
       - name: Set Image Name and Tag
-        shell: bash
+        shell: cmd
         run: |
-          # 镜像名称必须与 K8s Deployment YAML 中的名称匹配
-          IMAGE_NAME="course-management-frontend"
-          # 使用 Commit SHA 的前8位作为更短的标签，方便查看
-          IMAGE_TAG=$(echo ${{ github.sha }} | cut -c1-8)
+          set IMAGE_NAME=course-management-frontend
+          set IMAGE_TAG=%GITHUB_SHA:~0,8%
           
-          # 将变量写入 GITHUB_ENV 文件，供后续步骤使用
-          echo "IMAGE_NAME_WITH_TAG=$IMAGE_NAME:$IMAGE_TAG" >> $GITHUB_ENV
-          echo "IMAGE_NAME_LATEST=$IMAGE_NAME:latest" >> $GITHUB_ENV
-          echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
-          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+          echo IMAGE_NAME_WITH_TAG=%IMAGE_NAME%:%IMAGE_TAG%>> %GITHUB_ENV%
+          echo IMAGE_NAME_LATEST=%IMAGE_NAME%:latest>> %GITHUB_ENV%
+          echo IMAGE_NAME=%IMAGE_NAME%>> %GITHUB_ENV%
+          echo IMAGE_TAG=%IMAGE_TAG%>> %GITHUB_ENV%
 
       # 步骤 7: 在本地构建 Docker 镜像
       - name: Build Docker Image Locally
-        shell: bash
+        shell: cmd
+        working-directory: ./CM
         run: |
-          echo "Building image: ${{ env.IMAGE_NAME_LATEST }} and ${{ env.IMAGE_NAME_WITH_TAG }}"
-          # 同时打上 latest 标签和唯一的 commit 标签
-          docker build -t ${{ env.IMAGE_NAME_LATEST }} -t ${{ env.IMAGE_NAME_WITH_TAG }} -f Dockerfile .
+          echo Building image: %IMAGE_NAME_LATEST% and %IMAGE_NAME_WITH_TAG%
+          docker build -t %IMAGE_NAME_LATEST% -t %IMAGE_NAME_WITH_TAG% -f Dockerfile .
           
-          # 验证镜像是否构建成功
-          docker images | grep ${{ env.IMAGE_NAME }}
+          echo Verifying built images:
+          docker images | findstr %IMAGE_NAME%
 
       # 步骤 8: 验证 kubectl 连接
       - name: Verify kubectl Connection
-        shell: bash
+        shell: cmd
         run: |
-          echo "Checking kubectl connection..."
+          echo Checking kubectl connection...
           kubectl cluster-info
           kubectl get nodes
 
       # 步骤 9: 部署到本地 Kubernetes
       - name: Deploy to Local Kubernetes
-        shell: bash
+        shell: cmd
+        working-directory: ./CM
         run: |
-          # 假设您的 K8s 配置文件都在 'k8s/' 目录下
-          echo "Applying all K8s manifests from k8s/ directory..."
+          echo Applying all K8s manifests from k8s/ directory...
           kubectl apply -f k8s/
           
-          echo "Waiting for resources to be ready..."
-          sleep 5
+          echo Waiting for resources to be ready...
+          timeout /t 5 /nobreak >nul
           
-          # 检查 deployment 是否存在
-          if kubectl get deployment course-management-frontend > /dev/null 2>&1; then
-            echo "Deployment exists, updating..."
+          kubectl get deployment course-management-frontend >nul 2>&1
+          if %errorlevel% equ 0 (
+            echo Deployment exists, updating...
             
-            echo "Patching Deployment to use local image pull policy..."
-            # 使用 kubectl patch 动态修改 imagePullPolicy
-            kubectl patch deployment/course-management-frontend -p '{
-              "spec": {
-                "template": {
-                  "spec": {
-                    "containers": [
-                      {
-                        "name": "frontend",
-                        "imagePullPolicy": "IfNotPresent"
-                      }
-                    ]
-                  }
-                }
-              }
-            }'
-
-            echo "Updating Deployment with new image: ${{ env.IMAGE_NAME_WITH_TAG }}"
-            # 使用 kubectl set image 更新镜像标签
-            kubectl set image deployment/course-management-frontend frontend=${{ env.IMAGE_NAME_WITH_TAG }}
+            echo Patching Deployment to use local image pull policy...
+            kubectl patch deployment/course-management-frontend -p "{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"frontend\",\"imagePullPolicy\":\"IfNotPresent\"}]}}}}"
             
-            echo "Waiting for deployment rollout to finish..."
-            # 检查部署的滚动更新状态，超时时间设为3分钟
+            echo Updating Deployment with new image: %IMAGE_NAME_WITH_TAG%
+            kubectl set image deployment/course-management-frontend frontend=%IMAGE_NAME_WITH_TAG%
+            
+            echo Waiting for deployment rollout to finish...
             kubectl rollout status deployment/course-management-frontend --timeout=180s
             
-            # 显示部署状态
             kubectl get pods -l app=course-management-frontend
-          else
-            echo "Deployment not found. Please check your k8s manifests."
+          ) else (
+            echo Deployment not found. Please check your k8s manifests.
             kubectl get deployments
-            exit 1
-          fi
+            exit /b 1
+          )
 
       # 步骤 10: 验证部署结果
       - name: Verify Deployment
-        shell: bash
+        shell: cmd
         run: |
-          echo "=== Deployment Summary ==="
+          echo === Deployment Summary ===
           kubectl get deployment course-management-frontend -o wide
-          echo ""
-          echo "=== Pod Status ==="
+          echo.
+          echo === Pod Status ===
           kubectl get pods -l app=course-management-frontend -o wide
-          echo ""
-          echo "=== Service Status ==="
-          kubectl get svc -l app=course-management-frontend || echo "No services found with label app=course-management-frontend"
+          echo.
+          echo === Service Status ===
+          kubectl get svc -l app=course-management-frontend 2>nul || echo No services found with label app=course-management-frontend
           
-          # 检查 Pod 是否都在运行状态
-          READY_PODS=$(kubectl get pods -l app=course-management-frontend --no-headers | grep "Running" | wc -l)
-          TOTAL_PODS=$(kubectl get pods -l app=course-management-frontend --no-headers | wc -l)
-          
-          echo "Ready Pods: $READY_PODS/$TOTAL_PODS"
-          
-          if [ "$READY_PODS" -eq "$TOTAL_PODS" ] && [ "$TOTAL_PODS" -gt "0" ]; then
-            echo "✅ Deployment successful! All pods are running."
-          else
-            echo "❌ Some pods are not running. Please check the logs."
-            kubectl describe pods -l app=course-management-frontend
-            exit 1
-          fi
+          echo Deployment completed successfully!
