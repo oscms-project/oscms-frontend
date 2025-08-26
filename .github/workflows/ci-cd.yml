@@ -16,61 +16,46 @@ jobs:
         shell: cmd
 
     steps:
-      # 步骤 1: 设置 SSH 环境 (用于稳定的 GitHub 连接)
+      # --- 新增步骤 1: 强制清理工作目录 ---
+      - name: Clean Workspace
+        # 这个步骤会在克隆代码之前，确保工作目录是空的
+        # 它会删除当前目录下的所有文件和文件夹
+        run: |
+          # PowerShell 语法，更强大和可靠
+          Get-ChildItem -Path . -Recurse | Remove-Item -Force -Recurse
+          Write-Host "Workspace cleaned successfully."
+        shell: powershell # 强制使用 PowerShell，它的 Remove-Item 更可靠
+
+      # --- 步骤 2: 设置 SSH 环境 (保持不变) ---
       - name: Setup SSH Agent
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      # 步骤 2: 添加 GitHub 到 known_hosts (Windows 兼容方式)
+      # 步骤 3: 添加 GitHub 到 known_hosts (保持不变)
       - name: Add GitHub to known_hosts
         shell: powershell
         run: |
           $sshDir = "$env:USERPROFILE\.ssh"
-          if (-not (Test-Path $sshDir)) {
-            New-Item -Path $sshDir -ItemType Directory -Force
-          }
-          
-          $knownHostsFile = "$sshDir\known_hosts"
-          ssh-keyscan github.com >> $knownHostsFile
+          if (-not (Test-Path $sshDir)) { New-Item -Path $sshDir -ItemType Directory -Force }
+          ssh-keyscan github.com | Out-File -FilePath "$sshDir\known_hosts" -Append
           Write-Host "Successfully added github.com to known_hosts"
 
-       # 步骤 3: 手动克隆仓库 (使用 SSH)
+      # 步骤 4: 手动克隆仓库 (保持不变)
       - name: Clone Repository via SSH
         shell: cmd
         run: |
-          echo Cleaning up workspace...
-          
-          rem 检查工作目录是否已存在 .git 目录，如果存在则删除整个目录内容
-          rem 'dir /b .git >nul 2>nul' 检查 .git 是否存在
-          rem 'if exist' 检查文件或目录
-          if exist .git (
-            echo Workspace exists, cleaning up...
-            
-            rem 强制、安静地删除当前目录下的所有文件和子目录
-            rem rd /s /q .  这命令太危险，因为它会尝试删除工作目录本身
-            rem 一个更安全的方式是删除所有内容，但不删除工作目录
-            for /d %%i in (.*) do ( if "%%i" neq "." if "%%i" neq ".." rd /s /q "%%i" )
-            for %%i in (.*) do del /f /q "%%i"
-            for /d %%i in (*) do ( rd /s /q "%%i" )
-            for %%i in (*) do del /f /q "%%i"
-
-            echo Workspace cleaned.
-          )
-          
           echo Cloning repository via SSH...
           git clone git@github.com:${{ github.repository }}.git .
           if %errorlevel% neq 0 (
             echo Git clone failed!
             exit /b 1
           )
-          
           git checkout ${{ github.sha }}
           if %errorlevel% neq 0 (
             echo Git checkout failed!
             exit /b 1
           )
-
           echo Repository cloned successfully
 
       # 步骤 4: 设置 Node.js 环境
