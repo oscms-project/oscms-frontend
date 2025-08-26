@@ -35,13 +35,42 @@ jobs:
           ssh-keyscan github.com >> $knownHostsFile
           Write-Host "Successfully added github.com to known_hosts"
 
-      # 步骤 3: 手动克隆仓库 (使用 SSH)
+       # 步骤 3: 手动克隆仓库 (使用 SSH)
       - name: Clone Repository via SSH
         shell: cmd
         run: |
+          echo Cleaning up workspace...
+          
+          rem 检查工作目录是否已存在 .git 目录，如果存在则删除整个目录内容
+          rem 'dir /b .git >nul 2>nul' 检查 .git 是否存在
+          rem 'if exist' 检查文件或目录
+          if exist .git (
+            echo Workspace exists, cleaning up...
+            
+            rem 强制、安静地删除当前目录下的所有文件和子目录
+            rem rd /s /q .  这命令太危险，因为它会尝试删除工作目录本身
+            rem 一个更安全的方式是删除所有内容，但不删除工作目录
+            for /d %%i in (.*) do ( if "%%i" neq "." if "%%i" neq ".." rd /s /q "%%i" )
+            for %%i in (.*) do del /f /q "%%i"
+            for /d %%i in (*) do ( rd /s /q "%%i" )
+            for %%i in (*) do del /f /q "%%i"
+
+            echo Workspace cleaned.
+          )
+          
           echo Cloning repository via SSH...
           git clone git@github.com:${{ github.repository }}.git .
+          if %errorlevel% neq 0 (
+            echo Git clone failed!
+            exit /b 1
+          )
+          
           git checkout ${{ github.sha }}
+          if %errorlevel% neq 0 (
+            echo Git checkout failed!
+            exit /b 1
+          )
+
           echo Repository cloned successfully
 
       # 步骤 4: 设置 Node.js 环境
