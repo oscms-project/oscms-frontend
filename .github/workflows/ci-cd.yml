@@ -12,11 +12,24 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+       # --- 新增步骤：准备 SSH 环境 ---
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          ssh-known-hosts: 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl'
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          
+      - name: Add GitHub.com to known_hosts
+        run: ssh-keyscan github.com >> ~/.ssh/known_hosts
+        shell: bash
+
+      # --- 替换 checkout 步骤 ---
+      # 我们不再使用 actions/checkout@v4，而是手动执行 git clone
+      - name: Manually Clone Repository via SSH
+        run: |
+          # ${{ github.repository }} 的值是 "chengchengcheng521/oscms-frontend"
+          git clone git@github.com:${{ github.repository }}.git .
+          # git checkout ${{ github.sha }} # 检出触发工作流的具体 commit
+        shell: bash
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
