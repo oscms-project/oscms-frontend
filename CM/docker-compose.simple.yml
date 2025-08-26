@@ -1,0 +1,10 @@
+# 简化版 Docker Compose - 仅用于前端容器化
+version: '3.8'
+
+services:
+  frontend:
+    build: .
+    container_name: course-management-frontend
+    ports:
+      - "3000:80"
+    restart: unless-stopped

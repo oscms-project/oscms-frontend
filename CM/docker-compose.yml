@@ -1,0 +1,34 @@
+# 生产环境 Docker Compose 配置
+version: '3.8'
+
+services:
+  frontend:
+    image: ${DOCKER_IMAGE_NAME:-course-management-frontend:latest}
+    container_name: course-management-frontend-prod
+    ports:
+      - "3000:80"
+    environment:
+      - NODE_ENV=production
+      - DEPLOY_ENV=${DEPLOY_ENV:-prod}
+    volumes:
+      - nginx_logs:/var/log/nginx
+    restart: unless-stopped
+    networks:
+      - course-management-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend-prod.rule=Host(`your-domain.com`)"
+      - "traefik.http.services.frontend-prod.loadbalancer.server.port=80"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  nginx_logs:
+
+networks:
+  course-management-network:
+    driver: bridge

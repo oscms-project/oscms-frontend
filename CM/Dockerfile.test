@@ -1,0 +1,16 @@
+# 测试专用 Dockerfile
+FROM node:18-alpine
+
+WORKDIR /app
+
+# 复制package文件
+COPY package*.json ./
+
+# 安装所有依赖
+RUN npm ci
+
+# 复制源代码和测试文件
+COPY . .
+
+# 运行测试
+CMD ["npm", "run", "test"]

@@ -2,7 +2,7 @@ import axios from 'axios'
 import { useUserStore } from '@/stores/user'
 
 const instance = axios.create({
-  baseURL: '/', // 根据 openapi servers 配置
+  baseURL: 'localhost:8080', // 根据 openapi servers 配置
   timeout: 10000
 })
 //请求拦截器

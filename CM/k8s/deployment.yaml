@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: course-management-frontend
+  namespace: default
+  labels:
+    app: course-management-frontend
+    version: v1
+    component: frontend
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: course-management-frontend
+  template:
+    metadata:
+      labels:
+        app: course-management-frontend
+        version: v1
+        component: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: course-management-frontend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: DEPLOY_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: frontend-config
+              key: deploy-env
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+          readOnly: true
+        - name: cache-volume
+          mountPath: /var/cache/nginx
+        - name: run-volume
+          mountPath: /var/run
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: nginx-config
+          items:
+          - key: nginx.conf
+            path: nginx.conf
+      - name: cache-volume
+        emptyDir: {}
+      - name: run-volume
+        emptyDir: {}
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        fsGroup: 101

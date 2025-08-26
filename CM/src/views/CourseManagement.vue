@@ -68,6 +68,10 @@
         <div class="panel-header">
           <h2 class="panel-title">班级成员管理</h2>
           <div class="panel-actions">
+             <button class="btn btn-sm btn-outline" @click="openImportTAsModal">
+    <i class="i-lucide-users-cog mr-1"></i>
+    导入助教信息
+  </button>
             <button class="btn btn-sm btn-outline" @click="openImportStudentsModal">
               <i class="i-lucide-upload mr-1"></i>
               导入学生信息
@@ -569,6 +573,55 @@
       </div>
     </div>
 
+    <!-- Import TAs Modal -->
+<!-- Import TAs Modal -->
+<div v-if="showImportTAsModal" class="modal-overlay" @click="closeImportTAsModal">
+  <div class="modal-content import-students-modal" @click.stop>
+    <div class="modal-header">
+      <h3><i class="i-lucide-users-cog mr-2"></i>导入助教信息</h3>
+      <button class="btn-close" @click="closeImportTAsModal" title="关闭">
+        <i class="i-lucide-x"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div v-if="!selectedClass">
+        <p class="text-danger">请先在页面上方选择一个班级后再导入助教。</p>
+      </div>
+      <div v-else>
+        <p class="mb-2">将助教导入到班级: <strong>{{ selectedClass.name }}</strong></p>
+        
+        <div class="import-section">
+          <label for="manualTAInput" class="form-label">请输入助教ID</label>
+          <textarea 
+            id="manualTAInput" 
+            v-model="manualTAIdsInput" 
+            rows="8" 
+            class="form-control"
+            placeholder="请输入助教ID，每行一个，或用逗号、空格分隔"></textarea>
+          <p class="mt-2 text-muted">多个ID可用换行、逗号或空格分隔</p>
+        </div>
+
+        <div v-if="importTAError" class="alert alert-danger mt-3">
+          {{ importTAError }}
+        </div>
+        <div v-if="importTASuccessMessage" class="alert alert-success mt-3">
+          {{ importTASuccessMessage }}
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-default" @click="closeImportTAsModal">取消</button>
+      <button 
+        class="btn btn-primary" 
+        @click="confirmImportTAs" 
+        :disabled="isLoadingTAImport || !selectedClass || !manualTAIdsInput.trim()">
+        <i v-if="isLoadingTAImport" class="i-lucide-loader-2 animate-spin mr-1"></i>
+        {{ isLoadingTAImport ? '导入中...' : '确认导入' }}
+      </button>
+    </div>
+  </div>
+</div>
+
   </div>
 </template>
 
@@ -579,6 +632,7 @@ import { removeStudentFromClass } from '@/api/courseManagement';
 import { ArrowLeftIcon } from 'lucide-vue-next'
 import { getCourseClasses, getCourseDetail } from '@/api/course'
 import { useCourseStore } from '@/stores/course' // Import the course store
+import { importClassTAs } from '@/api/class';
 import {
   getCourseStats,
   getClassStudents,
@@ -596,7 +650,14 @@ import {
 
 const router = useRouter()
 const route = useRoute()
-
+const showImportTAsModal = ref(false); // 保留
+// const importTAMethod = ref('file'); // 删除此行
+// const selectedTAFile = ref(null); // 删除此行
+// const uploadedTAFileContent = ref(''); // 删除此行
+const manualTAIdsInput = ref(''); // 保留
+const isLoadingTAImport = ref(false); // 保留
+const importTAError = ref(''); // 保留
+const importTASuccessMessage = ref(''); // 保留
 // Initialize the course store
 const courseStore = useCourseStore()
 
@@ -609,7 +670,64 @@ const effectiveCourseId = computed(() => {
   }
   return courseStore.currentCourseId; // Fallback to store's currentCourseId
 });
+const openImportTAsModal = () => {
+  showImportTAsModal.value = true;
+  // importTAMethod.value = 'file'; // 删除此行
+  // selectedTAFile.value = null; // 删除此行
+  // uploadedTAFileContent.value = ''; // 删除此行
+  manualTAIdsInput.value = ''; // 保留
+  importTAError.value = '';
+  importTASuccessMessage.value = '';
+  isLoadingTAImport.value = false;
+};
+const closeImportTAsModal = () => {
+  showImportTAsModal.value = false;
+};
+const confirmImportTAs = async () => {
+  if (!selectedClass.value || !selectedClass.value.id) {
+    importTAError.value = '请先选择一个班级进行导入操作。';
+    return;
+  }
 
+  isLoadingTAImport.value = true;
+  importTAError.value = '';
+  importTASuccessMessage.value = '';
+  let taIds = [];
+
+  try {
+    if (!manualTAIdsInput.value.trim()) {
+      importTAError.value = '请输入助教ID。';
+      isLoadingTAImport.value = false;
+      return;
+    }
+    taIds = manualTAIdsInput.value.split(/[\r\n,;\s]+/).map(id => id.trim()).filter(id => id);
+
+    if (taIds.length === 0) {
+      importTAError.value = '未能解析到有效的助教ID，请检查输入内容。';
+      isLoadingTAImport.value = false;
+      return;
+    }
+
+    // 修改这里的调用方式，使用与导入学生相同的参数格式
+    await importClassTAs(selectedClass.value.id, { taIds }); // 将taIds包装在一个对象中
+    
+    importTASuccessMessage.value = `成功导入 ${taIds.length} 名助教！`;
+    
+    // 导入成功后2秒关闭弹窗
+    setTimeout(() => {
+      if (importTASuccessMessage.value && showImportTAsModal.value) { 
+        closeImportTAsModal();
+      }
+    }, 2000);
+
+  } catch (error) {
+    console.error('Error importing TAs:', error);
+    const apiErrorMessage = error.response?.data?.message || error.message || '未知错误';
+    importTAError.value = `导入失败: ${apiErrorMessage}`;
+  } finally {
+    isLoadingTAImport.value = false;
+  }
+};
 // Course information - courseName will now be a computed property from the store
 const courseName = computed(() => courseStore.currentCourseName)
 const courseStudents = ref('')

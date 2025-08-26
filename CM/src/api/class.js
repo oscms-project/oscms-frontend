@@ -43,3 +43,8 @@ export function getStudentClasses(studentId) {
 export function enrollClassById(classId) {
   return axios.post(`/classes/${classId}/enroll`);
 }
+
+// 批量添加助教到班级
+export function importClassTAs(classId, data) {
+  return axios.post(`/classes/${classId}/tas`, data)
+}

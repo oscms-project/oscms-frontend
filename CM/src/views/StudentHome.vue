@@ -35,7 +35,7 @@
           </div>
           <div class="course-info">
             <h4>{{ course.title }}</h4>
-            <p class="teacher">{{ course.teacher }}</p>
+            
           </div>
         </div>
       </div>
