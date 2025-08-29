@@ -94,6 +94,8 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+// slideInterval 用于后续扩展轮播图自动切换等功能，先定义为 null，防止 onUnmounted 报错
+let slideInterval = null;
 import { useUserStore } from '@/stores/user';
 import { useCourseStore } from '@/stores/course';
 import { useRouter } from 'vue-router';

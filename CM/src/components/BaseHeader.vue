@@ -20,10 +20,11 @@ const props = defineProps({
   user: Object
 });
 
-const emit = defineEmits(['avatarClick']);
+// 正确声明 emits: ['avatar-click']
+const emit = defineEmits(['avatar-click']);
 
 const handleAvatarClick = () => {
-  console.log("BaseHeader.vue: Avatar clicked, emitting avatarClick event."); // 新增日志
+  console.log("BaseHeader.vue: Avatar clicked, emitting avatar-click event.");
   emit('avatar-click');
 };
 </script>

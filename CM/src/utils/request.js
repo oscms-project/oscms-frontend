@@ -37,7 +37,7 @@ instance.interceptors.response.use(
       userStore.logout() // 清除用户信息和token
       
       // 跳转到登录页
-      window.location.href = '/login'
+      window.location.href = '/'
     }
     return Promise.reject(error)
   }
