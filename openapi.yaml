@@ -1,1520 +1,5546 @@
 openapi: 3.0.3
 info:
-  title: OCSMS API
+  title: OSCMS Backend API
   description: |
-    本文档基于 OpenAPI 3.0 规范，定义了软课程管理平台（在线课程管理、教学资料、练习、历史记录、用户管理等）的一组 RESTful 接口。
-    平台支持教师、助教、学生三类角色，所有接口返回均使用统一响应格式 `ApiResponse<T>`：
-      ```java
-      public class ApiResponse<T> {
-        private int code;       // 业务状态码，与 HTTP 状态码不同
-        private String message; // 说明信息
-        private T data;         // 返回的数据主体
-      }
-      ```
-    意味着所有返回都为以下格式：
-      ```json
-      {
-        "code": ..., (e.g. 400, 1001)
-        "message": ..., (e.g. "success")
-        "data": {
-          "xxx": ...
-          "xxx": ...,
-          ...
-        }
-      }
-      ```
-    HTTP状态码，400表示参数错误，404表示资源不存在（如用户ID不存在）
-    业务状态码，待更新
-  version: 3.0.0
+    在线课程管理系统（Online Student Course Management System）后端API接口文档
+    
+    ## 功能模块
+    - 用户认证与授权
+    - 用户管理
+    - 课程管理
+    - 班级管理
+    - 作业管理
+    - 题目管理
+    - 提交与批改
+    - 资料管理
+    - 学习记录
+    
+    ## 认证说明
+    除了注册和登录接口外，所有API都需要JWT Token认证。
+    请在请求头中添加：`Authorization: Bearer <your-jwt-token>`
+    
+    ## 通用响应格式
+    所有API响应都采用统一格式：
+    ```json
+    {
+      "code": 200,
+      "message": "success",
+      "data": {}
+    }
+    ```
+    
+  version: 1.0.1
+  contact:
+    name: OSCMS Development Team
+    email: support@oscms.com
+  license:
+    name: MIT License
+
 servers:
   - url: http://localhost:8080
-    description: 开发环境
+    description: 本地开发环境
+  - url: https://api.oscms.com
+    description: 生产环境
 
 tags:
   - name: Auth
-    description: 用户认证与授权
+    description: 用户认证相关接口
   - name: Users
-    description: 用户管理
+    description: 用户管理接口
   - name: Courses
-    description: 课程管理
+    description: 课程管理接口
   - name: Classes
-    description: 班级管理
-  - name: Materials
-    description: 教学资料管理
-  - name: Questions
-    description: 练习题目
+    description: 班级管理接口
   - name: Assignments
-    description: 在线练习
+    description: 作业管理接口
+  - name: Questions
+    description: 题目管理接口
   - name: Submissions
-    description: 练习提交与批改
+    description: 提交管理接口
+  - name: Materials
+    description: 资料管理接口
   - name: Records
-    description: 历史记录
+    description: 学习记录接口
 
 paths:
+  # ==================== 认证相关接口 ====================
   /auth/register:
     post:
-      tags: [Auth]
+      tags:
+        - Auth
       summary: 用户注册
+      description: |
+        接收用户注册信息并创建新用户账户
+        
+        ## 角色说明
+        - `teacher`: 教师角色
+        - `ta`: 助教角色  
+        - `student`: 学生角色
+        
+        ## 注意事项
+        - userId通常为学号或工号
+        - 密码长度需要6-100个字符
+        - 邮箱为可选字段
+      operationId: registerUser
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/RegisterRequest'
+            examples:
+              student_example:
+                summary: 学生注册示例
+                value:
+                  userId: "2021001001"
+                  username: "张三"
+                  password: "password123"
+                  role: "student"
+                  email: "zhangsan@example.com"
+              teacher_example:
+                summary: 教师注册示例
+                value:
+                  userId: "T001"
+                  username: "李老师"
+                  password: "teacher123"
+                  role: "teacher"
+                  email: "teacher.li@example.com"
       responses:
         '201':
           description: 注册成功
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseUser'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserResponse'
+              examples:
+                success:
+                  summary: 注册成功示例
+                  value:
+                    code: 201
+                    message: "用户注册成功"
+                    data:
+                      id: "2021001001"
+                      username: "张三"
+                      role: "ROLE_STUDENT"
+                      email: "zhangsan@example.com"
+                      createdAt: "2024-01-15T10:30:00"
         '400':
           description: 参数错误
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                validation_error:
+                  summary: 参数验证失败
+                  value:
+                    code: 400
+                    message: "用户ID不能为空"
+                    data: null
+                duplicate_user:
+                  summary: 用户已存在
+                  value:
+                    code: 400
+                    message: "用户ID已存在"
+                    data: null
 
   /auth/login:
     post:
-      tags: [Auth]
+      tags:
+        - Auth
       summary: 用户登录
+      description: |
+        用户登录认证接口，支持多角色登录
+        
+        ## 登录流程
+        1. 验证用户ID和密码
+        2. 验证用户是否拥有指定角色
+        3. 生成JWT Token
+        
+        ## 角色映射
+        - API角色 `student` -> 内部角色 `ROLE_STUDENT`
+        - API角色 `teacher` -> 内部角色 `ROLE_TEACHER`
+        - API角色 `ta` -> 内部角色 `ROLE_TA`
+        
+        ## Token使用
+        登录成功后，请在后续请求的Authorization头中携带返回的token：
+        `Authorization: Bearer <token>`
+      operationId: loginUser
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/LoginRequest'
+            examples:
+              student_login:
+                summary: 学生登录示例
+                value:
+                  userId: "2021001001"
+                  password: "password123"
+                  role: "student"
+              teacher_login:
+                summary: 教师登录示例
+                value:
+                  userId: "T001"
+                  password: "teacher123"
+                  role: "teacher"
       responses:
         '200':
-          description: 登录成功，返回 JWT Token
+          description: 登录成功
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseToken'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TokenResponse'
+              examples:
+                success:
+                  summary: 登录成功示例
+                  value:
+                    code: 200
+                    message: "登录成功"
+                    data:
+                      token: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyMDIxMDAxMDAxIiwiaWF0IjoxNjQyMjQzMjAwLCJleHAiOjE2NDIzMjk2MDB9.example"
         '401':
           description: 认证失败
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                invalid_credentials:
+                  summary: 用户名或密码错误
+                  value:
+                    code: 401
+                    message: "用户ID或密码错误"
+                    data: null
+                invalid_role:
+                  summary: 角色验证失败
+                  value:
+                    code: 401
+                    message: "用户不拥有该登录角色: student"
+                    data: null
+                account_disabled:
+                  summary: 账户被禁用
+                  value:
+                    code: 401
+                    message: "账户已被禁用"
+                    data: null
 
+  # ==================== 用户管理接口 ====================
   /users/{userId}:
     get:
-      tags: [Users]
+      tags:
+        - Users
       summary: 获取用户信息
+      description: |
+        根据用户ID获取用户的详细信息
+        
+        ## 权限要求
+        - 用户只能查看自己的信息（userId必须与当前登录用户一致）
+        
+        ## 注意事项
+        - 需要JWT Token认证
+        - 返回的用户信息不包含密码等敏感信息
+      operationId: getUserById
       parameters:
-        - $ref: '#/components/parameters/UserId'
+        - name: userId
+          in: path
+          required: true
+          description: 要获取信息的用户ID
+          schema:
+            type: string
+            example: "2021001001"
       responses:
         '200':
-          description: 用户信息
+          description: 成功获取用户信息
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseUser'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserResponse'
+              examples:
+                success:
+                  summary: 获取用户信息成功
+                  value:
+                    code: 200
+                    message: "用户信息获取成功"
+                    data:
+                      id: "2021001001"
+                      username: "张三"
+                      role: "ROLE_STUDENT"
+                      email: "zhangsan@example.com"
+                      createdAt: "2024-01-15T10:30:00"
         '404':
-          description: 未找到用户
+          description: 用户未找到
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                not_found:
+                  summary: 用户不存在
+                  value:
+                    code: 404
+                    message: "用户未找到"
+                    data: null
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                forbidden:
+                  summary: 无权限访问
+                  value:
+                    code: 403
+                    message: "无权限查看该用户信息"
+                    data: null
+      security:
+        - BearerAuth: []
+
     put:
-      tags: [Users]
-      summary: 更新个人信息
+      tags:
+        - Users
+      summary: 更新用户个人信息
+      description: |
+        更新指定用户的邮箱和/或密码
+        
+        ## 权限要求
+        - 用户只能更新自己的信息（userId必须与当前登录用户一致）
+        
+        ## 可更新字段
+        - email: 邮箱地址（可选）
+        - password: 新密码（可选）
+        
+        ## 注意事项
+        - 所有字段都是可选的，只更新提供的字段
+        - 密码长度需要6-100个字符
+        - 邮箱需要符合邮箱格式
+      operationId: updateUserProfile
       parameters:
-        - $ref: '#/components/parameters/UserId'
+        - name: userId
+          in: path
+          required: true
+          description: 要更新信息的用户ID
+          schema:
+            type: string
+            example: "2021001001"
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/UserUpdate'
+            examples:
+              update_email:
+                summary: 更新邮箱
+                value:
+                  email: "newemail@example.com"
+              update_password:
+                summary: 更新密码
+                value:
+                  password: "newpassword123"
+              update_both:
+                summary: 同时更新邮箱和密码
+                value:
+                  email: "newemail@example.com"
+                  password: "newpassword123"
       responses:
         '200':
-          description: 更新成功
+          description: 用户信息更新成功
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseUser'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserResponse'
+              examples:
+                success:
+                  summary: 更新成功
+                  value:
+                    code: 200
+                    message: "用户信息更新成功"
+                    data:
+                      id: "2021001001"
+                      username: "张三"
+                      role: "ROLE_STUDENT"
+                      email: "newemail@example.com"
+                      createdAt: "2024-01-15T10:30:00"
         '400':
-          description: 参数错误
+          description: 参数错误或无效的更新请求
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                invalid_email:
+                  summary: 邮箱格式错误
+                  value:
+                    code: 400
+                    message: "邮箱格式不正确"
+                    data: null
+                invalid_password:
+                  summary: 密码长度不符合要求
+                  value:
+                    code: 400
+                    message: "新密码长度必须在 6 到 100 个字符之间"
+                    data: null
+        '404':
+          description: 用户未找到
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - BearerAuth: []
+
   /users/{userId}/courses:
     get:
-      tags: [Users]
-      summary: 获取指定学生参与的所有课程
+      tags:
+        - Users
+      summary: 获取学生参与的所有课程
+      description: |
+        获取指定学生参与的所有课程列表
+        
+        ## 权限要求
+        - 用户只能查看自己参与的课程（userId必须与当前登录用户一致）
+        
+        ## 返回信息
+        - 课程基本信息（ID、名称、代码等）
+        - 教师信息
+        - 课程状态
+      operationId: getStudentCourses
       parameters:
-        - $ref: '#/components/parameters/UserId'
+        - name: userId
+          in: path
+          required: true
+          description: 学生的用户ID
+          schema:
+            type: string
+            example: "2021001001"
       responses:
         '200':
-          description: 学生的课程列表
+          description: 成功获取学生课程列表
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseCourseList'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/CourseDto'
+              examples:
+                success:
+                  summary: 获取课程列表成功
+                  value:
+                    code: 200
+                    message: "成功获取学生课程列表"
+                    data:
+                      - id: 1
+                        name: "Java程序设计"
+                        code: "CS101"
+                        outline: "Java基础语法和面向对象编程"
+                        objectives: "掌握Java编程基础"
+                        assessment: "期中考试30% + 期末考试50% + 平时作业20%"
+                        teacherId: "T001"
+                        teacherName: "李老师"
+                        completed: false
+                      - id: 2
+                        name: "数据结构与算法"
+                        code: "CS102"
+                        outline: "数据结构基础和常用算法"
+                        objectives: "掌握基本数据结构和算法"
+                        assessment: "期中考试40% + 期末考试60%"
+                        teacherId: "T002"
+                        teacherName: "王老师"
+                        completed: false
+        '404':
+          description: 用户未找到或无课程数据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - BearerAuth: []
 
   /users/{userId}/courses/{courseId}/class:
     get:
-      tags: [Users]
-      summary: 获取指定学生在某课程中的班级信息
+      tags:
+        - Users
+      summary: 获取学生在某课程中的班级信息
+      description: |
+        查询学生在特定课程中具体加入了哪个班级
+        
+        ## 权限要求
+        - 用户只能查看自己的班级信息（userId必须与当前登录用户一致）
+        
+        ## 使用场景
+        - 学生查看自己在某个课程中的班级
+        - 确认班级归属关系
+      operationId: getStudentClassInCourse
       parameters:
-        - $ref: '#/components/parameters/UserId'
-        - $ref: '#/components/parameters/CourseId'
+        - name: userId
+          in: path
+          required: true
+          description: 学生的用户ID
+          schema:
+            type: string
+            example: "2021001001"
+        - name: courseId
+          in: path
+          required: true
+          description: 课程ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
       responses:
         '200':
-          description: 学生所在班级
+          description: 成功获取班级信息
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseClass'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ClassDto'
+              examples:
+                success:
+                  summary: 获取班级信息成功
+                  value:
+                    code: 200
+                    message: "成功获取学生班级信息"
+                    data:
+                      id: 1
+                      name: "Java程序设计1班"
+                      code: "CS101-01"
+                      courseId: 1
         '404':
-          description: 未加入此课程
+          description: 未找到相关记录（用户、课程、班级或注册关系）
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                not_found:
+                  summary: 未找到班级信息
+                  value:
+                    code: 404
+                    message: "未找到该学生在此课程中的班级信息"
+                    data: null
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - BearerAuth: []
 
+  /users/{studentId}/favorites:
+    get:
+      tags:
+        - Users
+      summary: 获取学生收藏的题目
+      description: |
+        获取指定学生收藏的所有题目列表
+        
+        ## 权限要求
+        - 用户只能查看自己收藏的题目（studentId必须与当前登录用户一致）
+        
+        ## 功能说明
+        - 返回学生收藏的所有题目
+        - 包含题目的详细信息
+      operationId: listFavorites
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          description: 学生用户ID
+          schema:
+            type: string
+            example: "2021001001"
+      responses:
+        '200':
+          description: 成功获取收藏题目列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/QuestionDto'
+              examples:
+                success:
+                  summary: 获取收藏题目成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      - id: 1
+                        title: "Java基础语法题"
+                        content: "请写出Java中的基本数据类型"
+                        type: "选择题"
+                        difficulty: "简单"
+                      - id: 2
+                        title: "算法题"
+                        content: "实现快速排序算法"
+                        type: "编程题"
+                        difficulty: "中等"
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - BearerAuth: []
+
+  /users/{studentId}/classes/info:
+    get:
+      tags:
+        - Users
+      summary: 获取学生加入的所有班级信息
+      description: |
+        获取指定学生加入的所有班级的详细信息，包括班级名称、课程信息等
+        
+        ## 权限要求
+        - 学生只能查看自己的班级信息
+        - 教师和管理员可以查看任意学生的班级信息
+        
+        ## 返回信息
+        - 班级ID和名称
+        - 所属课程ID和名称
+        - 完整的班级-课程关联信息
+      operationId: getStudentEnrolledClassInfo
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          description: 学生用户ID
+          schema:
+            type: string
+            example: "2021001001"
+      responses:
+        '200':
+          description: 成功获取班级信息列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/StudentClassInfoDto'
+              examples:
+                success:
+                  summary: 获取班级信息成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      - classId: 1
+                        className: "Java程序设计1班"
+                        courseId: 1
+                        courseName: "Java程序设计"
+                      - classId: 2
+                        className: "数据结构A班"
+                        courseId: 2
+                        courseName: "数据结构与算法"
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                forbidden:
+                  summary: 无权限访问
+                  value:
+                    code: 403
+                    message: "您没有权限查看该学生的班级信息"
+                    data: null
+        '401':
+          description: 用户未认证
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                unauthorized:
+                  summary: 未认证
+                  value:
+                    code: 401
+                    message: "用户未认证"
+                    data: null
+      security:
+        - BearerAuth: []
+
+  # ==================== 课程管理接口 ====================
   /courses:
     get:
-      tags: [Courses]
-      summary: 列出指定教师的所有课程
+      tags:
+        - Courses
+      summary: 获取教师的所有课程
+      description: |
+        列出指定教师的所有课程
+        
+        ## 权限要求
+        - 只有教师本人可以查看自己创建的课程
+        - teacherId必须与当前登录用户一致
+        
+        ## 使用场景
+        - 教师查看自己创建的所有课程
+        - 课程管理页面的课程列表
+      operationId: listCoursesByTeacher
       parameters:
-        - in: query
-          name: teacherId
+        - name: teacherId
+          in: query
+          required: true
+          description: 教师ID
           schema:
             type: string
-          description: 指定教师ID
+            example: "T001"
       responses:
         '200':
-          description: 课程列表
+          description: 成功获取课程列表
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseCourseList'
-        '400':
-          description: 参数错误
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/CourseDto'
+              examples:
+                success:
+                  summary: 获取课程列表成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      - id: 1
+                        name: "Java程序设计"
+                        code: "CS101"
+                        outline: "Java基础语法和面向对象编程"
+                        objectives: "掌握Java编程基础"
+                        assessment: "期中考试30% + 期末考试50% + 平时作业20%"
+                        teacherId: "T001"
+                        teacherName: "李老师"
+                        completed: false
+                        chapters:
+                          - title: "第一章 Java基础"
+                            order: 1
+                      - id: 2
+                        name: "数据结构与算法"
+                        code: "CS102"
+                        outline: "数据结构基础和常用算法"
+                        objectives: "掌握基本数据结构和算法"
+                        assessment: "期中考试40% + 期末考试60%"
+                        teacherId: "T001"
+                        teacherName: "李老师"
+                        completed: false
+                        chapters: []
+        '403':
+          description: 权限不足
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
-        '404':
-          description: 未找到教师
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                forbidden:
+                  summary: 无权限访问
+                  value:
+                    code: 403
+                    message: "无权限查看该教师的课程"
+                    data: null
+      security:
+        - BearerAuth: []
+
     post:
-      tags: [Courses]
-      summary: 教师创建课程
+      tags:
+        - Courses
+      summary: 创建课程
+      description: |
+        教师创建新课程
+        
+        ## 权限要求
+        - 只有教师角色可以创建课程
+        - teacherId必须与当前登录用户一致
+        - 必须具有ROLE_TEACHER角色
+        
+        ## 创建内容
+        - 课程基本信息（名称、代码、大纲等）
+        - 课程章节（可选）
+        - 考核方式和课程目标
+      operationId: createCourse
       parameters:
-        - in: query
-          name: teacherId
+        - name: teacherId
+          in: query
+          required: true
+          description: 教师ID（必须与当前登录用户一致）
           schema:
             type: string
-          description: 指定教师ID
+            example: "T001"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CourseCreate'
+              $ref: '#/components/schemas/CourseCreateDto'
+            examples:
+              basic_course:
+                summary: 基础课程创建
+                value:
+                  name: "Java程序设计"
+                  code: "CS101"
+                  outline: "Java基础语法和面向对象编程"
+                  objectives: "掌握Java编程基础"
+                  assessment: "期中考试30% + 期末考试50% + 平时作业20%"
+                  completed: false
+              course_with_chapters:
+                summary: 带章节的课程创建
+                value:
+                  name: "数据结构与算法"
+                  code: "CS102"
+                  outline: "数据结构基础和常用算法"
+                  objectives: "掌握基本数据结构和算法"
+                  assessment: "期中考试40% + 期末考试60%"
+                  completed: false
+                  chapters:
+                    - title: "第一章 线性表"
+                      order: 1
+                    - title: "第二章 栈和队列"
+                      order: 2
       responses:
-        '201':
-          description: 创建成功
+        '200':
+          description: 课程创建成功
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseCourse'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CourseDto'
+              examples:
+                success:
+                  summary: 创建成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      id: 3
+                      name: "Java程序设计"
+                      code: "CS101"
+                      outline: "Java基础语法和面向对象编程"
+                      objectives: "掌握Java编程基础"
+                      assessment: "期中考试30% + 期末考试50% + 平时作业20%"
+                      teacherId: "T001"
+                      teacherName: "李老师"
+                      completed: false
+                      chapters:
+                        - title: "第一章 Java基础"
+                          order: 1
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                validation_error:
+                  summary: 参数验证失败
+                  value:
+                    code: 400
+                    message: "课程名称不能为空"
+                    data: null
+                duplicate_code:
+                  summary: 课程代码重复
+                  value:
+                    code: 400
+                    message: "课程代码已存在"
+                    data: null
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                not_teacher:
+                  summary: 非教师用户
+                  value:
+                    code: 403
+                    message: "只有教师可以创建课程"
+                    data: null
+      security:
+        - BearerAuth: []
 
   /courses/{courseId}:
     get:
-      tags: [Courses]
+      tags:
+        - Courses
       summary: 获取课程详情
+      description: |
+        根据课程ID获取课程的详细信息
+        
+        ## 权限要求
+        - 该课程的教师
+        - 该课程下的助教
+        - 该课程下的学生
+        
+        ## 返回信息
+        - 课程基本信息
+        - 教师信息
+        - 课程章节
+        - 考核方式等详细信息
+      operationId: getCourseById
       parameters:
-        - $ref: '#/components/parameters/CourseId'
+        - name: courseId
+          in: path
+          required: true
+          description: 课程ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
       responses:
         '200':
-          description: 课程详情
+          description: 成功获取课程详情
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseCourse'
-        '400':
-          description: 参数错误
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CourseDto'
+              examples:
+                success:
+                  summary: 获取课程详情成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      id: 1
+                      name: "Java程序设计"
+                      code: "CS101"
+                      outline: "Java基础语法和面向对象编程，包括类与对象、继承、多态、异常处理等核心概念"
+                      objectives: "掌握Java编程基础，能够独立开发简单的Java应用程序"
+                      assessment: "期中考试30% + 期末考试50% + 平时作业20%"
+                      teacherId: "T001"
+                      teacherName: "李老师"
+                      completed: false
+                      chapters:
+                        - title: "第一章 Java基础语法"
+                          order: 1
+                        - title: "第二章 面向对象编程"
+                          order: 2
+                        - title: "第三章 异常处理"
+                          order: 3
         '404':
-          description: 未找到课程
+          description: 课程未找到
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                not_found:
+                  summary: 课程不存在
+                  value:
+                    code: 404
+                    message: "课程未找到"
+                    data: null
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                forbidden:
+                  summary: 无权限访问
+                  value:
+                    code: 403
+                    message: "无权限查看该课程信息"
+                    data: null
+      security:
+        - BearerAuth: []
+
     put:
-      tags: [Courses]
+      tags:
+        - Courses
       summary: 更新课程信息
+      description: |
+        更新指定课程的信息
+        
+        ## 权限要求
+        - 只有该课程的教师可以更新课程信息
+        
+        ## 可更新内容
+        - 课程基本信息（名称、代码、大纲等）
+        - 课程章节
+        - 考核方式和课程目标
+        - 课程状态（是否结课）
+      operationId: updateCourse
       parameters:
-        - $ref: '#/components/parameters/CourseId'
+        - name: courseId
+          in: path
+          required: true
+          description: 要更新的课程ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CourseUpdate'
+              $ref: '#/components/schemas/CourseCreateDto'
+            examples:
+              update_basic_info:
+                summary: 更新基本信息
+                value:
+                  name: "Java程序设计（进阶）"
+                  code: "CS101"
+                  outline: "Java基础语法和面向对象编程，增加高级特性"
+                  objectives: "掌握Java编程基础和高级特性"
+                  assessment: "期中考试25% + 期末考试45% + 平时作业20% + 项目10%"
+                  completed: false
+              add_chapters:
+                summary: 添加章节
+                value:
+                  name: "Java程序设计"
+                  code: "CS101"
+                  outline: "Java基础语法和面向对象编程"
+                  objectives: "掌握Java编程基础"
+                  assessment: "期中考试30% + 期末考试50% + 平时作业20%"
+                  completed: false
+                  chapters:
+                    - title: "第一章 Java基础语法"
+                      order: 1
+                    - title: "第二章 面向对象编程"
+                      order: 2
+                    - title: "第三章 异常处理"
+                      order: 3
+                    - title: "第四章 集合框架"
+                      order: 4
       responses:
         '200':
-          description: 更新成功
+          description: 课程更新成功
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseCourse'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CourseDto'
+              examples:
+                success:
+                  summary: 更新成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      id: 1
+                      name: "Java程序设计（进阶）"
+                      code: "CS101"
+                      outline: "Java基础语法和面向对象编程，增加高级特性"
+                      objectives: "掌握Java编程基础和高级特性"
+                      assessment: "期中考试25% + 期末考试45% + 平时作业20% + 项目10%"
+                      teacherId: "T001"
+                      teacherName: "李老师"
+                      completed: false
+                      chapters:
+                        - title: "第一章 Java基础语法"
+                          order: 1
+                        - title: "第二章 面向对象编程"
+                          order: 2
         '400':
           description: 参数错误
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
+                $ref: '#/components/schemas/ApiResponse'
         '404':
-          description: 未找到课程
+          description: 课程未找到
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
+                $ref: '#/components/schemas/ApiResponse'
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - BearerAuth: []
 
     delete:
-      tags: [Courses]
+      tags:
+        - Courses
       summary: 删除课程
+      description: |
+        删除指定的课程
+        
+        ## 权限要求
+        - 只有该课程的教师可以删除课程
+        
+        ## 注意事项
+        - 删除课程将同时删除相关的班级、作业等数据
+        - 此操作不可逆，请谨慎使用
+        - 建议在删除前确认课程下没有重要数据
+      operationId: deleteCourse
       parameters:
-        - $ref: '#/components/parameters/CourseId'
+        - name: courseId
+          in: path
+          required: true
+          description: 要删除的课程ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
       responses:
-        '204':
-          description: 删除成功
+        '200':
+          description: 课程删除成功
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
-        '400':
-          description: 参数错误
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        nullable: true
+              examples:
+                success:
+                  summary: 删除成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data: null
         '404':
-          description: 未找到课程
+          description: 课程未找到
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                not_found:
+                  summary: 课程不存在
+                  value:
+                    code: 404
+                    message: "课程未找到"
+                    data: null
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                forbidden:
+                  summary: 无权限删除
+                  value:
+                    code: 403
+                    message: "只有课程教师可以删除课程"
+                    data: null
+        '400':
+          description: 删除失败（可能存在依赖数据）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                has_dependencies:
+                  summary: 存在依赖数据
+                  value:
+                    code: 400
+                    message: "无法删除：课程下存在班级或作业数据"
+                    data: null
+      security:
+        - BearerAuth: []
 
   /courses/{courseId}/classes:
     get:
-      tags: [ Classes ]
-      summary: 获取某课程下的所有班级
+      tags:
+        - Courses
+      summary: 获取课程下的所有班级
+      description: |
+        获取指定课程下的所有班级列表
+        
+        ## 权限要求
+        - 该课程的教师
+        - 该课程下的助教
+        - 该课程下的学生
+        
+        ## 返回信息
+        - 班级基本信息（ID、名称、代码）
+        - 班级与课程的关联关系
+      operationId: getCourseClasses
       parameters:
-        - $ref: '#/components/parameters/CourseId'
+        - name: courseId
+          in: path
+          required: true
+          description: 课程ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
       responses:
         '200':
-          description: 班级列表
+          description: 成功获取班级列表
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseClassList'
-        '400':
-          description: 参数错误
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ClassDto'
+              examples:
+                success:
+                  summary: 获取班级列表成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      - id: 1
+                        name: "Java程序设计1班"
+                        code: "CS101-01"
+                        courseId: 1
+                      - id: 2
+                        name: "Java程序设计2班"
+                        code: "CS101-02"
+                        courseId: 1
+                      - id: 3
+                        name: "Java程序设计3班"
+                        code: "CS101-03"
+                        courseId: 1
+                empty_result:
+                  summary: 无班级数据
+                  value:
+                    code: 200
+                    message: "success"
+                    data: []
         '404':
-          description: 未找到课程
+          description: 课程未找到
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
-  /courses/{courseId}/resources:
-    post:
-      tags: [Courses]
-      summary: 上传课程资料（创建新资源或更新已有资源新版本）
-      parameters:
-        - $ref: '#/components/parameters/CourseId'
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/MaterialUpload'
-      responses:
-        '201':
-          description: 上传成功
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                not_found:
+                  summary: 课程不存在
+                  value:
+                    code: 404
+                    message: "课程未找到"
+                    data: null
+        '403':
+          description: 权限不足
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseMaterialVersion'
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                forbidden:
+                  summary: 无权限访问
+                  value:
+                    code: 403
+                    message: "无权限查看该课程的班级信息"
+                    data: null
+      security:
+        - BearerAuth: []
 
-    get:
-      tags: [Courses]
-      summary: 列出指定课程的所有资料（仅返回最新版本）
-      parameters:
-        - $ref: '#/components/parameters/CourseId'
-      responses:
-        '200':
-          description: 资料列表
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseMaterialList'
-
+  # ==================== 班级管理接口 ====================
   /classes:
     get:
-      tags: [Classes]
-      summary: 列出所有班级
+      tags:
+        - Classes
+      summary: 获取班级列表
+      description: |
+        列出所有班级，可按课程筛选
+        
+        ## 权限要求
+        - 需要登录认证
+        
+        ## 筛选功能
+        - 不提供courseId：返回所有班级
+        - 提供courseId：返回指定课程下的班级
+        
+        ## 使用场景
+        - 管理员查看所有班级
+        - 按课程查看班级列表
+      operationId: listClasses
       parameters:
-        - in: query
-          name: courseId
+        - name: courseId
+          in: query
+          required: false
+          description: 课程ID（可选，用于筛选指定课程的班级）
           schema:
-            type: string
-          description: 按课程筛选
+            type: integer
+            format: int64
+            example: 1
       responses:
         '200':
-          description: 班级列表
+          description: 成功获取班级列表
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseClassList'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ClassDto'
+              examples:
+                all_classes:
+                  summary: 获取所有班级
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      - id: 1
+                        name: "Java程序设计1班"
+                        code: "CS101-01"
+                        courseId: 1
+                      - id: 2
+                        name: "Java程序设计2班"
+                        code: "CS101-02"
+                        courseId: 1
+                      - id: 3
+                        name: "数据结构A班"
+                        code: "CS102-A"
+                        courseId: 2
+                course_filtered:
+                  summary: 按课程筛选班级
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      - id: 1
+                        name: "Java程序设计1班"
+                        code: "CS101-01"
+                        courseId: 1
+                      - id: 2
+                        name: "Java程序设计2班"
+                        code: "CS101-02"
+                        courseId: 1
+                empty_result:
+                  summary: 无班级数据
+                  value:
+                    code: 200
+                    message: "success"
+                    data: []
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - BearerAuth: []
+
     post:
-      tags: [Classes]
+      tags:
+        - Classes
       summary: 创建班级
+      description: |
+        创建新的班级
+        
+        ## 权限要求
+        - 只有该课程的教师可以创建班级
+        
+        ## 创建内容
+        - 班级基本信息（名称、代码）
+        - 关联到指定课程
+      operationId: createClass
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ClassCreate'
+              $ref: '#/components/schemas/ClassCreateDto'
+            examples:
+              basic_class:
+                summary: 创建基础班级
+                value:
+                  name: "Java程序设计1班"
+                  code: "CS101-01"
+                  courseId: 1
+              advanced_class:
+                summary: 创建进阶班级
+                value:
+                  name: "数据结构实验班"
+                  code: "CS102-LAB"
+                  courseId: 2
       responses:
-        '201':
-          description: 创建成功
+        '200':
+          description: 班级创建成功
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseClass'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ClassDto'
+              examples:
+                success:
+                  summary: 创建成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      id: 4
+                      name: "Java程序设计1班"
+                      code: "CS101-01"
+                      courseId: 1
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                validation_error:
+                  summary: 参数验证失败
+                  value:
+                    code: 400
+                    message: "班级名称不能为空"
+                    data: null
+                duplicate_code:
+                  summary: 班级代码重复
+                  value:
+                    code: 400
+                    message: "班级代码已存在"
+                    data: null
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                not_teacher:
+                  summary: 非课程教师
+                  value:
+                    code: 403
+                    message: "只有课程教师可以创建班级"
+                    data: null
+      security:
+        - BearerAuth: []
 
   /classes/{classId}/students:
     get:
-      tags: [Classes]
-      summary: 列出班级学生
+      tags:
+        - Classes
+      summary: 获取班级学生列表
+      description: |
+        获取指定班级的所有学生
+        
+        ## 权限要求
+        - 该课程的教师
+        - 该课程的助教
+        
+        ## 返回信息
+        - 学生基本信息列表
+        - 不包含密码等敏感信息
+      operationId: listClassStudents
       parameters:
-        - $ref: '#/components/parameters/ClassId'
+        - name: classId
+          in: path
+          required: true
+          description: 班级ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
       responses:
         '200':
-          description: 学生列表
+          description: 成功获取学生列表
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseUserList'
-        '400':
-          description: 参数错误
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/UserResponse'
+              examples:
+                success:
+                  summary: 获取学生列表成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      - id: "2021001001"
+                        username: "张三"
+                        role: "ROLE_STUDENT"
+                        email: "zhangsan@example.com"
+                        createdAt: "2024-01-15T10:30:00"
+                      - id: "2021001002"
+                        username: "李四"
+                        role: "ROLE_STUDENT"
+                        email: "lisi@example.com"
+                        createdAt: "2024-01-16T09:20:00"
+                empty_result:
+                  summary: 班级暂无学生
+                  value:
+                    code: 200
+                    message: "success"
+                    data: []
         '404':
-          description: 未找到班级
+          description: 班级未找到
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
+                $ref: '#/components/schemas/ApiResponse'
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - BearerAuth: []
+
     post:
-      tags: [Classes]
-      summary: 批量导入学生
+      tags:
+        - Classes
+      summary: 批量导入学生到班级
+      description: |
+        批量将学生添加到指定班级
+        
+        ## 权限要求
+        - 该课程的教师
+        - 该课程的助教
+        
+        ## 导入功能
+        - 支持批量导入多个学生
+        - 自动跳过已存在的学生
+        - 返回导入结果统计
+      operationId: importStudentsToClass
       parameters:
-        - $ref: '#/components/parameters/ClassId'
+        - name: classId
+          in: path
+          required: true
+          description: 班级ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                studentIds:
-                  type: array
-                  items:
-                    type: string
+              $ref: '#/components/schemas/StudentImportDto'
+            examples:
+              batch_import:
+                summary: 批量导入学生
+                value:
+                  studentIds:
+                    - "2021001001"
+                    - "2021001002"
+                    - "2021001003"
+                    - "2021001004"
+              single_import:
+                summary: 导入单个学生
+                value:
+                  studentIds:
+                    - "2021001001"
       responses:
         '200':
-          description: 导入结果
+          description: 导入完成（包括部分成功的情况）
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseImportResult'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ImportResultDto'
+              examples:
+                full_success:
+                  summary: 全部导入成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      importedCount: 4
+                partial_success:
+                  summary: 部分导入成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      importedCount: 2
         '400':
           description: 参数错误
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
-        '404':
-          description: 未找到班级
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                empty_list:
+                  summary: 学生列表为空
+                  value:
+                    code: 400
+                    message: "studentIds 不能为空"
+                    data: null
+        '403':
+          description: 权限不足
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          description: 班级未找到
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - BearerAuth: []
+
+  /classes/{classId}/students/{studentId}:
+    delete:
+      tags:
+        - Classes
+      summary: 从班级移除学生
+      description: |
+        从指定班级中移除一个学生
+        
+        ## 权限要求
+        - 教师角色
+        - 管理员角色
+        
+        ## 注意事项
+        - 移除后学生将无法访问该班级的作业和资料
+        - 此操作不可逆，请谨慎使用
+      operationId: removeStudentFromClass
+      parameters:
+        - name: classId
+          in: path
+          required: true
+          description: 班级ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
+        - name: studentId
+          in: path
+          required: true
+          description: 要移除的学生ID
+          schema:
+            type: string
+            example: "2021001001"
+      responses:
+        '200':
+          description: 学生移除成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        nullable: true
+              examples:
+                success:
+                  summary: 移除成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data: null
+        '404':
+          description: 班级、学生未找到或学生不在此班级
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                class_not_found:
+                  summary: 班级不存在
+                  value:
+                    code: 404
+                    message: "班级未找到"
+                    data: null
+                student_not_in_class:
+                  summary: 学生不在该班级
+                  value:
+                    code: 404
+                    message: "学生不在该班级中"
+                    data: null
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                forbidden:
+                  summary: 无权限操作
+                  value:
+                    code: 403
+                    message: "您没有权限从班级移除学生"
+                    data: null
+      security:
+        - BearerAuth: []
 
   /classes/{classId}/tas:
     get:
-      tags: [ Classes ]
-      summary: 列出班级助教
+      tags:
+        - Classes
+      summary: 获取班级助教列表
+      description: |
+        获取指定班级的所有助教
+        
+        ## 权限要求
+        - 只有该课程的教师可以查看助教列表
+        
+        ## 返回信息
+        - 助教基本信息列表
+        - 不包含密码等敏感信息
+      operationId: listClassTeachingAssistants
       parameters:
-        - $ref: '#/components/parameters/ClassId'
+        - name: classId
+          in: path
+          required: true
+          description: 班级ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
       responses:
         '200':
-          description: 助教列表
+          description: 成功获取助教列表
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseUserList'
-        '400':
-          description: 参数错误
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/UserResponse'
+              examples:
+                success:
+                  summary: 获取助教列表成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      - id: "TA001"
+                        username: "王助教"
+                        role: "ROLE_TA"
+                        email: "ta.wang@example.com"
+                        createdAt: "2024-01-10T08:00:00"
+                      - id: "TA002"
+                        username: "赵助教"
+                        role: "ROLE_TA"
+                        email: "ta.zhao@example.com"
+                        createdAt: "2024-01-12T09:30:00"
+                empty_result:
+                  summary: 班级暂无助教
+                  value:
+                    code: 200
+                    message: "success"
+                    data: []
         '404':
-          description: 未找到班级
+          description: 班级未找到
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
+                $ref: '#/components/schemas/ApiResponse'
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - BearerAuth: []
 
     post:
-      tags: [ Classes ]
-      summary: 批量添加助教到班级
+      tags:
+        - Classes
+      summary: 添加助教到班级
+      description: |
+        批量将助教添加到指定班级
+        
+        ## 权限要求
+        - 只有该课程的教师可以添加助教
+        
+        ## 添加功能
+        - 支持批量添加多个助教
+        - 自动跳过已存在的助教
+        - 返回添加结果统计
+      operationId: addTeachingAssistantsToClass
       parameters:
-        - $ref: '#/components/parameters/ClassId'
+        - name: classId
+          in: path
+          required: true
+          description: 班级ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                taIds:
-                  type: array
-                  items:
-                    type: string
+              $ref: '#/components/schemas/TAImportDto'
+            examples:
+              batch_add:
+                summary: 批量添加助教
+                value:
+                  taIds:
+                    - "TA001"
+                    - "TA002"
+                    - "TA003"
+              single_add:
+                summary: 添加单个助教
+                value:
+                  taIds:
+                    - "TA001"
       responses:
         '200':
-          description: 添加结果
+          description: 添加完成
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseImportResult'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ImportResultDto'
+              examples:
+                success:
+                  summary: 添加成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      importedCount: 3
         '400':
           description: 参数错误
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
-        '404':
-          description: 未找到班级
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                empty_list:
+                  summary: 助教列表为空
+                  value:
+                    code: 400
+                    message: "taIds 不能为空"
+                    data: null
+        '403':
+          description: 权限不足
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          description: 班级未找到
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - BearerAuth: []
+
+  /classes/{classId}/enroll:
+    post:
+      tags:
+        - Classes
+      summary: 学生加入班级
+      description: |
+        当前登录学生报名加入指定班级
+        
+        ## 权限要求
+        - 必须是学生角色
+        - 需要登录认证
+        
+        ## 加入规则
+        - 学生只能加入自己有权限的班级
+        - 不能重复加入同一班级
+      operationId: enrollInClass
+      parameters:
+        - name: classId
+          in: path
+          required: true
+          description: 要加入的班级ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
+      responses:
+        '201':
+          description: 成功加入班级
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        nullable: true
+              examples:
+                success:
+                  summary: 加入成功
+                  value:
+                    code: 201
+                    message: "成功加入班级 1"
+                    data: null
+        '400':
+          description: 加入失败（如已在班级中）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                already_enrolled:
+                  summary: 已在班级中
+                  value:
+                    code: 400
+                    message: "您已经在该班级中"
+                    data: null
+        '404':
+          description: 班级未找到
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                not_student:
+                  summary: 非学生用户
+                  value:
+                    code: 403
+                    message: "只有学生可以加入班级"
+                    data: null
+      security:
+        - BearerAuth: []
 
   /classes/{classId}/assignments:
     get:
-      tags: [ Assignments ]
-      summary: 列出某班级下的所有作业
+      tags:
+        - Classes
+      summary: 获取班级作业列表
+      description: |
+        获取指定班级的所有作业
+        
+        ## 权限要求
+        - 该课程的教师
+        - 该课程的助教
+        - 该班级的学生
+        
+        ## 返回信息
+        - 作业基本信息列表
+        - 作业状态和截止时间
+      operationId: listClassAssignments
       parameters:
-        - $ref: '#/components/parameters/ClassId'
+        - name: classId
+          in: path
+          required: true
+          description: 班级ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
       responses:
         '200':
-          description: 班级作业列表
+          description: 成功获取作业列表
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseAssignmentList'
-        '400':
-          description: 参数错误
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AssignmentDto'
+              examples:
+                success:
+                  summary: 获取作业列表成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      - id: 1
+                        title: "Java基础练习"
+                        description: "完成Java基础语法相关练习题"
+                        courseId: 1
+                        openTime: "2024-01-15T09:00:00"
+                        dueDate: "2024-01-22T23:59:59"
+                        allowResubmit: false
+                      - id: 2
+                        title: "面向对象编程作业"
+                        description: "设计并实现一个简单的类继承体系"
+                        courseId: 1
+                        openTime: "2024-01-20T09:00:00"
+                        dueDate: "2024-01-27T23:59:59"
+                        allowResubmit: true
+        '403':
+          description: 权限不足
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
+                $ref: '#/components/schemas/ApiResponse'
         '404':
-          description: 未找到班级
+          description: 班级未找到
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - BearerAuth: []
+
     post:
-      tags: [ Assignments ]
-      summary: 老师给某个班级布置作业
+      tags:
+        - Classes
+      summary: 为班级布置作业
+      description: |
+        教师或助教为指定班级布置新作业
+        
+        ## 权限要求
+        - 该课程的教师
+        - 该课程的助教
+        
+        ## 作业内容
+        - 作业基本信息（标题、描述）
+        - 时间设置（开放时间、截止时间）
+        - 关联题目（可选）
+        - 提交设置（是否允许重复提交）
+      operationId: createAssignmentForClass
       parameters:
-        - $ref: '#/components/parameters/ClassId'
+        - name: classId
+          in: path
+          required: true
+          description: 班级ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/AssignmentCreateDto'
+            examples:
+              basic_assignment:
+                summary: 基础作业
+                value:
+                  title: "Java基础练习"
+                  description: "完成Java基础语法相关练习题"
+                  courseId: 1
+                  openTime: "2024-01-15T09:00:00"
+                  dueDate: "2024-01-22T23:59:59"
+                  allowResubmit: false
+              assignment_with_questions:
+                summary: 包含题目的作业
+                value:
+                  title: "面向对象编程作业"
+                  description: "设计并实现一个简单的类继承体系"
+                  courseId: 1
+                  openTime: "2024-01-20T09:00:00"
+                  dueDate: "2024-01-27T23:59:59"
+                  allowResubmit: true
+                  questionIds: [1, 2, 3]
       responses:
         '201':
-          description: 布置成功，返回新作业
+          description: 作业布置成功
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseAssignment'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AssignmentDto'
+              examples:
+                success:
+                  summary: 布置成功
+                  value:
+                    code: 201
+                    message: "作业布置成功"
+                    data:
+                      id: 3
+                      title: "Java基础练习"
+                      description: "完成Java基础语法相关练习题"
+                      courseId: 1
+                      openTime: "2024-01-15T09:00:00"
+                      dueDate: "2024-01-22T23:59:59"
+                      allowResubmit: false
         '400':
           description: 参数错误
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                validation_error:
+                  summary: 参数验证失败
+                  value:
+                    code: 400
+                    message: "作业标题不能为空"
+                    data: null
+                invalid_date:
+                  summary: 时间设置错误
+                  value:
+                    code: 400
+                    message: "截止日期必须在将来"
+                    data: null
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
         '404':
-          description: 未找到班级
+          description: 班级或课程未找到
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - BearerAuth: []
 
-  /classes/{classId}/resources:
-    get:
-      tags: [Classes]
-      summary: 列出指定班级可见的资料（仅返回最新版本）
-      parameters:
-        - $ref: '#/components/parameters/ClassId'
-      responses:
-        '200':
-          description: 班级可见资料列表
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseMaterialList'
-
-
-  /materials/{materialId}/versions:
-    get:
-      tags: [Materials]
-      summary: 列出指定资料的所有历史版本
-      parameters:
-        - $ref: '#/components/parameters/MaterialId'
-      responses:
-        '200':
-          description: 版本列表
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseVersionList'
-
-  /materials/{materialId}/versions/{version}:
-    get:
-      tags: [Materials]
-      summary: 获取指定版本的资料详情
-      parameters:
-        - $ref: '#/components/parameters/MaterialId'
-        - name: version
-          in: path
-          required: true
-          schema:
-            type: integer
-          description: 版本号，从1开始
-      responses:
-        '200':
-          description: 单个版本详情
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseMaterialVersion'
+  # ==================== 题目管理接口 ====================
   /questions:
     get:
-      tags: [Questions]
-      summary: 列出题库中所有题目
+      tags:
+        - Questions
+      summary: 获取题目列表
+      description: |
+        获取题目列表，可按课程筛选
+        
+        ## 权限要求
+        - 需要登录认证
+        
+        ## 筛选功能
+        - 不提供courseId：返回所有题目
+        - 提供courseId：返回指定课程的题目
+        
+        ## 使用场景
+        - 教师查看题目库
+        - 学生浏览练习题目
+        - 按课程筛选相关题目
+      operationId: listQuestions
       parameters:
-        - in: query
-          name: courseId
+        - name: courseId
+          in: query
+          required: false
+          description: 课程ID（可选，用于筛选指定课程的题目）
           schema:
             type: string
-          description: 按课程筛选题目
+            example: "1"
       responses:
         '200':
-          description: 题目列表
+          description: 成功获取题目列表
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseQuestionList'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/QuestionDto'
+              examples:
+                all_questions:
+                  summary: 获取所有题目
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      - id: 1
+                        title: "Java中的基本数据类型有哪些？"
+                        type: "choice"
+                        choices: ["int, double, boolean, char", "String, int, double", "int, float, string, boolean", "byte, short, int, long"]
+                        correctAnswer: "int, double, boolean, char"
+                        score: 5
+                      - id: 2
+                        title: "实现一个简单的快速排序算法"
+                        type: "coding"
+                        choices: null
+                        correctAnswer: "参考答案：使用分治法实现快速排序"
+                        score: 20
+                course_filtered:
+                  summary: 按课程筛选题目
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      - id: 1
+                        title: "Java中的基本数据类型有哪些？"
+                        type: "choice"
+                        choices: ["int, double, boolean, char", "String, int, double", "int, float, string, boolean", "byte, short, int, long"]
+                        correctAnswer: "int, double, boolean, char"
+                        score: 5
+                empty_result:
+                  summary: 无题目数据
+                  value:
+                    code: 200
+                    message: "success"
+                    data: []
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - BearerAuth: []
+
     post:
-      tags: [Questions]
-      summary: 在题库中新建题目
+      tags:
+        - Questions
+      summary: 创建题目
+      description: |
+        创建新的题目
+        
+        ## 权限要求
+        - 教师角色
+        - 助教角色
+        
+        ## 题目类型
+        - choice: 选择题（需要提供选项）
+        - coding: 编程题（不需要选项）
+        
+        ## 创建内容
+        - 题目基本信息（标题、类型、分数）
+        - 选择题的选项列表
+        - 正确答案或参考答案
+      operationId: createQuestion
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/QuestionCreateDto'
+            examples:
+              choice_question:
+                summary: 创建选择题
+                value:
+                  title: "Java中的基本数据类型有哪些？"
+                  type: "choice"
+                  choices: ["int, double, boolean, char", "String, int, double", "int, float, string, boolean", "byte, short, int, long"]
+                  correctAnswer: "int, double, boolean, char"
+                  score: 5
+              coding_question:
+                summary: 创建编程题
+                value:
+                  title: "实现一个简单的快速排序算法"
+                  type: "coding"
+                  correctAnswer: "参考答案：使用分治法实现快速排序，选择一个基准元素，将数组分为小于和大于基准的两部分，递归排序"
+                  score: 20
       responses:
         '201':
-          description: 创建成功，返回新题目
+          description: 题目创建成功
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseQuestion'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/QuestionDto'
+              examples:
+                success:
+                  summary: 创建成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      id: 3
+                      title: "Java中的基本数据类型有哪些？"
+                      type: "choice"
+                      choices: ["int, double, boolean, char", "String, int, double", "int, float, string, boolean", "byte, short, int, long"]
+                      correctAnswer: "int, double, boolean, char"
+                      score: 5
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                validation_error:
+                  summary: 参数验证失败
+                  value:
+                    code: 400
+                    message: "题目标题不能为空"
+                    data: null
+                invalid_type:
+                  summary: 题目类型错误
+                  value:
+                    code: 400
+                    message: "题目类型必须是choice或coding"
+                    data: null
+                missing_choices:
+                  summary: 选择题缺少选项
+                  value:
+                    code: 400
+                    message: "选择题必须提供选项列表"
+                    data: null
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                not_authorized:
+                  summary: 无权限创建
+                  value:
+                    code: 403
+                    message: "只有教师和助教可以创建题目"
+                    data: null
+      security:
+        - BearerAuth: []
 
-  /questions/{questionId}:
+  /questions/{id}:
     get:
-      tags: [Questions]
+      tags:
+        - Questions
       summary: 获取题目详情
+      description: |
+        根据题目ID获取题目的详细信息
+        
+        ## 权限要求
+        - 需要登录认证
+        
+        ## 返回信息
+        - 题目完整信息
+        - 包含选项、答案、分数等
+      operationId: getQuestionById
       parameters:
-        - $ref: '#/components/parameters/QuestionId'
+        - name: id
+          in: path
+          required: true
+          description: 题目ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
       responses:
         '200':
-          description: 单个题目详情
+          description: 成功获取题目详情
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseQuestion'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/QuestionDto'
+              examples:
+                choice_question:
+                  summary: 选择题详情
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      id: 1
+                      title: "Java中的基本数据类型有哪些？"
+                      type: "choice"
+                      choices: ["int, double, boolean, char", "String, int, double", "int, float, string, boolean", "byte, short, int, long"]
+                      correctAnswer: "int, double, boolean, char"
+                      score: 5
+                coding_question:
+                  summary: 编程题详情
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      id: 2
+                      title: "实现一个简单的快速排序算法"
+                      type: "coding"
+                      choices: null
+                      correctAnswer: "参考答案：使用分治法实现快速排序"
+                      score: 20
+        '404':
+          description: 题目未找到
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                not_found:
+                  summary: 题目不存在
+                  value:
+                    code: 404
+                    message: "题目未找到"
+                    data: null
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - BearerAuth: []
+
     put:
-      tags: [Questions]
-      summary: 更新题目
+      tags:
+        - Questions
+      summary: 更新题目信息
+      description: |
+        更新指定题目的信息
+        
+        ## 权限要求
+        - 教师角色
+        - 助教角色
+        
+        ## 可更新内容
+        - 题目基本信息（标题、类型、分数）
+        - 选择题的选项列表
+        - 正确答案或参考答案
+        
+        ## 注意事项
+        - 更新题目类型时需要相应调整选项
+        - 已被作业使用的题目更新需谨慎
+      operationId: updateQuestion
       parameters:
-        - $ref: '#/components/parameters/QuestionId'
+        - name: id
+          in: path
+          required: true
+          description: 要更新的题目ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/QuestionUpdateDto'
+            examples:
+              update_choice:
+                summary: 更新选择题
+                value:
+                  title: "Java中的基本数据类型有哪些？（更新版）"
+                  type: "choice"
+                  choices: ["int, double, boolean, char", "String, int, double", "int, float, string, boolean", "byte, short, int, long, float"]
+                  correctAnswer: "int, double, boolean, char"
+                  score: 8
+              update_coding:
+                summary: 更新编程题
+                value:
+                  title: "实现快速排序算法并分析时间复杂度"
+                  type: "coding"
+                  correctAnswer: "参考答案：使用分治法实现快速排序，平均时间复杂度O(nlogn)，最坏情况O(n²)"
+                  score: 25
       responses:
         '200':
-          description: 更新成功
+          description: 题目更新成功
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseQuestion'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/QuestionDto'
+              examples:
+                success:
+                  summary: 更新成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      id: 1
+                      title: "Java中的基本数据类型有哪些？（更新版）"
+                      type: "choice"
+                      choices: ["int, double, boolean, char", "String, int, double", "int, float, string, boolean", "byte, short, int, long, float"]
+                      correctAnswer: "int, double, boolean, char"
+                      score: 8
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          description: 题目未找到
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - BearerAuth: []
+
     delete:
-      tags: [Questions]
+      tags:
+        - Questions
       summary: 删除题目
+      description: |
+        删除指定的题目
+        
+        ## 权限要求
+        - 教师角色
+        - 助教角色
+        
+        ## 注意事项
+        - 删除题目将影响相关的作业
+        - 此操作不可逆，请谨慎使用
+        - 建议在删除前确认题目未被作业使用
+      operationId: deleteQuestion
       parameters:
-        - $ref: '#/components/parameters/QuestionId'
+        - name: id
+          in: path
+          required: true
+          description: 要删除的题目ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
       responses:
         '204':
-          description: 删除成功
+          description: 题目删除成功
+        '404':
+          description: 题目未找到
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseVoid'
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                not_found:
+                  summary: 题目不存在
+                  value:
+                    code: 404
+                    message: "题目未找到"
+                    data: null
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                forbidden:
+                  summary: 无权限删除
+                  value:
+                    code: 403
+                    message: "只有教师和助教可以删除题目"
+                    data: null
+        '400':
+          description: 删除失败（可能被作业使用）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                in_use:
+                  summary: 题目正在使用中
+                  value:
+                    code: 400
+                    message: "无法删除：题目正在被作业使用"
+                    data: null
+      security:
+        - BearerAuth: []
 
-  /assignments/{assignmentId}:
-    get:
-      tags: [Assignments]
-      summary: 获取作业详情
+  /questions/{questionId}/favorite:
+    post:
+      tags:
+        - Questions
+      summary: 收藏题目
+      description: |
+        学生收藏指定题目
+        
+        ## 权限要求
+        - 学生只能收藏自己的题目（studentId必须与当前登录用户一致）
+        
+        ## 收藏功能
+        - 将题目添加到个人收藏列表
+        - 方便后续复习和查看
+        - 可通过用户管理接口查看收藏列表
+      operationId: favoriteQuestion
       parameters:
-        - $ref: '#/components/parameters/AssignmentId'
+        - name: questionId
+          in: path
+          required: true
+          description: 要收藏的题目ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
+        - name: studentId
+          in: query
+          required: true
+          description: 学生ID（必须与当前登录用户一致）
+          schema:
+            type: string
+            example: "2021001001"
       responses:
         '200':
-          description: 单个作业详情
+          description: 收藏成功
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseAssignment'
-    put:
-      tags: [Assignments]
-      summary: 更新作业基本信息
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        nullable: true
+              examples:
+                success:
+                  summary: 收藏成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data: null
+        '400':
+          description: 收藏失败（如已收藏）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                already_favorited:
+                  summary: 已收藏该题目
+                  value:
+                    code: 400
+                    message: "您已经收藏了该题目"
+                    data: null
+        '404':
+          description: 题目未找到
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                forbidden:
+                  summary: 无权限收藏
+                  value:
+                    code: 403
+                    message: "您只能收藏自己的题目"
+                    data: null
+      security:
+        - BearerAuth: []
+
+  # ==================== 作业管理接口 ====================
+  /assignments/{assignmentId}:
+    get:
+      tags:
+        - Assignments
+      summary: 获取作业详情
+      description: |
+        根据作业ID获取作业的详细信息，包括题目列表
+        
+        ## 权限要求
+        - 该作业的教师
+        - 该作业的助教
+        - 参与该作业班级的学生
+        
+        ## 返回信息
+        - 作业基本信息（标题、描述、时间等）
+        - 关联的题目列表
+        - 作业状态和统计信息
+      operationId: getAssignmentById
       parameters:
-        - $ref: '#/components/parameters/AssignmentId'
+        - name: assignmentId
+          in: path
+          required: true
+          description: 作业ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
+      responses:
+        '200':
+          description: 成功获取作业详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AssignmentDto'
+              examples:
+                success:
+                  summary: 获取作业详情成功
+                  value:
+                    code: 200
+                    message: "作业详情获取成功"
+                    data:
+                      id: 1
+                      title: "Java基础练习"
+                      description: "完成Java基础语法相关练习题，包括变量、数据类型、控制结构等"
+                      courseId: 1
+                      classId: 1
+                      openTime: "2024-01-15T09:00:00"
+                      dueDate: "2024-01-22T23:59:59"
+                      allowResubmit: false
+                      questionCount: 5
+                      createdAt: "2024-01-10T14:30:00"
+                      updatedAt: "2024-01-12T10:15:00"
+                      questions:
+                        - id: 1
+                          title: "Java中的基本数据类型有哪些？"
+                          type: "choice"
+                          score: 5
+                        - id: 2
+                          title: "实现一个简单的循环结构"
+                          type: "coding"
+                          score: 15
+        '404':
+          description: 作业未找到
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                not_found:
+                  summary: 作业不存在
+                  value:
+                    code: 404
+                    message: "作业未找到"
+                    data: null
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                forbidden:
+                  summary: 无权限访问
+                  value:
+                    code: 403
+                    message: "无权限查看该作业"
+                    data: null
+      security:
+        - BearerAuth: []
+
+    put:
+      tags:
+        - Assignments
+      summary: 更新作业信息
+      description: |
+        更新指定作业的信息
+        
+        ## 权限要求
+        - 只有该作业的教师或助教可以更新
+        
+        ## 可更新内容
+        - 作业基本信息（标题、描述）
+        - 时间设置（开放时间、截止时间）
+        - 提交设置（是否允许重复提交）
+        - 关联的题目列表
+        
+        ## 注意事项
+        - 所有字段都是可选的，只更新提供的字段
+        - 更新题目列表将全量替换现有题目
+        - 截止时间必须在将来
+      operationId: updateAssignment
+      parameters:
+        - name: assignmentId
+          in: path
+          required: true
+          description: 要更新的作业ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/AssignmentUpdateDto'
+            examples:
+              update_basic_info:
+                summary: 更新基本信息
+                value:
+                  title: "Java基础练习（修订版）"
+                  description: "完成Java基础语法相关练习题，增加异常处理部分"
+                  allowResubmit: true
+              update_time:
+                summary: 更新时间设置
+                value:
+                  openTime: "2024-01-16T09:00:00"
+                  dueDate: "2024-01-25T23:59:59"
+              update_questions:
+                summary: 更新关联题目
+                value:
+                  title: "Java基础练习"
+                  questionIds: [1, 2, 3, 5, 8]
       responses:
         '200':
-          description: 更新成功
+          description: 作业更新成功
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseAssignment'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AssignmentDto'
+              examples:
+                success:
+                  summary: 更新成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      id: 1
+                      title: "Java基础练习（修订版）"
+                      description: "完成Java基础语法相关练习题，增加异常处理部分"
+                      courseId: 1
+                      classId: 1
+                      openTime: "2024-01-15T09:00:00"
+                      dueDate: "2024-01-22T23:59:59"
+                      allowResubmit: true
+                      questionCount: 5
+                      createdAt: "2024-01-10T14:30:00"
+                      updatedAt: "2024-01-15T16:20:00"
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                validation_error:
+                  summary: 参数验证失败
+                  value:
+                    code: 400
+                    message: "截止日期必须在将来"
+                    data: null
+                invalid_questions:
+                  summary: 题目ID无效
+                  value:
+                    code: 400
+                    message: "部分题目ID不存在"
+                    data: null
+        '404':
+          description: 作业未找到
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - BearerAuth: []
 
   /assignments/{assignmentId}/questions:
     get:
-      tags: [Assignments]
-      summary: 列出一个作业包含的所有题目
+      tags:
+        - Assignments
+      summary: 获取作业的题目列表
+      description: |
+        列出指定作业包含的所有题目
+        
+        ## 权限要求
+        - 该作业的教师
+        - 该作业的助教
+        - 参与该作业班级的学生
+        
+        ## 返回信息
+        - 题目完整信息列表
+        - 包含题目类型、分数、选项等
+      operationId: getAssignmentQuestions
       parameters:
-        - $ref: '#/components/parameters/AssignmentId'
+        - name: assignmentId
+          in: path
+          required: true
+          description: 作业ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
       responses:
         '200':
-          description: 作业题目列表
+          description: 成功获取题目列表
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseQuestionList'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/QuestionDto'
+              examples:
+                success:
+                  summary: 获取题目列表成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      - id: 1
+                        title: "Java中的基本数据类型有哪些？"
+                        type: "choice"
+                        choices: ["int, double, boolean, char", "String, int, double", "int, float, string, boolean", "byte, short, int, long"]
+                        correctAnswer: "int, double, boolean, char"
+                        score: 5
+                      - id: 2
+                        title: "实现一个简单的循环结构"
+                        type: "coding"
+                        choices: null
+                        correctAnswer: "参考答案：使用for或while循环"
+                        score: 15
+                      - id: 3
+                        title: "Java异常处理机制"
+                        type: "choice"
+                        choices: ["try-catch", "throw-throws", "finally", "以上都是"]
+                        correctAnswer: "以上都是"
+                        score: 8
+                empty_result:
+                  summary: 作业暂无题目
+                  value:
+                    code: 200
+                    message: "success"
+                    data: []
+        '404':
+          description: 作业未找到
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - BearerAuth: []
+
     post:
-      tags: [Assignments]
-      summary: 从题库导入题目到作业
+      tags:
+        - Assignments
+      summary: 向作业添加题目
+      description: |
+        根据题目ID列表向指定作业中添加题目
+        
+        ## 权限要求
+        - 只有该作业的教师或助教可以添加题目
+        
+        ## 添加功能
+        - 支持批量添加多个题目
+        - 自动跳过已存在的题目
+        - 返回添加结果统计
+        
+        ## 注意事项
+        - 题目必须存在才能添加
+        - 重复添加会被自动跳过
+      operationId: addQuestionsToAssignment
       parameters:
-        - $ref: '#/components/parameters/AssignmentId'
+        - name: assignmentId
+          in: path
+          required: true
+          description: 作业ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/IdListDto'
+            examples:
+              batch_add:
+                summary: 批量添加题目
+                value:
+                  ids: [1, 2, 3, 4, 5]
+              single_add:
+                summary: 添加单个题目
+                value:
+                  ids: [6]
       responses:
         '200':
-          description: 导入结果
+          description: 添加完成
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseImportResult'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ImportResultDto'
+              examples:
+                full_success:
+                  summary: 全部添加成功
+                  value:
+                    code: 200
+                    message: "成功向作业 1 添加了 5 道题目。"
+                    data:
+                      importedCount: 5
+                partial_success:
+                  summary: 部分添加成功
+                  value:
+                    code: 200
+                    message: "成功向作业 1 添加了 3 道题目。 (部分题目可能因已存在或未找到而被跳过，详情请查看日志)"
+                    data:
+                      importedCount: 3
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                empty_list:
+                  summary: 题目列表为空
+                  value:
+                    code: 400
+                    message: "ID列表不能为空"
+                    data: null
+                invalid_ids:
+                  summary: 题目ID无效
+                  value:
+                    code: 400
+                    message: "部分题目ID不存在"
+                    data: null
+        '404':
+          description: 作业未找到
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                forbidden:
+                  summary: 无权限操作
+                  value:
+                    code: 403
+                    message: "只有教师和助教可以向作业添加题目"
+                    data: null
+      security:
+        - BearerAuth: []
 
-  /classes/{classId}/assignments/{assignmentId}/submissions:
-    get:
-      tags: [Submissions]
-      summary: 教师查看某班级下某作业的全部提交
+  # ==================== 资料管理接口 ====================
+  /courses/{courseId}/resources:
+    post:
+      tags:
+        - Materials
+      summary: 上传课程资料
+      description: |
+        教师或助教上传课程资料
+        
+        ## 权限要求
+        - 该课程的教师
+        - 该课程的助教
+        
+        ## 上传功能
+        - 支持多种文件类型（PDF、PPT、ZIP、视频等）
+        - 可设置资料章节顺序
+        - 可指定可见班级范围
+        - 自动版本管理
+        
+        ## 文件类型
+        - pdf: PDF文档
+        - ppt: PowerPoint演示文稿
+        - zip: 压缩包
+        - video: 视频文件
+        - code: 代码文件
+        - image: 图片文件
+        - file: 其他文件类型
+      operationId: uploadCourseMaterial
       parameters:
-        - $ref: '#/components/parameters/ClassId'
-        - $ref: '#/components/parameters/AssignmentId'
+        - name: courseId
+          in: path
+          required: true
+          description: 课程ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MaterialUploadDto'
+            examples:
+              pdf_upload:
+                summary: 上传PDF文档
+                value:
+                  chapterOrder: 1
+                  type: "pdf"
+                  description: "第一章课程讲义"
+                  visibleForClasses: ["1", "2"]
+              video_upload:
+                summary: 上传视频文件
+                value:
+                  chapterOrder: 2
+                  type: "video"
+                  description: "Java基础视频教程"
+                  visibleForClasses: ["1"]
       responses:
         '200':
-          description: 提交记录列表
+          description: 资料上传成功
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseSubmissionList'
-    post:
-      tags: [Submissions]
-      summary: 学生向指定班级的作业提交答案
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MaterialVersionDto'
+              examples:
+                success:
+                  summary: 上传成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      materialId: 1
+                      version: 1
+                      filename: "java-basics.pdf"
+                      url: "/files/materials/1/v1/java-basics.pdf"
+                      description: "第一章课程讲义"
+                      uploadedAt: "2024-01-15T14:30:00"
+        '400':
+          description: 上传失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                validation_error:
+                  summary: 参数验证失败
+                  value:
+                    code: 400
+                    message: "资料类型不能为空"
+                    data: null
+                invalid_file:
+                  summary: 文件类型不支持
+                  value:
+                    code: 400
+                    message: "不支持的文件类型"
+                    data: null
+                file_too_large:
+                  summary: 文件过大
+                  value:
+                    code: 400
+                    message: "文件大小超过限制"
+                    data: null
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                forbidden:
+                  summary: 无权限上传
+                  value:
+                    code: 403
+                    message: "只有教师和助教可以上传资料"
+                    data: null
+        '404':
+          description: 课程未找到
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - BearerAuth: []
+
+    get:
+      tags:
+        - Materials
+      summary: 获取课程资料列表
+      description: |
+        获取指定课程的所有资料
+        
+        ## 权限要求
+        - 该课程的教师
+        - 该课程的助教
+        - 该课程的学生
+        
+        ## 返回信息
+        - 资料基本信息列表
+        - 文件类型和章节信息
+        - 可见性设置
+        - 最新版本信息
+      operationId: listCourseMaterials
       parameters:
-        - $ref: '#/components/parameters/ClassId'
-        - $ref: '#/components/parameters/AssignmentId'
+        - name: courseId
+          in: path
+          required: true
+          description: 课程ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
+      responses:
+        '200':
+          description: 成功获取资料列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/MaterialDto'
+              examples:
+                success:
+                  summary: 获取资料列表成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      - id: 1
+                        courseId: 1
+                        filename: "java-basics.pdf"
+                        type: "pdf"
+                        chapterOrder: 1
+                        url: "/files/materials/1/v1/java-basics.pdf"
+                        visibleForClasses: ["1", "2"]
+                        createdAt: "2024-01-15T14:30:00"
+                        updatedAt: "2024-01-15T14:30:00"
+                        latestVersion: 1
+                      - id: 2
+                        courseId: 1
+                        filename: "java-tutorial.mp4"
+                        type: "video"
+                        chapterOrder: 2
+                        url: "/files/materials/2/v1/java-tutorial.mp4"
+                        visibleForClasses: ["1"]
+                        createdAt: "2024-01-16T09:15:00"
+                        updatedAt: "2024-01-16T09:15:00"
+                        latestVersion: 1
+                      - id: 3
+                        courseId: 1
+                        filename: "exercise-code.zip"
+                        type: "zip"
+                        chapterOrder: 3
+                        url: "/files/materials/3/v2/exercise-code.zip"
+                        visibleForClasses: ["1", "2", "3"]
+                        createdAt: "2024-01-17T16:20:00"
+                        updatedAt: "2024-01-18T10:45:00"
+                        latestVersion: 2
+                empty_result:
+                  summary: 课程暂无资料
+                  value:
+                    code: 200
+                    message: "success"
+                    data: []
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          description: 课程未找到
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - BearerAuth: []
+
+  /classes/{classId}/resources:
+    get:
+      tags:
+        - Materials
+      summary: 获取班级资料列表
+      description: |
+        获取指定班级可见的所有资料
+        
+        ## 权限要求
+        - 该班级所属课程的教师
+        - 该班级的成员（学生、助教）
+        
+        ## 返回信息
+        - 对该班级可见的资料列表
+        - 根据班级权限过滤资料
+        - 按章节顺序排列
+      operationId: listClassMaterials
+      parameters:
+        - name: classId
+          in: path
+          required: true
+          description: 班级ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
+      responses:
+        '200':
+          description: 成功获取班级资料列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/MaterialDto'
+              examples:
+                success:
+                  summary: 获取班级资料成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      - id: 1
+                        courseId: 1
+                        filename: "java-basics.pdf"
+                        type: "pdf"
+                        chapterOrder: 1
+                        url: "/files/materials/1/v1/java-basics.pdf"
+                        visibleForClasses: ["1", "2"]
+                        createdAt: "2024-01-15T14:30:00"
+                        updatedAt: "2024-01-15T14:30:00"
+                        latestVersion: 1
+                      - id: 3
+                        courseId: 1
+                        filename: "exercise-code.zip"
+                        type: "zip"
+                        chapterOrder: 3
+                        url: "/files/materials/3/v2/exercise-code.zip"
+                        visibleForClasses: ["1", "2", "3"]
+                        createdAt: "2024-01-17T16:20:00"
+                        updatedAt: "2024-01-18T10:45:00"
+                        latestVersion: 2
+                filtered_result:
+                  summary: 根据班级权限过滤后的结果
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      - id: 1
+                        courseId: 1
+                        filename: "java-basics.pdf"
+                        type: "pdf"
+                        chapterOrder: 1
+                        url: "/files/materials/1/v1/java-basics.pdf"
+                        visibleForClasses: ["1", "2"]
+                        createdAt: "2024-01-15T14:30:00"
+                        updatedAt: "2024-01-15T14:30:00"
+                        latestVersion: 1
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          description: 班级未找到
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - BearerAuth: []
+
+  /materials/{materialId}/versions:
+    get:
+      tags:
+        - Materials
+      summary: 获取资料的所有版本
+      description: |
+        获取指定资料的所有历史版本
+        
+        ## 权限要求
+        - 有权限查看该资料的用户
+        
+        ## 返回信息
+        - 资料的所有版本列表
+        - 每个版本的详细信息
+        - 按版本号排序（最新版本在前）
+        
+        ## 版本管理
+        - 每次上传新文件会创建新版本
+        - 保留历史版本便于回溯
+        - 版本号自动递增
+      operationId: listMaterialVersions
+      parameters:
+        - name: materialId
+          in: path
+          required: true
+          description: 资料ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
+      responses:
+        '200':
+          description: 成功获取版本列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/MaterialVersionDto'
+              examples:
+                success:
+                  summary: 获取版本列表成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      - materialId: 1
+                        version: 2
+                        filename: "java-basics-updated.pdf"
+                        url: "/files/materials/1/v2/java-basics-updated.pdf"
+                        description: "第一章课程讲义（更新版）"
+                        uploadedAt: "2024-01-20T11:15:00"
+                      - materialId: 1
+                        version: 1
+                        filename: "java-basics.pdf"
+                        url: "/files/materials/1/v1/java-basics.pdf"
+                        description: "第一章课程讲义"
+                        uploadedAt: "2024-01-15T14:30:00"
+                single_version:
+                  summary: 只有一个版本
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      - materialId: 2
+                        version: 1
+                        filename: "java-tutorial.mp4"
+                        url: "/files/materials/2/v1/java-tutorial.mp4"
+                        description: "Java基础视频教程"
+                        uploadedAt: "2024-01-16T09:15:00"
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                forbidden:
+                  summary: 无权限查看
+                  value:
+                    code: 403
+                    message: "无权限查看该资料"
+                    data: null
+        '404':
+          description: 资料未找到
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                not_found:
+                  summary: 资料不存在
+                  value:
+                    code: 404
+                    message: "资料未找到"
+                    data: null
+      security:
+        - BearerAuth: []
+
+  /materials/{materialId}/versions/{version}:
+    get:
+      tags:
+        - Materials
+      summary: 获取资料的指定版本
+      description: |
+        获取资料的特定版本详情
+        
+        ## 权限要求
+        - 有权限查看该资料的用户
+        
+        ## 返回信息
+        - 指定版本的详细信息
+        - 文件下载链接
+        - 版本描述和上传时间
+        
+        ## 使用场景
+        - 查看历史版本
+        - 下载特定版本文件
+        - 版本对比和回溯
+      operationId: getMaterialVersion
+      parameters:
+        - name: materialId
+          in: path
+          required: true
+          description: 资料ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
+        - name: version
+          in: path
+          required: true
+          description: 版本号
+          schema:
+            type: integer
+            minimum: 1
+            example: 2
+      responses:
+        '200':
+          description: 成功获取版本详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MaterialVersionDto'
+              examples:
+                success:
+                  summary: 获取版本详情成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      materialId: 1
+                      version: 2
+                      filename: "java-basics-updated.pdf"
+                      url: "/files/materials/1/v2/java-basics-updated.pdf"
+                      description: "第一章课程讲义（更新版，增加了练习题）"
+                      uploadedAt: "2024-01-20T11:15:00"
+                latest_version:
+                  summary: 最新版本
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      materialId: 3
+                      version: 1
+                      filename: "exercise-code.zip"
+                      url: "/files/materials/3/v1/exercise-code.zip"
+                      description: "Java练习代码包"
+                      uploadedAt: "2024-01-17T16:20:00"
+        '404':
+          description: 资料或版本未找到
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                material_not_found:
+                  summary: 资料不存在
+                  value:
+                    code: 404
+                    message: "资料未找到"
+                    data: null
+                version_not_found:
+                  summary: 版本不存在
+                  value:
+                    code: 404
+                    message: "指定版本不存在"
+                    data: null
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                forbidden:
+                  summary: 无权限查看
+                  value:
+                    code: 403
+                    message: "无权限查看该资料"
+                    data: null
+      security:
+        - BearerAuth: []
+
+  # ==================== 提交管理接口 ====================
+  /classes/{classId}/assignments/{assignmentId}/submissions:
+    post:
+      tags:
+        - Submissions
+      summary: 提交作业答案
+      description: |
+        学生为指定班级的特定作业提交答案
+        
+        ## 权限要求
+        - 必须是学生角色
+        - 必须是该作业所在班级的学生
+        - 只能为自己提交作业
+        
+        ## 提交功能
+        - 支持多种题目类型的答案提交
+        - 自动客观题评分
+        - 主观题等待教师批改
+        - 记录提交时间戳
+        
+        ## 答案格式
+        - 选择题：选项ID或答案文本
+        - 编程题：完整代码
+        - 简答题：文本答案
+        - 其他题型：对应格式的答案
+      operationId: submitAssignmentAnswers
+      parameters:
+        - name: classId
+          in: path
+          required: true
+          description: 班级ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
+        - name: assignmentId
+          in: path
+          required: true
+          description: 作业ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/SubmissionCreateDto'
+            examples:
+              choice_and_coding:
+                summary: 选择题和编程题提交
+                value:
+                  studentId: "2021001"
+                  answers:
+                    - questionId: 1
+                      response: "A"
+                    - questionId: 2
+                      response: "public class Hello { public static void main(String[] args) { System.out.println(\"Hello World\"); } }"
+              multiple_choice:
+                summary: 多道选择题提交
+                value:
+                  studentId: "2021002"
+                  answers:
+                    - questionId: 1
+                      response: "B"
+                    - questionId: 3
+                      response: "C"
+                    - questionId: 5
+                      response: "A"
       responses:
         '201':
-          description: 提交成功
+          description: 作业提交成功
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseSubmission'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SubmissionDto'
+              examples:
+                success:
+                  summary: 提交成功
+                  value:
+                    code: 201
+                    message: "作业提交成功"
+                    data:
+                      id: 1
+                      assignmentId: 1
+                      studentId: "2021001"
+                      answers:
+                        - questionId: 1
+                          response: "A"
+                          score: 10
+                          correct: true
+                          feedback: null
+                          correctAnswer: "A"
+                          questionType: "choice"
+                        - questionId: 2
+                          response: "public class Hello { public static void main(String[] args) { System.out.println(\"Hello World\"); } }"
+                          score: null
+                          correct: null
+                          feedback: null
+                          correctAnswer: null
+                          questionType: "coding"
+                      autoScore: 10
+                      manualScore: null
+                      totalScore: 10
+                      status: "submitted"
+                      submittedAt: "2024-01-20T15:30:00"
+                      updatedAt: "2024-01-20T15:30:00"
+        '400':
+          description: 提交失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                validation_error:
+                  summary: 参数验证失败
+                  value:
+                    code: 400
+                    message: "答案列表不能为空"
+                    data: null
+                duplicate_submission:
+                  summary: 重复提交
+                  value:
+                    code: 400
+                    message: "该作业已提交，不能重复提交"
+                    data: null
+                assignment_closed:
+                  summary: 作业已截止
+                  value:
+                    code: 400
+                    message: "作业提交已截止"
+                    data: null
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                not_student:
+                  summary: 非学生用户
+                  value:
+                    code: 403
+                    message: "只有学生可以提交作业"
+                    data: null
+                not_class_member:
+                  summary: 非班级成员
+                  value:
+                    code: 403
+                    message: "您不是该班级的学生"
+                    data: null
+                submit_for_others:
+                  summary: 为他人提交
+                  value:
+                    code: 403
+                    message: "您只能为自己提交作业"
+                    data: null
+        '404':
+          description: 资源未找到
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                assignment_not_found:
+                  summary: 作业不存在
+                  value:
+                    code: 404
+                    message: "作业未找到"
+                    data: null
+                class_not_found:
+                  summary: 班级不存在
+                  value:
+                    code: 404
+                    message: "班级未找到"
+                    data: null
+      security:
+        - BearerAuth: []
+
+    get:
+      tags:
+        - Submissions
+      summary: 获取作业的所有提交
+      description: |
+        教师查看某班级下某作业的全部提交记录
+        
+        ## 权限要求
+        - 该作业所属课程的教师
+        - 该作业所在班级的助教
+        
+        ## 返回信息
+        - 所有学生的提交记录
+        - 提交状态和分数信息
+        - 自动评分和手动评分结果
+        - 提交时间和更新时间
+        
+        ## 使用场景
+        - 教师查看班级作业完成情况
+        - 批改作业前查看提交列表
+        - 统计分析和成绩管理
+      operationId: getSubmissionsForAssignment
+      parameters:
+        - name: classId
+          in: path
+          required: true
+          description: 班级ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
+        - name: assignmentId
+          in: path
+          required: true
+          description: 作业ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
+      responses:
+        '200':
+          description: 成功获取提交列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SubmissionDto'
+              examples:
+                success:
+                  summary: 获取提交列表成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      - id: 1
+                        assignmentId: 1
+                        studentId: "2021001"
+                        answers:
+                          - questionId: 1
+                            response: "A"
+                            score: 10
+                            correct: true
+                            feedback: null
+                            correctAnswer: "A"
+                            questionType: "choice"
+                          - questionId: 2
+                            response: "public class Hello { public static void main(String[] args) { System.out.println(\"Hello World\"); } }"
+                            score: 15
+                            correct: true
+                            feedback: "代码规范，逻辑正确"
+                            correctAnswer: null
+                            questionType: "coding"
+                        autoScore: 10
+                        manualScore: 15
+                        totalScore: 25
+                        status: "graded"
+                        submittedAt: "2024-01-20T15:30:00"
+                        updatedAt: "2024-01-21T09:15:00"
+                      - id: 2
+                        assignmentId: 1
+                        studentId: "2021002"
+                        answers:
+                          - questionId: 1
+                            response: "B"
+                            score: 0
+                            correct: false
+                            feedback: null
+                            correctAnswer: "A"
+                            questionType: "choice"
+                          - questionId: 2
+                            response: "System.out.println(\"Hello\");"
+                            score: null
+                            correct: null
+                            feedback: null
+                            correctAnswer: null
+                            questionType: "coding"
+                        autoScore: 0
+                        manualScore: null
+                        totalScore: 0
+                        status: "submitted"
+                        submittedAt: "2024-01-20T16:45:00"
+                        updatedAt: "2024-01-20T16:45:00"
+                empty_result:
+                  summary: 暂无提交
+                  value:
+                    code: 200
+                    message: "success"
+                    data: []
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                forbidden:
+                  summary: 无权限查看
+                  value:
+                    code: 403
+                    message: "只有教师和助教可以查看所有提交"
+                    data: null
+        '404':
+          description: 资源未找到
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+      security:
+        - BearerAuth: []
 
   /submissions/{submissionId}:
     get:
-      tags: [Submissions]
-      summary: 查看单次提交详情
+      tags:
+        - Submissions
+      summary: 获取提交详情
+      description: |
+        查看单次提交的详细信息
+        
+        ## 权限要求
+        - 该作业所属课程的教师
+        - 该作业所在班级的助教
+        - 该提交的学生本人
+        
+        ## 返回信息
+        - 完整的提交详情
+        - 所有题目的答案和评分
+        - 教师反馈和批改记录
+        - 提交和更新时间戳
+        
+        ## 使用场景
+        - 学生查看自己的提交结果
+        - 教师查看学生提交详情
+        - 批改作业时查看具体答案
+      operationId: getSubmissionDetails
       parameters:
-        - $ref: '#/components/parameters/SubmissionId'
+        - name: submissionId
+          in: path
+          required: true
+          description: 提交ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
       responses:
         '200':
-          description: 提交详情
+          description: 成功获取提交详情
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseSubmission'
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SubmissionDto'
+              examples:
+                graded_submission:
+                  summary: 已批改的提交
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      id: 1
+                      assignmentId: 1
+                      studentId: "2021001"
+                      answers:
+                        - questionId: 1
+                          response: "A"
+                          score: 10
+                          correct: true
+                          feedback: null
+                          correctAnswer: "A"
+                          questionType: "choice"
+                        - questionId: 2
+                          response: "public class Hello { public static void main(String[] args) { System.out.println(\"Hello World\"); } }"
+                          score: 15
+                          correct: true
+                          feedback: "代码规范，逻辑正确，运行结果符合要求"
+                          correctAnswer: null
+                          questionType: "coding"
+                        - questionId: 3
+                          response: "Java是一种面向对象的编程语言"
+                          score: 8
+                          correct: null
+                          feedback: "回答基本正确，但可以更详细地说明其特性"
+                          correctAnswer: null
+                          questionType: "essay"
+                      autoScore: 10
+                      manualScore: 23
+                      totalScore: 33
+                      status: "graded"
+                      submittedAt: "2024-01-20T15:30:00"
+                      updatedAt: "2024-01-21T09:15:00"
+                ungraded_submission:
+                  summary: 未批改的提交
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      id: 2
+                      assignmentId: 1
+                      studentId: "2021002"
+                      answers:
+                        - questionId: 1
+                          response: "B"
+                          score: 0
+                          correct: false
+                          feedback: null
+                          correctAnswer: "A"
+                          questionType: "choice"
+                        - questionId: 2
+                          response: "System.out.println(\"Hello\");"
+                          score: null
+                          correct: null
+                          feedback: null
+                          correctAnswer: null
+                          questionType: "coding"
+                      autoScore: 0
+                      manualScore: null
+                      totalScore: 0
+                      status: "submitted"
+                      submittedAt: "2024-01-20T16:45:00"
+                      updatedAt: "2024-01-20T16:45:00"
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                forbidden:
+                  summary: 无权限查看
+                  value:
+                    code: 403
+                    message: "无权限查看该提交"
+                    data: null
+        '404':
+          description: 提交未找到
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                not_found:
+                  summary: 提交不存在
+                  value:
+                    code: 404
+                    message: "提交未找到"
+                    data: null
+      security:
+        - BearerAuth: []
 
   /submissions/{submissionId}/grade:
     put:
-      tags: [ Submissions ]
-      summary: 教师批改主观题（不影响自动批改题目）
+      tags:
+        - Submissions
+      summary: 批改提交
+      description: |
+        教师对学生提交进行手动批改
+        
+        ## 权限要求
+        - 该作业所属课程的教师
+        - 该作业所在班级的助教
+        
+        ## 批改功能
+        - 对主观题进行评分
+        - 添加教师反馈
+        - 修正客观题分数（如有需要）
+        - 更新总分和状态
+        
+        ## 批改类型
+        - 编程题：代码质量、运行结果、算法效率
+        - 简答题：答案准确性、完整性、表达能力
+        - 其他主观题：根据评分标准给分
+        
+        ## 分数计算
+        - 自动评分：客观题自动计算
+        - 手动评分：主观题教师给分
+        - 总分：自动分数 + 手动分数
+      operationId: gradeSubmissionManually
       parameters:
-        - $ref: '#/components/parameters/SubmissionId'
+        - name: submissionId
+          in: path
+          required: true
+          description: 提交ID
+          schema:
+            type: integer
+            format: int64
+            example: 1
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/ManualGradeDto'
+            examples:
+              coding_and_essay:
+                summary: 编程题和简答题批改
+                value:
+                  grades:
+                    - questionId: 2
+                      score: 15
+                      feedback: "代码规范，逻辑正确，运行结果符合要求"
+                    - questionId: 3
+                      score: 8
+                      feedback: "回答基本正确，但可以更详细地说明其特性"
+              partial_grading:
+                summary: 部分题目批改
+                value:
+                  grades:
+                    - questionId: 4
+                      score: 12
+                      feedback: "算法思路正确，但代码实现有小错误"
       responses:
         '200':
-          description: 批改成功，返回更新后的提交详情
+          description: 批改成功
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseSubmission'
-
-  /records/learning:
-    get:
-      tags: [Records]
-      summary: 学习记录查询
-      responses:
-        '200':
-          description: 学习轨迹
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SubmissionDto'
+              examples:
+                success:
+                  summary: 批改成功
+                  value:
+                    code: 200
+                    message: "success"
+                    data:
+                      id: 1
+                      assignmentId: 1
+                      studentId: "2021001"
+                      answers:
+                        - questionId: 1
+                          response: "A"
+                          score: 10
+                          correct: true
+                          feedback: null
+                          correctAnswer: "A"
+                          questionType: "choice"
+                        - questionId: 2
+                          response: "public class Hello { public static void main(String[] args) { System.out.println(\"Hello World\"); } }"
+                          score: 15
+                          correct: true
+                          feedback: "代码规范，逻辑正确，运行结果符合要求"
+                          correctAnswer: null
+                          questionType: "coding"
+                        - questionId: 3
+                          response: "Java是一种面向对象的编程语言"
+                          score: 8
+                          correct: null
+                          feedback: "回答基本正确，但可以更详细地说明其特性"
+                          correctAnswer: null
+                          questionType: "essay"
+                      autoScore: 10
+                      manualScore: 23
+                      totalScore: 33
+                      status: "graded"
+                      submittedAt: "2024-01-20T15:30:00"
+                      updatedAt: "2024-01-21T09:15:00"
+        '400':
+          description: 批改失败
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseLearningRecordList'
-
-  /records/exercise:
-    get:
-      tags: [Records]
-      summary: 练习记录查询
-      responses:
-        '200':
-          description: 练习记录
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                validation_error:
+                  summary: 参数验证失败
+                  value:
+                    code: 400
+                    message: "批改成绩列表不能为空"
+                    data: null
+                invalid_score:
+                  summary: 分数无效
+                  value:
+                    code: 400
+                    message: "分数不能超过题目满分"
+                    data: null
+                question_not_found:
+                  summary: 题目不存在
+                  value:
+                    code: 400
+                    message: "题目不存在于该作业中"
+                    data: null
+        '403':
+          description: 权限不足
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseExerciseRecordList'
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                forbidden:
+                  summary: 无权限批改
+                  value:
+                    code: 403
+                    message: "只有教师和助教可以批改作业"
+                    data: null
+        '404':
+          description: 提交未找到
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                not_found:
+                  summary: 提交不存在
+                  value:
+                    code: 404
+                    message: "提交未找到"
+                    data: null
+      security:
+        - BearerAuth: []
 
+# ==================== 数据模型定义 ====================
 components:
-  parameters:
-    UserId:
-      name: userId
-      in: path
-      required: true
-      schema:
-        type: string
-      description: 用户唯一标识
-    CourseId:
-      name: courseId
-      in: path
-      required: true
-      schema:
-        type: string
-      description: 课程唯一标识
-    ClassId:
-      name: classId
-      in: path
-      required: true
-      schema:
-        type: string
-      description: 班级唯一标识
-    QuestionId:
-      name: questionId
-      in: path
-      required: true
-      schema:
-        type: string
-      description: 题目唯一标识
-    AssignmentId:
-      name: assignmentId
-      in: path
-      required: true
-      schema:
-        type: string
-      description: 作业唯一标识
-    SubmissionId:
-      name: submissionId
-      in: path
-      required: true
-      schema:
-        type: string
-      description: 提交记录唯一标识
-    MaterialId:
-      name: materialId
-      in: path
-      required: true
-      schema:
-        type: string
-      description: 资料组唯一标识
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT Token认证
+        
+        使用方式：在请求头中添加
+        `Authorization: Bearer <your-jwt-token>`
+
   schemas:
+    # 通用响应模型
     ApiResponse:
       type: object
-      description: 统一响应体
       properties:
         code:
           type: integer
-          description: 业务状态码，与 HTTP 状态码不同
+          description: 业务状态码（通常与HTTP状态码一致）
           example: 200
         message:
           type: string
           description: 说明信息
           example: "success"
         data:
-          description: 返回的数据主体
-
-    ApiResponseVoid:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponse'
-      properties:
-        data:
-          type: object
+          description: 返回的数据主体（具体类型根据接口而定）
           nullable: true
+      required:
+        - code
+        - message
 
-    ApiResponseUser:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponse'
+    # ==================== 认证相关模型 ====================
+    RegisterRequest:
+      type: object
       properties:
-        data:
-          $ref: '#/components/schemas/User'
+        userId:
+          type: string
+          description: 用户ID（学号/工号）
+          maxLength: 50
+          example: "2021001001"
+        username:
+          type: string
+          description: 用户名
+          minLength: 2
+          maxLength: 50
+          example: "张三"
+        password:
+          type: string
+          description: 密码
+          minLength: 6
+          maxLength: 100
+          format: password
+          example: "password123"
+        role:
+          type: string
+          description: 用户角色
+          enum: [teacher, ta, student]
+          example: "student"
+        email:
+          type: string
+          description: 邮箱地址（可选）
+          format: email
+          maxLength: 100
+          example: "zhangsan@example.com"
+      required:
+        - userId
+        - username
+        - password
+        - role
 
-    ApiResponseToken:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponse'
+    LoginRequest:
+      type: object
       properties:
-        data:
-          $ref: '#/components/schemas/TokenResponse'
+        userId:
+          type: string
+          description: 用户ID（学号/工号）
+          example: "2021001001"
+        password:
+          type: string
+          description: 密码
+          format: password
+          example: "password123"
+        role:
+          type: string
+          description: 登录角色
+          enum: [teacher, ta, student]
+          example: "student"
+      required:
+        - userId
+        - password
+        - role
 
-    ApiResponseUserList:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponse'
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/User'
-
-    ApiResponseCourse:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponse'
-      properties:
-        data:
-          $ref: '#/components/schemas/Course'
-
-    ApiResponseCourseList:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponse'
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/Course'
-
-    ApiResponseClass:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponse'
-      properties:
-        data:
-          $ref: '#/components/schemas/Class'
-
-    ApiResponseClassList:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponse'
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/Class'
-    ApiResponseMaterialList:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponse'
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/Material'
-
-    ApiResponseMaterialVersion:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponse'
-      properties:
-        data:
-          $ref: '#/components/schemas/MaterialVersion'
-
-    ApiResponseVersionList:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponse'
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/MaterialVersion'
-
-
-
-
-    ApiResponseLearningRecordList:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponse'
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/LearningRecord'
-
-    ApiResponseImportResult:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponse'
-      properties:
-        data:
-          type: object
-          properties:
-            importedCount:
-              type: integer
-              description: 成功导入的学生数量
-
-
-
-
-    ApiResponseExerciseRecordList:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponse'
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/ExerciseRecord'
     TokenResponse:
       type: object
       properties:
         token:
           type: string
+          description: JWT访问令牌
+          example: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyMDIxMDAxMDAxIiwiaWF0IjoxNjQyMjQzMjAwLCJleHAiOjE2NDIzMjk2MDB9.example"
+      required:
+        - token
 
-    RegisterRequest:
-      type: object
-      required: [username, password, role]
-      properties:
-        userId:
-          type: string
-        username:
-          type: string
-        password:
-          type: string
-        role:
-          type: string
-          enum: [teacher, ta, student]
-        email:
-          type: string
-
-    LoginRequest:
-      type: object
-      required: [username, password]
-      properties:
-        userId:
-          type: string
-        password:
-          type: string
-
-    User:
+    UserResponse:
       type: object
       properties:
         id:
           type: string
+          description: 用户ID
+          example: "2021001001"
         username:
           type: string
+          description: 用户名
+          example: "张三"
         role:
           type: string
+          description: 用户角色（内部格式）
+          enum: [ROLE_TEACHER, ROLE_TA, ROLE_STUDENT]
+          example: "ROLE_STUDENT"
         email:
           type: string
+          description: 邮箱地址
+          format: email
+          example: "zhangsan@example.com"
+        createdAt:
+          type: string
+          description: 创建时间
+          format: date-time
+          example: "2024-01-15T10:30:00"
+      required:
+        - id
+        - username
+        - role
+        - createdAt
 
+    # ==================== 用户管理相关模型 ====================
     UserUpdate:
       type: object
       properties:
         email:
           type: string
+          description: 邮箱地址（可选更新）
+          format: email
+          maxLength: 100
+          example: "newemail@example.com"
         password:
           type: string
+          description: 新密码（可选更新）
+          format: password
+          minLength: 6
+          maxLength: 100
+          example: "newpassword123"
+      description: |
+        用户信息更新请求体
+        
+        所有字段都是可选的，只更新提供的字段：
+        - 如果只提供email，则只更新邮箱
+        - 如果只提供password，则只更新密码
+        - 如果都提供，则同时更新邮箱和密码
 
-    Course:
+    CourseDto:
       type: object
       properties:
         id:
-          type: string
+          type: integer
+          format: int64
+          description: 课程ID
+          example: 1
         name:
           type: string
+          description: 课程名称
+          example: "Java程序设计"
         code:
           type: string
+          description: 课程代码
+          example: "CS101"
         outline:
           type: string
           description: 课程大纲
+          example: "Java基础语法和面向对象编程"
         objectives:
           type: string
           description: 课程目标
+          example: "掌握Java编程基础"
         assessment:
           type: string
           description: 考核方式
+          example: "期中考试30% + 期末考试50% + 平时作业20%"
         teacherId:
           type: string
+          description: 教师ID
+          example: "T001"
+        teacherName:
+          type: string
+          description: 教师姓名
+          example: "李老师"
         chapters:
           type: array
           description: 课程章节列表
           items:
-            $ref: '#/components/schemas/ChapterCreate'
+            $ref: '#/components/schemas/ChapterCreateDto'
+          nullable: true
         completed:
           type: boolean
-          description: 课程是否结课
+          description: 课程是否已完成
+          example: false
+      required:
+        - id
+        - name
+        - code
+        - teacherId
 
-    ChapterCreate:
+    ClassDto:
       type: object
-      required: [title, order]
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 班级ID
+          example: 1
+        name:
+          type: string
+          description: 班级名称
+          example: "Java程序设计1班"
+        code:
+          type: string
+          description: 班级代码
+          example: "CS101-01"
+        courseId:
+          type: integer
+          format: int64
+          description: 所属课程ID
+          example: 1
+      required:
+        - id
+        - name
+        - courseId
+
+    StudentClassInfoDto:
+      type: object
+      properties:
+        classId:
+          type: integer
+          format: int64
+          description: 班级ID
+          example: 1
+        className:
+          type: string
+          description: 班级名称
+          example: "Java程序设计1班"
+        courseId:
+          type: integer
+          format: int64
+          description: 课程ID
+          example: 1
+        courseName:
+          type: string
+          description: 课程名称
+          example: "Java程序设计"
+      required:
+        - classId
+        - courseId
+        - courseName
+
+    QuestionDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 题目ID
+          example: 1
+        title:
+          type: string
+          description: 题目标题
+          example: "Java基础语法题"
+        content:
+          type: string
+          description: 题目内容
+          example: "请写出Java中的基本数据类型"
+        type:
+          type: string
+          description: 题目类型
+          example: "选择题"
+        difficulty:
+          type: string
+          description: 难度等级
+          example: "简单"
+      required:
+        - id
+        - title
+        - content
+        - type
+
+    ChapterCreateDto:
+      type: object
       properties:
         title:
           type: string
           description: 章节标题
+          example: "第一章 Java基础"
         order:
           type: integer
-          description: 本章节在课程中的编号，从1开始
+          description: 章节顺序（从1开始）
+          minimum: 0
+          example: 1
+      required:
+        - title
 
-    CourseCreate:
+    # ==================== 课程管理相关模型 ====================
+    CourseCreateDto:
       type: object
-      required: [name, code]
       properties:
         name:
           type: string
+          description: 课程名称
+          example: "Java程序设计"
         code:
           type: string
+          description: 课程代码
+          example: "CS101"
         outline:
           type: string
           description: 课程大纲
+          example: "Java基础语法和面向对象编程"
+          nullable: true
         objectives:
           type: string
           description: 课程目标
+          example: "掌握Java编程基础"
+          nullable: true
         assessment:
           type: string
           description: 考核方式
+          example: "期中考试30% + 期末考试50% + 平时作业20%"
+          nullable: true
         chapters:
           type: array
-          description: 课程章节列表
+          description: 课程章节列表（可选）
           items:
-            $ref: '#/components/schemas/ChapterCreate'
+            $ref: '#/components/schemas/ChapterCreateDto'
+          nullable: true
         completed:
           type: boolean
-          description: 课程是否结课
+          description: 课程是否已结课
+          example: false
+          nullable: true
+      required:
+        - name
+        - code
+      description: |
+        课程创建/更新请求体
+        
+        必填字段：
+        - name: 课程名称
+        - code: 课程代码（需要唯一）
+        
+        可选字段：
+        - outline: 课程大纲
+        - objectives: 课程目标  
+        - assessment: 考核方式
+        - chapters: 课程章节列表
+        - completed: 是否结课
 
-    CourseUpdate:
-      allOf:
-        - $ref: '#/components/schemas/CourseCreate'
-      description: 与 `CourseCreate` 相同，支持修改包括章节列表在内的所有字段
+    # ==================== 班级管理相关模型 ====================
+    ClassCreateDto:
+      type: object
+      properties:
+        name:
+          type: string
+          description: 班级名称
+          example: "Java程序设计1班"
+        code:
+          type: string
+          description: 班级代码
+          example: "CS101-01"
+        courseId:
+          type: integer
+          format: int64
+          description: 所属课程ID
+          example: 1
+      required:
+        - name
+        - code
+        - courseId
+      description: |
+        班级创建请求体
+        
+        必填字段：
+        - name: 班级名称
+        - code: 班级代码（需要唯一）
+        - courseId: 所属课程ID
 
-    Class:
+    StudentImportDto:
+      type: object
+      properties:
+        studentIds:
+          type: array
+          description: 要导入的学生ID列表
+          items:
+            type: string
+          minItems: 1
+          example: ["2021001001", "2021001002", "2021001003"]
+      required:
+        - studentIds
+      description: |
+        批量导入学生请求体
+        
+        用于将多个学生批量添加到班级中
+
+    TAImportDto:
+      type: object
+      properties:
+        taIds:
+          type: array
+          description: 要添加的助教ID列表
+          items:
+            type: string
+          minItems: 1
+          example: ["TA001", "TA002", "TA003"]
+      required:
+        - taIds
+      description: |
+        批量添加助教请求体
+        
+        用于将多个助教批量添加到班级中
+
+    ImportResultDto:
+      type: object
+      properties:
+        importedCount:
+          type: integer
+          description: 成功导入/添加的数量
+          minimum: 0
+          example: 3
+      required:
+        - importedCount
+      description: |
+        导入结果响应体
+        
+        返回批量操作的成功数量统计
+
+    AssignmentDto:
       type: object
       properties:
         id:
-          type: string
-        name:
-          type: string
-        code:
-          type: string
-        courseId:
-          type: string
-
-    ClassCreate:
-      type: object
-      required: [name, code, courseId]
-      properties:
-        name:
-          type: string
-        code:
-          type: string
-        courseId:
-          type: string
-
-
-    ExerciseRecord:
-      type: object
-      properties:
-        assignmentId:
-          type: string
-        score:
-          type: number
-        status:
-          type: string
-          enum:
-            - submitted
-            - not_submitted
-            - late
-          description: 提交状态
-
-    LearningRecord:
-      type: object
-      properties:
-        courseId:
-          type: string
-        chapter:
-          type: string
-        completedAt:
-          type: string
-          format: date-time
-    QuestionCreateDto:
-      type: object
-      required: [title, type, correctAnswer]
-      properties:
-        title:
-          type: string
-        type:
-          type: string
-          enum: [choice, coding]
-        choices:
-          type: array
-          items:
-            type: string
-          description: 仅对 choice 类型生效
-        correctAnswer:
-          type: string
-          description: 客观题的标准答案
-        score:
           type: integer
-          description: 本题分值
-
-    QuestionUpdateDto:
-      allOf:
-        - $ref: '#/components/schemas/QuestionCreateDto'
-
-    Question:
-      type: object
-      properties:
-        id:
-          type: string
+          format: int64
+          description: 作业ID
+          example: 1
         title:
           type: string
-        type:
-          type: string
-        choices:
-          type: array
-          items:
-            type: string
-        correctAnswer:
-          type: string
-        score:
-          type: integer
-
-    AssignmentCreateDto:
-      type: object
-      required: [title, courseId, openTime, dueDate]
-      properties:
-        title:
-          type: string
+          description: 作业标题
+          example: "Java基础练习"
         description:
           type: string
+          description: 作业描述
+          example: "完成Java基础语法相关练习题"
+          nullable: true
         courseId:
-          type: string
+          type: integer
+          format: int64
+          description: 所属课程ID
+          example: 1
         openTime:
           type: string
           format: date-time
+          description: 作业开放时间
+          example: "2024-01-15T09:00:00"
         dueDate:
           type: string
           format: date-time
+          description: 作业截止时间
+          example: "2024-01-22T23:59:59"
         allowResubmit:
           type: boolean
-          description: 是否允许学生多次提交
+          description: 是否允许重复提交
+          example: false
+      required:
+        - id
+        - title
+        - courseId
+        - openTime
+        - dueDate
+        - allowResubmit
+
+    AssignmentCreateDto:
+      type: object
+      properties:
+        title:
+          type: string
+          description: 作业标题
+          example: "Java基础练习"
+        description:
+          type: string
+          description: 作业描述
+          example: "完成Java基础语法相关练习题"
+          nullable: true
+        courseId:
+          type: integer
+          format: int64
+          description: 所属课程ID
+          example: 1
+        openTime:
+          type: string
+          format: date-time
+          description: 作业开放时间
+          example: "2024-01-15T09:00:00"
+        dueDate:
+          type: string
+          format: date-time
+          description: 作业截止时间（必须在将来）
+          example: "2024-01-22T23:59:59"
+        allowResubmit:
+          type: boolean
+          description: 是否允许重复提交
+          default: false
+          example: false
         questionIds:
           type: array
+          description: 关联的题目ID列表（可选）
+          items:
+            type: integer
+            format: int64
+          nullable: true
+          example: [1, 2, 3]
+      required:
+        - title
+        - courseId
+        - openTime
+        - dueDate
+      description: |
+        作业创建请求体
+        
+        必填字段：
+        - title: 作业标题
+        - courseId: 所属课程ID
+        - openTime: 开放时间
+        - dueDate: 截止时间（必须在将来）
+        
+        可选字段：
+        - description: 作业描述
+        - allowResubmit: 是否允许重复提交（默认false）
+        - questionIds: 关联的题目ID列表
+
+    # ==================== 题目管理相关模型 ====================
+    QuestionDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 题目ID
+          example: 1
+        title:
+          type: string
+          description: 题目标题
+          example: "Java中的基本数据类型有哪些？"
+        type:
+          type: string
+          description: 题目类型
+          enum: [choice, coding]
+          example: "choice"
+        choices:
+          type: array
+          description: 选择题选项列表（仅选择题有效）
           items:
             type: string
+          nullable: true
+          example: ["int, double, boolean, char", "String, int, double", "int, float, string, boolean", "byte, short, int, long"]
+        correctAnswer:
+          type: string
+          description: 正确答案或参考答案
+          example: "int, double, boolean, char"
+        score:
+          type: integer
+          description: 题目分数
+          minimum: 0
+          example: 5
+      required:
+        - id
+        - title
+        - type
+        - correctAnswer
+        - score
 
-    MaterialUpload:
+    QuestionCreateDto:
       type: object
-      required: [file, chapterOrder]
+      properties:
+        title:
+          type: string
+          description: 题目标题
+          example: "Java中的基本数据类型有哪些？"
+        type:
+          type: string
+          description: 题目类型
+          enum: [choice, coding]
+          example: "choice"
+        choices:
+          type: array
+          description: 选择题选项列表（选择题必填，编程题可为空）
+          items:
+            type: string
+          nullable: true
+          example: ["int, double, boolean, char", "String, int, double", "int, float, string, boolean", "byte, short, int, long"]
+        correctAnswer:
+          type: string
+          description: 正确答案或参考答案
+          example: "int, double, boolean, char"
+        score:
+          type: integer
+          description: 题目分数
+          minimum: 0
+          example: 5
+      required:
+        - title
+        - type
+        - correctAnswer
+        - score
+      description: |
+        题目创建请求体
+        
+        必填字段：
+        - title: 题目标题
+        - type: 题目类型（choice选择题 / coding编程题）
+        - correctAnswer: 正确答案或参考答案
+        - score: 题目分数
+        
+        可选字段：
+        - choices: 选择题选项列表（选择题必须提供，编程题可为空）
+
+    QuestionUpdateDto:
+      type: object
+      properties:
+        title:
+          type: string
+          description: 题目标题
+          example: "Java中的基本数据类型有哪些？（更新版）"
+        type:
+          type: string
+          description: 题目类型
+          enum: [choice, coding]
+          example: "choice"
+        choices:
+          type: array
+          description: 选择题选项列表（选择题必填，编程题可为空）
+          items:
+            type: string
+          nullable: true
+          example: ["int, double, boolean, char", "String, int, double", "int, float, string, boolean", "byte, short, int, long, float"]
+        correctAnswer:
+          type: string
+          description: 正确答案或参考答案
+          example: "int, double, boolean, char"
+        score:
+          type: integer
+          description: 题目分数
+          minimum: 0
+          example: 8
+      required:
+        - title
+        - type
+        - correctAnswer
+        - score
+      description: |
+        题目更新请求体
+        
+        继承自QuestionCreateDto，字段要求相同：
+        - title: 题目标题
+        - type: 题目类型（choice选择题 / coding编程题）
+        - correctAnswer: 正确答案或参考答案
+        - score: 题目分数
+        - choices: 选择题选项列表（选择题必须提供）
+
+    # ==================== 作业管理相关模型 ====================
+    AssignmentDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 作业ID
+          example: 1
+        title:
+          type: string
+          description: 作业标题
+          example: "Java基础练习"
+        description:
+          type: string
+          description: 作业描述
+          example: "完成Java基础语法相关练习题，包括变量、数据类型、控制结构等"
+          nullable: true
+        courseId:
+          type: integer
+          format: int64
+          description: 所属课程ID
+          example: 1
+        classId:
+          type: integer
+          format: int64
+          description: 所属班级ID
+          example: 1
+          nullable: true
+        openTime:
+          type: string
+          format: date-time
+          description: 作业开放时间
+          example: "2024-01-15T09:00:00"
+        dueDate:
+          type: string
+          format: date-time
+          description: 作业截止时间
+          example: "2024-01-22T23:59:59"
+        allowResubmit:
+          type: boolean
+          description: 是否允许重复提交
+          example: false
+        questionCount:
+          type: integer
+          description: 题目数量
+          minimum: 0
+          example: 5
+        createdAt:
+          type: string
+          format: date-time
+          description: 创建时间
+          example: "2024-01-10T14:30:00"
+        updatedAt:
+          type: string
+          format: date-time
+          description: 更新时间
+          example: "2024-01-12T10:15:00"
+        questions:
+          type: array
+          description: 关联的题目列表（可选，获取详情时包含）
+          items:
+            $ref: '#/components/schemas/QuestionDto'
+          nullable: true
+      required:
+        - id
+        - title
+        - courseId
+        - openTime
+        - dueDate
+        - allowResubmit
+        - questionCount
+        - createdAt
+        - updatedAt
+
+    AssignmentUpdateDto:
+      type: object
+      properties:
+        title:
+          type: string
+          description: 作业标题
+          maxLength: 255
+          example: "Java基础练习（修订版）"
+        description:
+          type: string
+          description: 作业描述
+          example: "完成Java基础语法相关练习题，增加异常处理部分"
+          nullable: true
+        courseId:
+          type: integer
+          format: int64
+          description: 所属课程ID
+          example: 1
+        classId:
+          type: integer
+          format: int64
+          description: 所属班级ID
+          example: 1
+          nullable: true
+        openTime:
+          type: string
+          format: date-time
+          description: 作业开放时间
+          example: "2024-01-16T09:00:00"
+        dueDate:
+          type: string
+          format: date-time
+          description: 作业截止时间（必须在将来）
+          example: "2024-01-25T23:59:59"
+        allowResubmit:
+          type: boolean
+          description: 是否允许重复提交
+          example: true
+        questionIds:
+          type: array
+          description: 题目ID列表（全量替换逻辑）
+          items:
+            type: integer
+            format: int64
+          nullable: true
+          example: [1, 2, 3, 5, 8]
+      description: |
+        作业更新请求体
+        
+        所有字段都是可选的，只更新提供的字段：
+        - title: 作业标题
+        - description: 作业描述
+        - courseId: 所属课程ID
+        - classId: 所属班级ID
+        - openTime: 开放时间
+        - dueDate: 截止时间（必须在将来）
+        - allowResubmit: 是否允许重复提交
+        - questionIds: 题目ID列表（全量替换现有题目）
+
+    IdListDto:
+      type: object
+      properties:
+        ids:
+          type: array
+          description: ID列表
+          items:
+            type: integer
+            format: int64
+          minItems: 1
+          example: [1, 2, 3, 4, 5]
+      required:
+        - ids
+      description: |
+        ID列表请求体
+        
+        用于批量操作，如向作业添加题目等
+
+    # ==================== 资料管理相关模型 ====================
+    MaterialDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 资料ID
+          example: 1
+        courseId:
+          type: integer
+          format: int64
+          description: 所属课程ID
+          example: 1
+        filename:
+          type: string
+          description: 文件名
+          example: "java-basics.pdf"
+        type:
+          type: string
+          description: 资料类型
+          enum: [pdf, ppt, zip, video, code, image, file]
+          example: "pdf"
+        chapterOrder:
+          type: integer
+          description: 章节顺序
+          minimum: 0
+          example: 1
+        url:
+          type: string
+          description: 文件访问URL
+          example: "/files/materials/1/v1/java-basics.pdf"
+        visibleForClasses:
+          type: array
+          description: 可见班级ID列表
+          items:
+            type: string
+          example: ["1", "2"]
+        createdAt:
+          type: string
+          format: date-time
+          description: 创建时间
+          example: "2024-01-15T14:30:00"
+        updatedAt:
+          type: string
+          format: date-time
+          description: 更新时间
+          example: "2024-01-15T14:30:00"
+        latestVersion:
+          type: integer
+          description: 最新版本号
+          minimum: 1
+          example: 1
+      required:
+        - id
+        - courseId
+        - filename
+        - type
+        - chapterOrder
+        - url
+        - createdAt
+        - updatedAt
+        - latestVersion
+
+    MaterialUploadDto:
+      type: object
       properties:
         file:
           type: string
           format: binary
+          description: 要上传的文件
         chapterOrder:
           type: integer
-          description: 资源所属章节编号，从1开始
+          description: 章节顺序
+          minimum: 0
+          example: 1
+        type:
+          type: string
+          description: 资料类型
+          enum: [pdf, ppt, zip, video, code, image, file]
+          example: "pdf"
         description:
           type: string
+          description: 资料描述
+          example: "第一章课程讲义"
+          nullable: true
         visibleForClasses:
           type: array
+          description: 可见班级ID列表
           items:
             type: string
-          description: 如果不传这个字段（即null）表示所有班级均可见，若为空列表则均不可见
+          example: ["1", "2"]
+          nullable: true
+      required:
+        - file
+        - chapterOrder
+        - type
+      description: |
+        资料上传请求体
+        
+        必填字段：
+        - file: 要上传的文件
+        - chapterOrder: 章节顺序
+        - type: 资料类型
+        
+        可选字段：
+        - description: 资料描述
+        - visibleForClasses: 可见班级列表（为空则所有班级可见）
+        
+        支持的资料类型：
+        - pdf: PDF文档
+        - ppt: PowerPoint演示文稿
+        - zip: 压缩包
+        - video: 视频文件
+        - code: 代码文件
+        - image: 图片文件
+        - file: 其他文件类型
 
-    Material:
+    MaterialVersionDto:
       type: object
       properties:
         materialId:
-          type: string
-        chapterOrder:
           type: integer
-        visibleForClasses:
-          type: array
-          items:
-            type: string
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-        latestVersion:
-          type: integer
-          description: 最新版本号
-
-    MaterialVersion:
-      type: object
-      properties:
-        materialId:
-          type: string
+          format: int64
+          description: 资料ID
+          example: 1
         version:
           type: integer
+          description: 版本号
+          minimum: 1
+          example: 2
         filename:
           type: string
+          description: 文件名
+          example: "java-basics-updated.pdf"
         url:
           type: string
+          description: 文件访问URL
+          example: "/files/materials/1/v2/java-basics-updated.pdf"
         description:
           type: string
+          description: 版本描述
+          example: "第一章课程讲义（更新版，增加了练习题）"
+          nullable: true
         uploadedAt:
           type: string
           format: date-time
-    AssignmentUpdateDto:
-      allOf:
-        - $ref: '#/components/schemas/AssignmentCreateDto'
+          description: 上传时间
+          example: "2024-01-20T11:15:00"
+      required:
+        - materialId
+        - version
+        - filename
+        - url
+        - uploadedAt
+      description: |
+        资料版本信息
+        
+        每次上传新文件都会创建新版本，保留历史记录：
+        - 版本号自动递增
+        - 保留所有历史版本
+        - 支持版本回溯和对比
 
-    Assignment:
+    # ==================== 提交管理相关模型 ====================
+    SubmissionDto:
       type: object
       properties:
         id:
-          type: string
-        title:
-          type: string
-        description:
-          type: string
-        courseId:
-          type: string
-        openTime:
-          type: string
-          format: date-time
-        dueDate:
-          type: string
-          format: date-time
-        allowResubmit:
-          type: boolean
-        questionCount:
           type: integer
+          format: int64
+          description: 提交ID
+          example: 1
+        assignmentId:
+          type: integer
+          format: int64
+          description: 作业ID
+          example: 1
+        studentId:
+          type: string
+          description: 学生ID
+          example: "2021001"
+        answers:
+          type: array
+          description: 答案结果列表
+          items:
+            $ref: '#/components/schemas/AnswerResultDto'
+        autoScore:
+          type: integer
+          description: 自动评分（客观题）
+          minimum: 0
+          example: 10
+          nullable: true
+        manualScore:
+          type: integer
+          description: 手动评分（主观题）
+          minimum: 0
+          example: 15
+          nullable: true
+        totalScore:
+          type: integer
+          description: 总分
+          minimum: 0
+          example: 25
+        status:
+          type: string
+          description: 提交状态
+          enum: [submitted, graded, returned]
+          example: "graded"
+        submittedAt:
+          type: string
+          format: date-time
+          description: 提交时间
+          example: "2024-01-20T15:30:00"
+        updatedAt:
+          type: string
+          format: date-time
+          description: 最后更新时间（如批改后）
+          example: "2024-01-21T09:15:00"
+      required:
+        - id
+        - assignmentId
+        - studentId
+        - answers
+        - totalScore
+        - status
+        - submittedAt
+        - updatedAt
+      description: |
+        作业提交信息
+        
+        包含学生提交的完整信息：
+        - 基本信息：提交ID、作业ID、学生ID
+        - 答案详情：所有题目的答案和评分结果
+        - 分数统计：自动分、手动分、总分
+        - 状态管理：提交状态和时间戳
+        
+        状态说明：
+        - submitted: 已提交，等待批改
+        - graded: 已批改完成
+        - returned: 已返回给学生
 
     SubmissionCreateDto:
       type: object
-      required: [studentId, answers]
       properties:
         studentId:
           type: string
+          description: 学生ID
+          example: "2021001"
         answers:
           type: array
+          description: 答案列表
           items:
             $ref: '#/components/schemas/AnswerDto'
+          minItems: 1
+      required:
+        - studentId
+        - answers
+      description: |
+        作业提交请求体
+        
+        学生提交作业时需要提供：
+        - studentId: 学生身份标识
+        - answers: 所有题目的答案列表
+        
+        答案格式根据题目类型：
+        - 选择题：选项ID或答案文本
+        - 编程题：完整的代码
+        - 简答题：文本回答
+        - 其他类型：对应格式的答案
 
     AnswerDto:
       type: object
       properties:
         questionId:
-          type: string
+          type: integer
+          format: int64
+          description: 题目ID
+          example: 1
         response:
           type: string
+          description: 学生答案
+          example: "A"
+          nullable: true
+      required:
+        - questionId
+      description: |
+        学生答案
+        
+        用于提交作业时提供每道题的答案：
+        - questionId: 对应的题目ID
+        - response: 学生的回答内容
+        
+        不同题型的答案格式：
+        - 选择题：选项标识（如"A"、"B"）
+        - 编程题：完整代码文本
+        - 简答题：文本回答
+        - 判断题：true/false
 
     AnswerResultDto:
       type: object
       properties:
         questionId:
-          type: string
+          type: integer
+          format: int64
+          description: 题目ID
+          example: 1
         response:
           type: string
+          description: 学生答案
+          example: "A"
+          nullable: true
         score:
           type: integer
+          description: 该题得分
+          minimum: 0
+          example: 10
           nullable: true
         correct:
           type: boolean
+          description: 是否正确（主要用于客观题）
+          example: true
           nullable: true
         feedback:
           type: string
+          description: 教师反馈
+          example: "回答正确"
           nullable: true
-
-    SubmissionGradeDto:
-      type: object
-      required: [score]
-      properties:
-        score:
-          type: integer
-        feedback:
+        correctAnswer:
           type: string
-
-    Submission:
-      type: object
-      properties:
-        submissionId:
-          type: string
-        assignmentId:
-          type: string
-        studentId:
-          type: string
-        answers:
-          type: array
-          items:
-            $ref: '#/components/schemas/AnswerResultDto'
-        autoScore:
-          type: integer
-          description: 自动批改所得分
-        manualScore:
-          type: integer
+          description: 正确答案
+          example: "A"
           nullable: true
-          description: 教师批改所得分
-        totalScore:
-          type: integer
-          description: 总分 = autoScore + manualScore
-        status:
+        questionType:
           type: string
-          enum: [ submitted, graded ]
-        submittedAt:
-          type: string
-          format: date-time
+          description: 题目类型
+          enum: [choice, coding, essay, judgment, fill_blank]
+          example: "choice"
+      required:
+        - questionId
+        - questionType
+      description: |
+        答案结果详情
+        
+        包含学生答案的完整评分信息：
+        - 基本信息：题目ID、学生答案、题目类型
+        - 评分结果：得分、是否正确
+        - 反馈信息：教师评语、正确答案
+        
+        题目类型说明：
+        - choice: 选择题
+        - coding: 编程题
+        - essay: 简答题
+        - judgment: 判断题
+        - fill_blank: 填空题
 
     ManualGradeDto:
       type: object
-      required: [ grades ]
       properties:
         grades:
           type: array
+          description: 批改成绩列表
           items:
-            type: object
-            required: [ questionId, score ]
-            properties:
-              questionId:
-                type: string
-              score:
-                type: integer
-              feedback:
-                type: string
+            $ref: '#/components/schemas/GradeItemDto'
+          minItems: 1
+      required:
+        - grades
+      description: |
+        手动批改请求体
+        
+        教师批改作业时提供：
+        - grades: 需要批改的题目列表
+        
+        批改功能：
+        - 对主观题进行评分
+        - 提供详细的教师反馈
+        - 修正客观题分数（如需要）
+        - 支持部分题目批改
 
-    ApiResponseQuestion:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponse'
-      properties:
-        data:
-          $ref: '#/components/schemas/Question'
-
-    ApiResponseQuestionList:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponse'
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/Question'
-
-    ApiResponseAssignment:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponse'
-      properties:
-        data:
-          $ref: '#/components/schemas/Assignment'
-
-    ApiResponseAssignmentList:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponse'
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/Assignment'
-
-    ApiResponseSubmission:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponse'
-      properties:
-        data:
-          $ref: '#/components/schemas/Submission'
-
-    ApiResponseSubmissionList:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponse'
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/Submission'
-
-    IdListDto:
+    GradeItemDto:
       type: object
-      required: [ids]
       properties:
-        ids:
-          type: array
-          items:
-            type: string
+        questionId:
+          type: integer
+          format: int64
+          description: 题目ID
+          example: 2
+        score:
+          type: integer
+          description: 分数
+          minimum: 0
+          example: 15
+        feedback:
+          type: string
+          description: 教师反馈
+          example: "代码规范，逻辑正确，运行结果符合要求"
+          nullable: true
+      required:
+        - questionId
+        - score
+      description: |
+        单题批改信息
+        
+        针对单个题目的批改：
+        - questionId: 要批改的题目ID
+        - score: 给定的分数
+        - feedback: 可选的教师评语
+        
+        批改原则：
+        - 分数不能超过题目满分
+        - 建议提供具体的反馈意见
+        - 有助于学生理解和改进
+
+# 全局安全配置（除了注册登录外的所有接口都需要认证）
+security:
+  - BearerAuth: []

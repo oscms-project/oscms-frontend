@@ -3,7 +3,7 @@ import request from '@/utils/request'
 // 获取课程统计信息
 export const getCourseStats = (courseId) => {
   return request({
-    url: `/courses/${courseId}/stats`,
+    url: `/api/courses/${courseId}/stats`,
     method: 'get'
   })
 }
@@ -11,7 +11,7 @@ export const getCourseStats = (courseId) => {
 // 获取班级学生列表
 export const getClassStudents = (classId) => {
   return request({
-    url: `/classes/${classId}/students`,
+    url: `/api/classes/${classId}/students`,
     method: 'get'
   })
 }
@@ -19,7 +19,7 @@ export const getClassStudents = (classId) => {
 // 导入学生
 export const importStudents = (classId, studentIds) => {
   return request({
-    url: `/classes/${classId}/students`,
+    url: `/api/classes/${classId}/students`,
     method: 'post',
     data: { studentIds }
   })
@@ -28,7 +28,7 @@ export const importStudents = (classId, studentIds) => {
 // 获取班级作业列表
 export const getClassAssignments = (classId) => {
   return request({
-    url: `/classes/${classId}/assignments`,
+    url: `/api/classes/${classId}/assignments`,
     method: 'get'
   })
 }
@@ -36,7 +36,7 @@ export const getClassAssignments = (classId) => {
 // 导出课程成绩
 export const exportCourseGrades = (courseId) => {
   return request({
-    url: `/courses/${courseId}/grades/export`,
+    url: `/api/courses/${courseId}/grades/export`,
     method: 'get',
     responseType: 'blob'
   })
@@ -45,7 +45,7 @@ export const exportCourseGrades = (courseId) => {
 // 发送作业提醒
 export const sendAssignmentReminder = (assignmentId, studentIds) => {
   return request({
-    url: `/assignments/${assignmentId}/remind`,
+    url: `/api/assignments/${assignmentId}/remind`,
     method: 'post',
     data: { studentIds }
   })
@@ -54,7 +54,7 @@ export const sendAssignmentReminder = (assignmentId, studentIds) => {
 // 获取学生进度
 export const getStudentsProgress = (courseId) => {
   return request({
-    url: `/courses/${courseId}/students/progress`,
+    url: `/api/courses/${courseId}/students/progress`,
     method: 'get'
   })
 }
@@ -62,7 +62,7 @@ export const getStudentsProgress = (courseId) => {
 // 获取课程详情（包含章节信息）
 export const getCourseDetail = (courseId) => {
   return request({
-    url: `/courses/${courseId}`,
+    url: `/api/courses/${courseId}`,
     method: 'get'
   })
 }
@@ -70,7 +70,7 @@ export const getCourseDetail = (courseId) => {
 // 获取用户详细信息
 export const getUserDetail = (userId) => {
   return request({
-    url: `/users/${userId}`,
+    url: `/api/users/${userId}`,
     method: 'get'
   })
 }
@@ -78,7 +78,7 @@ export const getUserDetail = (userId) => {
 // 获取作业详情
 export const getAssignmentDetail = (assignmentId) => {
   return request({
-    url: `/assignments/${assignmentId}`,
+    url: `/api/assignments/${assignmentId}`,
     method: 'get'
   })
 }
@@ -86,7 +86,7 @@ export const getAssignmentDetail = (assignmentId) => {
 // 更新作业信息
 export const updateAssignment = (assignmentId, data) => {
   return request({
-    url: `/assignments/${assignmentId}`,
+    url: `/api/assignments/${assignmentId}`,
     method: 'put',
     data
   })
@@ -95,7 +95,7 @@ export const updateAssignment = (assignmentId, data) => {
 // 获取作业的提交记录
 export const getAssignmentSubmissions = (classId, assignmentId) => {
   return request({
-    url: `/classes/${classId}/assignments/${assignmentId}/submissions`,
+    url: `/api/classes/${classId}/assignments/${assignmentId}/submissions`,
     method: 'get'
   })
 }
@@ -103,7 +103,7 @@ export const getAssignmentSubmissions = (classId, assignmentId) => {
 // 新增: 获取作业统计信息
 export const getAssignmentStats = (assignmentId) => {
   return request({
-    url: `/assignments/${assignmentId}/stats`,
+    url: `/api/assignments/${assignmentId}/stats`,
     method: 'get'
   })
 }
@@ -111,7 +111,7 @@ export const getAssignmentStats = (assignmentId) => {
 // 新增: 获取课程章节信息
 export const getAssignmentChapters = (courseId) => {
   return request({
-    url: `/courses/${courseId}/chapters`,
+    url: `/api/courses/${courseId}/chapters`,
     method: 'get'
   })
 }
@@ -119,7 +119,7 @@ export const getAssignmentChapters = (courseId) => {
 // 新增: 获取学生详细信息（包含联系方式等）
 export const getStudentDetails = (studentId) => {
   return request({
-    url: `/students/${studentId}/details`,
+    url: `/api/students/${studentId}/details`,
     method: 'get'
   })
 }
@@ -127,7 +127,7 @@ export const getStudentDetails = (studentId) => {
 // 新增: 批量获取作业统计信息
 export const getBatchAssignmentStats = (assignmentIds) => {
   return request({
-    url: '/assignments/stats/batch',
+    url: '/api/assignments/stats/batch',
     method: 'post',
     data: { assignmentIds }
   })
@@ -136,7 +136,7 @@ export const getBatchAssignmentStats = (assignmentIds) => {
 // 新增: 更新作业章节信息
 export const updateAssignmentChapter = (assignmentId, chapterId) => {
   return request({
-    url: `/assignments/${assignmentId}/chapter`,
+    url: `/api/assignments/${assignmentId}/chapter`,
     method: 'put',
     data: { chapterId }
   })
@@ -152,7 +152,7 @@ export const getCourseChapters = (courseId) => {
 // 获取学生在特定班级的作业完成摘要
 export const getStudentAssignmentSummary = (classId, studentId) => {
   return request({
-    url: `/classes/${classId}/students/${studentId}/assignment-summary`,
+    url: `/api/classes/${classId}/students/${studentId}/assignment-summary`,
     method: 'get'
   });
 };
@@ -160,7 +160,7 @@ export const getStudentAssignmentSummary = (classId, studentId) => {
 // 创建新班级
 export const createClass = (data) => {
   return request({
-    url: '/classes',
+    url: '/api/classes',
     method: 'post',
     data
   });
@@ -169,7 +169,7 @@ export const createClass = (data) => {
 // 从班级移除学生
 export const removeStudentFromClass = (classId, studentId) => {
   return request({
-    url: `/classes/${classId}/students/${studentId}`,
+    url: `/api/classes/${classId}/students/${studentId}`,
     method: 'delete'
   });
 };

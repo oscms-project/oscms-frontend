@@ -1,7 +1,7 @@
 import axios from '@/utils/request'
 //获取用户信息，包括用户名，id，role,email等
 export function getUser(userId) {
-  return axios.get(`/users/${userId}`)
+  return axios.get(`/api/users/${userId}`)
 }
 // 获取用户收藏的题目列表
 export function getFavoriteExercises(studentId) {
@@ -11,7 +11,7 @@ export function getFavoriteExercises(studentId) {
     // 假设你项目中已经配置了axios实例，例如 request
     // 如果没有，你需要确保 axios.get 的基础URL和认证头已正确配置
     // 或者使用项目中已有的 request 工具
-    return axios.get(`/users/${studentId}/favorites`)
+    return axios.get(`/api/users/${studentId}/favorites`)
         .then(response => {
             // 假设 ApiResponseQuestionList 的结构是 { code: number, message: string, data: Question[] }
             if (response.data && response.data.code === 200 && Array.isArray(response.data.data)) {
@@ -40,15 +40,15 @@ export function getFavoriteExercises(studentId) {
 }
 //更新个人信息
 export function updateUser(userId, data) {
-  return axios.put(`/users/${userId}`, data)
+  return axios.put(`/api/users/${userId}`, data)
 }
 //获取指定id学生参与的所有课程，返回course数组，包含课程章节，id，名称，大纲，作业，老师等信息
 export function getUserCourses(userId) {
-  return axios.get(`/users/${userId}/courses`)
+  return axios.get(`/api/users/${userId}/courses`)
 }
 //获取指定学生在某课程中的班级信息，包含班级id，名称，代码，所属课程id
 export function getUserCourseClass(userId, courseId) {
-  return axios.get(`/users/${userId}/courses/${courseId}/class`)
+  return axios.get(`/api/users/${userId}/courses/${courseId}/class`)
 }
 
 // 学生收藏题目
@@ -63,7 +63,7 @@ export function addFavoriteExercise(studentId, questionId) {
   }
   
 
-  return axios.post(`/questions/${questionId}/favorite?studentId=${studentId}`)
+  return axios.post(`/api/questions/${questionId}/favorite?studentId=${studentId}`)
     .then(response => {
       // 如果后端返回统一格式的响应，解析响应数据
       if (response.data && response.data.code === 200) {
@@ -90,3 +90,4 @@ export function addFavoriteExercise(studentId, questionId) {
       throw new Error('收藏题目时发生未知错误');
     });
 }
+

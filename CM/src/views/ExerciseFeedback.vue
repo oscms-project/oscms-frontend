@@ -238,8 +238,8 @@ const user = ref({
 const favoriteQuestion = async (questionId) => {
   try {
     const studentId = userStore.userId; // 从用户store获取当前登录的学生ID
-    await addFavoriteExercise(studentId, questionId);
-    
+    await addFavoriteExercise(questionId, studentId);
+
     // 收藏成功处理
     showAlert.value = true;
     alertMessage.value = "题目已成功收藏";
