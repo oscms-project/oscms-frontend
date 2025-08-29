@@ -317,6 +317,12 @@ const fetchStudentCourses = async () => {
     // 3. 遍历每个班级，查作业完成情况
     for (const cls of studentClasses) {
       try {
+        // 检查classId是否有效
+        if (!cls.classId) {
+          console.warn('跳过无效的班级数据:', cls);
+          continue;
+        }
+        
         const summaryRes = await getStudentAssignmentSummary(cls.classId, userStore.userId);
         if (summaryRes.data && summaryRes.data.data) {
           const summary = summaryRes.data.data;

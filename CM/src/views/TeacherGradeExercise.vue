@@ -267,7 +267,7 @@
                         <div class="text-sm text-gray-500 mb-4">
                             <span>总分: {{ exercise.totalPoints }} 分</span>
                             <span class="mx-2">|</span>
-                            <span>{{ exercise.type === 'choice' ? '选择题' : exercise.type === 'programming' ? '编程题' :
+                            <span>{{ exercise.type === 'choice' ? '选择题' : exercise.type === 'programming' ? '编程题' : exercise.type === 'short_answer' ? '简答题' :
                                 '混合题型' }}</span>
                             <span class="mx-2">|</span>
                             <span>提交人数: {{ submissions.length }}</span>
@@ -335,7 +335,7 @@
                                     <tr v-for="(question, index) in feedbackReport.questionAnalysis" :key="index"
                                         class="hover:bg-gray-50">
                                         <td class="border px-4 py-2">{{ index + 1 }}</td>
-                                        <td class="border px-4 py-2">{{ question.type === 'choice' ? '选择题' : '编程题' }}
+                                        <td class="border px-4 py-2">{{ question.type === 'choice' ? '选择题' : question.type === 'programming' ? '编程题' : question.type === 'short_answer' ? '简答题' : '其他' }}
                                         </td>
                                         <td class="border px-4 py-2">{{ question.points }}</td>
                                         <td class="border px-4 py-2">{{ question.avgScore.toFixed(1) }}</td>
@@ -831,7 +831,7 @@ const saveGrades = async () => {
         const pendingSubmissions = submissionState.list.filter(s => s.status === 'submitted');
         
         // 获取主观题列表
-        const subjectiveQuestions = exercise.value.questions.filter(q => q.type === 'programming' || q.type === 'subjective');
+        const subjectiveQuestions = exercise.value.questions.filter(q => q.type === 'programming' || q.type === 'subjective' || q.type === 'short_answer');
         
         // 批量处理每个提交
         for (const submission of pendingSubmissions) {

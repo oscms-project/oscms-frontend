@@ -809,6 +809,13 @@
           </div>
         </template>
 
+        <template v-else-if="currentQuestion?.type === 'short_answer'">
+          <div class="form-group">
+            <label for="referenceAnswer">参考答案</label>
+            <textarea id="referenceAnswer" v-model="currentQuestion.referenceAnswer" rows="4" placeholder="输入参考答案"></textarea>
+          </div>
+        </template>
+
         <template v-else-if="currentQuestion?.type === 'programming'">
           <div class="form-group">
             <label for="questionDescription">题目描述</label>
@@ -2594,6 +2601,7 @@ const previewVersion = (resourceId, version) => {
 const questionTypes = [
   { value: 'choice', label: '选择题', icon: 'i-lucide-list' },
   { value: 'programming', label: '编程题', icon: 'i-lucide-code' },
+  { value: 'short_answer', label: '简答题', icon: 'i-lucide-edit-3' },
   { value: 'completion', label: '填空题', icon: 'i-lucide-pen-line' },
   { value: 'essay', label: '问答题', icon: 'i-lucide-file-text' }
 ];

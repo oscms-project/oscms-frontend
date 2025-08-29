@@ -185,7 +185,8 @@
                 <!-- 选择题 -->
                 <div v-for="(question, qIndex) in task.questions" :key="qIndex" class="border rounded-lg p-4" :class="{
                     'border-blue-200 bg-blue-50': question.type === 'choice',
-                    'border-green-200 bg-green-50': question.type === 'programming'
+                    'border-green-200 bg-green-50': question.type === 'programming',
+                    'border-orange-200 bg-orange-50': question.type === 'short_answer'
                 }">
                     <div class="flex justify-between items-start mb-4">
                         <div class="flex items-start">
@@ -194,9 +195,10 @@
                                 <div class="flex items-center">
                                     <span class="px-2 py-0.5 text-xs rounded-full mr-2" :class="{
                                         'bg-blue-200 text-blue-800': question.type === 'choice',
-                                        'bg-green-200 text-green-800': question.type === 'programming'
+                                        'bg-green-200 text-green-800': question.type === 'programming',
+                                        'bg-orange-200 text-orange-800': question.type === 'short_answer'
                                     }">
-                                        {{ question.type === 'choice' ? '选择题' : '编程题' }}
+                                        {{ question.type === 'choice' ? '选择题' : question.type === 'programming' ? '编程题' : question.type === 'short_answer' ? '简答题' : '其他' }}
                                     </span>
                                     <input v-if="!question.bankId" v-model="question.text" type="text"
                                         class="flex-grow px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -267,6 +269,17 @@
                                 <span class="text-gray-700">{{ option.text }}</span>
                             </div>
                         </template>
+                    </div>
+
+                    <!-- 简答题详情 -->
+                    <div v-if="question.type === 'short_answer'" class="ml-6 mt-4">
+                        <div class="mb-3">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">参考答案</label>
+                            <textarea v-if="!question.bankId" v-model="question.referenceAnswer"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 h-24"
+                                placeholder="请输入参考答案"></textarea>
+                            <div v-else class="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-md h-24 overflow-y-auto whitespace-pre-wrap">{{ question.referenceAnswer || '无参考答案' }}</div>
+                        </div>
                     </div>
 
                     <!-- 编程题详情 -->
@@ -414,7 +427,7 @@
                         <div class="text-sm text-gray-500 mb-2">
                             <span>总分: {{ task.totalPoints || 0 }} 分</span>
                             <span class="mx-2">|</span>
-                            <span>{{ task.type === 'choice' ? '选择题' : task.type === 'programming' ? '编程题' : '混合题型'
+                            <span>{{ task.type === 'choice' ? '选择题' : task.type === 'programming' ? '编程题' : task.type === 'short_answer' ? '简答题' : '混合题型'
                                 }}</span>
                             <span class="mx-2">|</span>
                             <span>{{ task.timeLimit ? `时间限制: ${task.timeLimit} 分钟` : '无时间限制' }}</span>
@@ -450,6 +463,16 @@
                                         {{ ['A', 'B', 'C', 'D'][oIndex] }}
                                     </div>
                                     <div>{{ option || `选项 ${['A', 'B', 'C', 'D'][oIndex]}` }}</div>
+                                </div>
+                            </div>
+
+                            <!-- 简答题详情 -->
+                            <div v-if="question.type === 'short_answer'" class="ml-6 mt-4">
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">请在此输入答案：</label>
+                                    <textarea
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 h-24"
+                                        placeholder="请输入您的答案..."></textarea>
                                 </div>
                             </div>
 
@@ -809,6 +832,14 @@
                                     {{ ['A', 'B', 'C', 'D'][oIndex] }}
                                 </div>
                                 <div>{{ option }}</div>
+                            </div>
+                        </div>
+
+                        <!-- 简答题详情 -->
+                        <div v-if="previewQuestion.type === 'short_answer'" class="mb-6">
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">参考答案：</label>
+                                <div class="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-md min-h-24 whitespace-pre-wrap">{{ previewQuestion.referenceAnswer || '无参考答案' }}</div>
                             </div>
                         </div>
 
