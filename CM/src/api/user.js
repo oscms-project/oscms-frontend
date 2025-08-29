@@ -53,7 +53,7 @@ export function getUserCourseClass(userId, courseId) {
 
 // 学生收藏题目
 // 学生收藏题目 - 修正后的接口
-export function addFavoriteExercise(studentId, questionId) {
+export function addFavoriteExercise( questionId,studentId) {
   if (!studentId) {
     return Promise.reject(new Error('学生ID不能为空'));
   }
