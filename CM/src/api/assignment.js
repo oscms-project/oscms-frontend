@@ -1,4 +1,4 @@
-import axios from 'axios'
+import request from '@/utils/request'
 
 /**
  * 获取作业下的全部题目
@@ -9,7 +9,7 @@ export function getAssignmentQuestions(assignmentId) {
     if (!assignmentId) {
         return Promise.reject(new Error('作业ID不能为空'));
     }
-    return axios
+    return request
         .get(`/api/assignments/${assignmentId}/questions`)
         .then(res => {
             if (res.data && res.data.code === 200) {
@@ -28,7 +28,7 @@ export function getAssignmentQuestions(assignmentId) {
  * @returns {Promise<Object>} 提交结果
  */
 export function submitAssignmentAnswers(classId, assignmentId, data) {
-    return axios
+    return request
         .post(`/api/classes/${classId}/assignments/${assignmentId}/submissions`, data)
         .then(res => {
             if (res.data && res.data.code === 201) {
@@ -48,7 +48,7 @@ export function getSubmissionDetail(submissionId) {
     if (!submissionId) {
         return Promise.reject(new Error('提交ID不能为空'));
     }
-    return axios
+    return request
         .get(`/api/submissions/${submissionId}`)
         .then(res => {
             if (res.data && res.data.code === 200) {
@@ -65,7 +65,7 @@ export function getSubmissionDetail(submissionId) {
  * @returns {Promise<Array>}
  */
 export function getQuestionBank(params = {}) {
-    return axios
+    return request
         .get('/api/questions', { params })
         .then(res => {
             if (res.data && res.data.code === 200) {
@@ -83,7 +83,7 @@ export function getQuestionBank(params = {}) {
  * @returns {Promise<Object>}
  */
 export function importQuestionsToAssignment(assignmentId, questionIds) {
-    return axios
+    return request
         .post(`/api/assignments/${assignmentId}/questions`, { ids: questionIds })
         .then(res => {
             if (res.data && res.data.code === 200) {
@@ -101,7 +101,7 @@ export function importQuestionsToAssignment(assignmentId, questionIds) {
  * @returns {Promise<Object>}
  */
 export function createAssignment(classId, assignmentData) {
-    return axios
+    return request
         .post(`/api/classes/${classId}/assignments`, assignmentData)
         .then(res => {
             if (res.data && res.data.code === 201) {
@@ -119,7 +119,7 @@ export function createAssignment(classId, assignmentData) {
  * @returns {Promise<Array>} 提交列表
  */
 export function getAssignmentSubmissions(classId, assignmentId) {
-    return axios
+    return request
         .get(`/api/classes/${classId}/assignments/${assignmentId}/submissions`)
         .then(res => {
             if (res.data && res.data.code === 200) {
@@ -137,7 +137,7 @@ export function getAssignmentSubmissions(classId, assignmentId) {
  * @returns {Promise<ApiResponse<Submission[]>>} 提交记录列表
  */
 export function getAssignmentSubmissionsList(classId, assignmentId) {
-    return axios
+    return request
         .get(`/api/classes/${classId}/assignments/${assignmentId}/submissions`)
         .then(res => {
             if (res.data && res.data.code === 200) {
@@ -154,7 +154,7 @@ export function getAssignmentSubmissionsList(classId, assignmentId) {
  * @returns {Promise<ApiResponse<Submission>>} 更新后的提交记录
  */
 export function gradeSubmission(submissionId, grades) {
-    return axios
+    return request
         .put(`/api/submissions/${submissionId}/grade`, { grades })
         .then(res => {
             if (res.data && res.data.code === 200) {
@@ -172,7 +172,7 @@ export function gradeSubmission(submissionId, grades) {
  * @returns {Promise<Object>} 创建的题目对象
  */
 export function createQuestionInBank(questionData) {
-    return axios
+    return request
         .post('/api/questions', questionData)
         .then(res => {
             // 后端创建成功可能返回 201 Created，或者 200 OK 并附带数据
@@ -200,7 +200,7 @@ export function getLatestSubmission(assignmentId) {
     if (!assignmentId) {
         return Promise.reject(new Error('作业ID不能为空'));
     }
-    return axios
+    return request
         .get(`/api/assignments/${assignmentId}/latest-submission`)
         .then(res => {
             if (res.data && res.data.code === 200) {
