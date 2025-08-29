@@ -169,7 +169,7 @@
        <!-- 下载按钮链接到文件URL -->
       <button 
         class="download-btn" 
-        @click="downloadFile(material.url, material.filename)"
+        @click="downloadFile(material.id, material.filename)"
       >
         下载
       </button>
@@ -573,10 +573,23 @@ const filteredMaterials = computed(() => {
   }
   return filtered;
 });
-// 完善下载函数
-const downloadFile = (url, filename) => {
-  fetch(url)
-    .then(response => response.blob())
+// 完善下载函数 - 使用正确的API接口
+const downloadFile = (materialId, filename) => {
+  // 构建正确的下载URL
+  const downloadUrl = `http://localhost:8080/api/courses/${courseId.value}/resources/${materialId}/download`;
+  
+  fetch(downloadUrl, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${userStore.token}`
+    }
+  })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`下载失败: ${response.status}`);
+      }
+      return response.blob();
+    })
     .then(blob => {
       // 创建一个临时的URL对象
       const fileURL = window.URL.createObjectURL(blob);

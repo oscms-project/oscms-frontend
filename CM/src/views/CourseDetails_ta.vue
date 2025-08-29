@@ -2126,20 +2126,41 @@
       showResourcePreview.value = true;
     };
     
-    // 下载资源
+    // 下载资源 - 使用正确的API接口
     const downloadResource = (resource) => {
-      // 在实际应用中，这里应该触发文件下载
-      console.log(resource.filename);
-      if (resource.url) {
-        const a = document.createElement('a');
-        a.href = resource.url;
-        a.download = resource.filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      } else {
-        alert(`下载资源：${resource.filename}`);
-      }
+      // 构建正确的下载URL
+      const downloadUrl = `http://localhost:8080/api/courses/${courseId.value}/resources/${resource.id}/download`;
+      
+      fetch(downloadUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${userStore.token}`
+        }
+      })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`下载失败: ${response.status}`);
+          }
+          return response.blob();
+        })
+        .then(blob => {
+          // 创建一个临时的URL对象
+          const fileURL = window.URL.createObjectURL(blob);
+          // 创建一个链接元素
+          const fileLink = document.createElement('a');
+          fileLink.href = fileURL;
+          fileLink.setAttribute('download', resource.filename);
+          // 模拟点击下载
+          document.body.appendChild(fileLink);
+          fileLink.click();
+          // 清理
+          document.body.removeChild(fileLink);
+          window.URL.revokeObjectURL(fileURL);
+        })
+        .catch(error => {
+          console.error('下载文件失败:', error);
+          alert('下载文件失败，请稍后重试');
+        });
     };
     
     // 判断资源是否可以预览
