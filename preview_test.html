@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>选项显示测试</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+</head>
+<body>
+    <div id="app">
+        <h3>测试选项显示</h3>
+        
+        <h4>对象格式选项：</h4>
+        <div v-for="(option, index) in objectOptions" :key="index">
+            <p>直接显示: {{ option }}</p>
+            <p>修复后显示: {{ typeof option === 'object' ? (option.text || option.label || String(option)) : option }}</p>
+            <hr>
+        </div>
+        
+        <h4>字符串格式选项：</h4>
+        <div v-for="(option, index) in stringOptions" :key="index">
+            <p>直接显示: {{ option }}</p>
+            <p>修复后显示: {{ typeof option === 'object' ? (option.text || option.label || String(option)) : option }}</p>
+            <hr>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+        
+        createApp({
+            data() {
+                return {
+                    objectOptions: [
+                        { id: "1", text: "这是选项A的内容" },
+                        { id: "2", text: "这是选项B的内容" },
+                        { id: "3", label: "这是选项C的内容（用label字段）" },
+                        { id: "4", other: "这是选项D的内容（用other字段）" }
+                    ],
+                    stringOptions: [
+                        "这是字符串选项1",
+                        "这是字符串选项2",
+                        "这是字符串选项3",
+                        "这是字符串选项4"
+                    ]
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

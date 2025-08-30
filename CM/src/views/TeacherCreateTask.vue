@@ -50,11 +50,6 @@
                         @click="publishTask">
                         发布
                     </button>
-                    <!-- 临时测试按钮 -->
-                    <button class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs"
-                        @click="() => showMessage('测试消息显示')">
-                        测试消息
-                    </button>
                 </div>
             </div>
         </div>
@@ -467,7 +462,7 @@
                                         class="w-6 h-6 rounded-full flex items-center justify-center border mr-2 border-gray-300">
                                         {{ ['A', 'B', 'C', 'D'][oIndex] }}
                                     </div>
-                                    <div>{{ option || `选项 ${['A', 'B', 'C', 'D'][oIndex]}` }}</div>
+                                    <div>{{ typeof option === 'object' ? (option.text || option.label || String(option)) : (option || `选项 ${['A', 'B', 'C', 'D'][oIndex]}`) }}</div>
                                 </div>
                             </div>
 
@@ -837,7 +832,7 @@
                                                                         {{ ['A', 'B', 'C', 'D'][oIndex] }}
                                                                 </div>
                                                                 <div>
-                                                                    {{ option }}
+                                                                    {{ typeof option === 'object' ? (option.text || option.label || String(option)) : option }}
                                                                 </div>
                                                         </div>
                         </div>
