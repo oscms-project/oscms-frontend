@@ -50,6 +50,11 @@
                         @click="publishTask">
                         发布
                     </button>
+                    <!-- 临时测试按钮 -->
+                    <button class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs"
+                        @click="() => showMessage('测试消息显示')">
+                        测试消息
+                    </button>
                 </div>
             </div>
         </div>
@@ -824,15 +829,17 @@
 
                         <!-- 选择题选项 -->
                         <div v-if="previewQuestion.type === 'choice'" class="space-y-2 mb-6">
-                            <div v-for="(option, oIndex) in previewQuestion.options" :key="oIndex"
-                                class="flex items-center p-3 rounded-lg"
-                                :class="{ 'bg-green-50 border border-green-200': previewQuestion.correctAnswer === oIndex, 'border border-gray-200': previewQuestion.correctAnswer !== oIndex }">
-                                <div class="w-6 h-6 rounded-full flex items-center justify-center border mr-2"
-                                    :class="{ 'bg-green-500 border-green-500 text-white': previewQuestion.correctAnswer === oIndex, 'border-gray-300': previewQuestion.correctAnswer !== oIndex }">
-                                    {{ ['A', 'B', 'C', 'D'][oIndex] }}
-                                </div>
-                                <div>{{ option }}</div>
-                            </div>
+                                                        <div v-for="(option, oIndex) in previewQuestion.options" :key="oIndex"
+                                                                class="flex items-center p-3 rounded-lg"
+                                                                :class="{ 'bg-green-50 border border-green-200': previewQuestion.correctAnswer === oIndex, 'border border-gray-200': previewQuestion.correctAnswer !== oIndex }">
+                                                                <div class="w-6 h-6 rounded-full flex items-center justify-center border mr-2"
+                                                                        :class="{ 'bg-green-500 border-green-500 text-white': previewQuestion.correctAnswer === oIndex, 'border-gray-300': previewQuestion.correctAnswer !== oIndex }">
+                                                                        {{ ['A', 'B', 'C', 'D'][oIndex] }}
+                                                                </div>
+                                                                <div>
+                                                                    {{ option }}
+                                                                </div>
+                                                        </div>
                         </div>
 
                         <!-- 简答题详情 -->
@@ -989,11 +996,18 @@ const alertMessage = ref('');
 
 // 显示提示信息
 const showMessage = (message) => {
+    console.log('[showMessage] 显示消息:', message);
     alertMessage.value = message;
     showAlert.value = true;
 
+    console.log('[showMessage] 消息状态设置完成:', {
+        alertMessage: alertMessage.value,
+        showAlert: showAlert.value
+    });
+
     // 2秒后自动关闭
     setTimeout(() => {
+        console.log('[showMessage] 2秒后自动关闭消息');
         showAlert.value = false;
     }, 2000);
 };
@@ -1443,7 +1457,46 @@ const removeFromSelected = (questionId) => {
 
 // 预览题库题目
 const previewBankQuestion = (question) => {
-    previewQuestion.value = question;
+    // 创建预览数据的副本，确保选项格式统一
+    const previewData = { ...question };
+    
+    // 如果是选择题，强制处理选项数据为字符串数组
+    if (question.type === 'choice') {
+        let optionsArray = [];
+        
+        // 优先使用 choices 字段（如果存在且为数组）
+        if (Array.isArray(question.choices)) {
+            optionsArray = question.choices.map((choice) => {
+                if (typeof choice === 'string') {
+                    return choice; // 直接返回字符串
+                } else if (typeof choice === 'object' && choice !== null) {
+                    return choice.text || choice.label || String(choice); // 提取 text 或 label 字段
+                } else {
+                    return String(choice || ''); // 兜底转换为字符串
+                }
+            });
+        } 
+        // 如果没有 choices，尝试使用 options 字段
+        else if (Array.isArray(question.options)) {
+            optionsArray = question.options.map((option) => {
+                if (typeof option === 'string') {
+                    return option; // 直接返回字符串
+                } else if (typeof option === 'object' && option !== null) {
+                    return option.text || option.label || String(option); // 提取 text 或 label 字段
+                } else {
+                    return String(option || ''); // 兜底转换为字符串
+                }
+            });
+        }
+        
+        // 强制将处理后的字符串数组赋值给 options
+        previewData.options = optionsArray;
+        
+        // 删除原来的 choices 字段，避免混淆
+        delete previewData.choices;
+    }
+    
+    previewQuestion.value = previewData;
     showQuestionPreview.value = true;
 };
 
@@ -1650,6 +1703,8 @@ const previewTask = () => {
 
 // 发布任务
 const publishTask = async () => {
+    console.log('[publishTask] 开始发布任务...');
+    
     // 验证必填字段
     if (!task.title) {
         showMessage('请输入任务标题');
@@ -1671,6 +1726,9 @@ const publishTask = async () => {
         showMessage('请添加至少一道题目');
         return;
     }
+    
+    console.log('[publishTask] 基础验证通过');
+    
     // 验证每道题目
     for (let i = 0; i < task.questions.length; i++) {
         const q = task.questions[i];
@@ -1700,6 +1758,9 @@ const publishTask = async () => {
             }
         }
     }
+    
+    console.log('[publishTask] 题目验证通过');
+    
     // 合并 assignmentData，严格按接口字段
     const assignmentData = {
         title: task.title,
@@ -1723,14 +1784,34 @@ const publishTask = async () => {
             return ids; // Corrected placement
         })()
     };
+    
+    console.log('[publishTask] 准备发送的数据:', {
+        classId: task.classId,
+        assignmentData: assignmentData
+    });
+    
     try {
-        await createAssignment(task.classId, assignmentData);
-         showMessage('布置作业成功');
+        console.log('[publishTask] 开始调用 createAssignment API...');
+        const result = await createAssignment(task.classId, assignmentData);
+        console.log('[publishTask] API 调用成功，返回结果:', result);
+        
+        console.log('[publishTask] 显示成功消息...');
+        showMessage('创建练习成功');
+        
+        console.log('[publishTask] 准备跳转...');
+        // 立即跳转返回上一页
         setTimeout(() => {
+            console.log('[publishTask] 执行跳转...');
             goBackToCourseManagement();
-        }, 1500);
+        }, 1000);
     } catch (e) {
-        ElMessageNotification.error(e.message || '布置作业失败'); // Changed to .error
+        console.error('[publishTask] 错误详情:', {
+            error: e,
+            message: e.message,
+            response: e.response,
+            stack: e.stack
+        });
+        showMessage(e.message || '创建练习失败，请重试');
     }
 };
 

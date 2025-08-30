@@ -101,15 +101,34 @@ export function importQuestionsToAssignment(assignmentId, questionIds) {
  * @returns {Promise<Object>}
  */
 export function createAssignment(classId, assignmentData) {
+    console.log('[createAssignment API] 开始调用，参数:', { classId, assignmentData });
+    
     return request
         .post(`/api/classes/${classId}/assignments`, assignmentData)
         .then(res => {
-            if (res.data && res.data.code === 201) {
+            console.log('[createAssignment API] 收到响应:', res);
+            console.log('[createAssignment API] 响应数据:', res.data);
+            
+            if (res.data && (res.data.code === 201 || res.data.code === 200)) {
+                console.log('[createAssignment API] 响应成功，返回数据:', res.data.data);
                 return res.data.data
             } else {
+                console.error('[createAssignment API] 响应失败:', {
+                    code: res.data?.code,
+                    message: res.data?.message,
+                    fullResponse: res.data
+                });
                 throw new Error(res.data?.message || '布置作业失败')
             }
         })
+        .catch(error => {
+            console.error('[createAssignment API] 请求异常:', {
+                error: error,
+                response: error.response,
+                message: error.message
+            });
+            throw error;
+        });
 }
 
 /**
