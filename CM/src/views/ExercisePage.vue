@@ -315,7 +315,7 @@ const submitExercise = async () => {
             questionId: question.id,
             response: answers.value[index] || ''
         }));
-
+        console.log('提交作业 studentId:', userStore.userId);
         // 提交答案
         const result = await submitAssignmentAnswers(classId, assignmentId, {
             studentId,

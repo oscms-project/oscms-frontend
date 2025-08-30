@@ -401,7 +401,6 @@ import { useRouter, useRoute } from 'vue-router';
 import { getAssignmentSubmissions, getSubmissionDetail, gradeSubmission, getAssignmentQuestions } from '@/api/assignment';
 import { useCourseStore } from '@/stores/course';
 import { useUserStore } from '@/stores/user';
-import axios from 'axios';
 
 const router = useRouter();
 const route = useRoute();
@@ -562,7 +561,6 @@ const formatDate = (dateString) => {
 const loadSubmissions = async () => {
     submissionState.loading = true;
     submissionState.error = null;
-    
     try {
         // 检查必要参数
         if (!classId.value) {
@@ -571,50 +569,45 @@ const loadSubmissions = async () => {
         if (!assignmentId.value) {
             throw new Error('作业ID不能为空');
         }
-
         console.log('开始获取提交列表，参数:', {
             classId: classId.value,
             assignmentId: assignmentId.value
         });
-        
-        const response = await axios.get(`/classes/${classId.value}/assignments/${assignmentId.value}/submissions`);
-        console.log('获取到提交列表响应:', response.data);
-        
-        // 检查response是否是数组
-        if (Array.isArray(response.data.data)) {
-            // 处理每个提交记录
-            submissionState.list = response.data.data.map(submission => {
-                console.log('处理提交记录:', submission);
-                return {
-                    ...submission,
-                    // 格式化日期
-                    submittedAt: formatDateTime(submission.submittedAt),
-                    // 添加UI状态
-                    isExpanded: false,
-                    isGrading: false,
-                    // 确保answers数组存在
-                    answers: submission.answers || [],
-                    // 确保分数为数字
-                    autoScore: Number(submission.autoScore) || 0,
-                    manualScore: Number(submission.manualScore) || 0,
-                    totalScore: Number(submission.totalScore) || 0
-                };
-            });
-
-            // 更新统计信息
-            updateSubmissionStats();
-            
-            // 更新submissions引用（用于UI显示）
-            submissions.value = submissionState.list;
-        } else {
-            console.error('获取提交列表失败：响应不是数组', response.data);
+        const response = await getAssignmentSubmissions(classId.value, assignmentId.value);
+        console.log('获取到提交列表响应:', response);
+        // 兼容后端返回数组或对象（如 { code, data })
+        let submissionArr = Array.isArray(response) ? response : response.data || response;
+        if (!Array.isArray(submissionArr)) {
+            console.error('获取提交列表失败：响应不是数组', response);
             throw new Error('获取提交列表失败：响应格式错误');
         }
+        // 处理每个提交记录
+        submissionState.list = submissionArr.map(submission => {
+            console.log('处理提交记录:', submission);
+            return {
+                ...submission,
+                // 格式化日期
+                submittedAt: formatDateTime(submission.submittedAt),
+                // 添加UI状态
+                isExpanded: false,
+                isGrading: false,
+                // 确保answers数组存在
+                answers: submission.answers || [],
+                // 确保分数为数字
+                autoScore: Number(submission.autoScore) || 0,
+                manualScore: Number(submission.manualScore) || 0,
+                totalScore: Number(submission.totalScore) || 0
+            };
+        });
+        // 更新统计信息
+        updateSubmissionStats();
+        // 更新submissions引用（用于UI显示）
+        submissions.value = submissionState.list;
     } catch (err) {
         console.error('加载提交列表失败:', err);
         submissionState.error = err.message || '加载提交列表失败，请重试';
         // 如果是参数错误，返回到课程管理页面
-        if (err.message.includes('ID不能为空')) {
+        if (err.message && err.message.includes('ID不能为空')) {
             alert(err.message);
             router.push('/course-management');
         }
@@ -670,8 +663,7 @@ defineExpose({
 // 选中提交，拉取详情
 const selectSubmissionHandler = async (submission) => {
     try {
-        const detailResponse = await axios.get(`/submissions/${submission.submissionId || submission.id}`);
-        const detailData = detailResponse.data.data; // API返回的原始提交详情
+        const detailData = await getSubmissionDetail(submission.submissionId || submission.id);
         console.log('获取到提交详情:', detailData);
         const numSubjectiveQuestions = subjectiveQuestions.value.length;
         const newQuestionScores = new Array(numSubjectiveQuestions).fill(0);
@@ -722,7 +714,6 @@ const selectSubmissionHandler = async (submission) => {
             // 如果需要，可以保留从API获取的原始完整答案列表，例如：
             // originalRawAnswers: detailData.answers || [] 
         };
-        
     } catch (error) {
         console.error('获取提交详情失败:', error);
         showMessage('获取提交详情失败');
@@ -780,16 +771,27 @@ const saveCurrentGrade = async () => {
     if (!selectedSubmission.value) return;
     console.log('选中的提交:', selectedSubmission.value);
 
-    // 构建评分数据
+    // 构建评分数据，保证类型严格
     const grades = subjectiveQuestions.value.map((question, index) => ({
         questionId: String(question.id),
-        score: selectedSubmission.value.questionScores[index] || 0,
-        feedback: selectedSubmission.value.feedback[index] || ''
+        score: Number(selectedSubmission.value.questionScores[index]) || 0,
+        feedback: String(selectedSubmission.value.feedback[index] || '')
     }));
+    // 保证 overallFeedback 一定是字符串
+    const overallFeedback = String(selectedSubmission.value.overallFeedback || '');
+    // 校验：禁止空批改
+    if (!grades.length) {
+        showMessage('没有可批改的题目，请先评分后再提交');
+        return;
+    }
 
     try {
         loading.value = true;
-        const response = await gradeSubmission(selectedSubmission.value.submissionId, grades);
+        const response = await gradeSubmission(
+            selectedSubmission.value.submissionId,
+            grades,
+            overallFeedback
+        );
         console.log('批改提交响应:', selectedSubmission.value);
         // 计算人工评分总和
         const manualScore = grades.reduce((sum, grade) => sum + grade.score, 0);

@@ -308,23 +308,27 @@ const retryWrongQuestions = async (practice) => {
     console.log("查询练习提交，班级ID:", classId.value, "练习ID:", practice.id);
     const submissions = await getAssignmentSubmissions(classId.value, practice.id);
     console.log("获取练习提交记录:", submissions);
-    
     // 检查API返回数据格式
-    if (!submissions.data || !submissions.data.data) {
+    if (!submissions.data || !Array.isArray(submissions.data.data)) {
       showAlert.value = true;
       alertMessage.value = "获取练习提交记录失败";
       setTimeout(() => { showAlert.value = false; }, 2000);
       return;
     }
-    
+    // 打印所有提交记录和 studentId 及类型
+    console.log('所有提交记录:', submissions.data.data);
+    if (submissions.data.data.length > 0) {
+      console.log('第一个提交记录对象:', submissions.data.data[0]);
+    }
+    console.log('当前用户 studentId:', userStore.userId, typeof userStore.userId);
     // 从所有提交中查找当前用户的提交记录
     const studentSubmission = submissions.data.data.find(
-      submission => submission.studentId === userStore.userId
+      submission => String(submission.studentId) === String(userStore.userId)
     );
     console.log('找到的学生提交记录:', studentSubmission);
-    
-    // 如果未找到提交记录，提示练习未完成
+    // 如果未找到提交记录，详细打印所有提交记录和 userId
     if (!studentSubmission || !studentSubmission.id) {
+      console.warn('未找到学生提交记录，所有提交记录为:', submissions.data.data, 'userId:', userStore.userId);
       showAlert.value = true;
       alertMessage.value = "该练习未完成，暂无错题可做！";
       setTimeout(() => { showAlert.value = false; }, 2000);
@@ -371,23 +375,27 @@ const viewLastRecord = async (practice) => {
     // 使用正确的API获取班级中该练习的所有提交记录
     const submissions = await getAssignmentSubmissions(classId.value, practice.id);
     console.log('获取练习提交记录:', submissions);
-    
     // 检查API返回数据格式
-    if (!submissions.data || !submissions.data.data) {
+    if (!submissions.data || !Array.isArray(submissions.data.data)) {
       showAlert.value = true;
       alertMessage.value = "获取练习提交记录失败";
       setTimeout(() => { showAlert.value = false; }, 2000);
       return;
     }
-    
+    // 打印所有提交记录和 studentId 及类型
+    console.log('所有提交记录:', submissions.data.data);
+    if (submissions.data.data.length > 0) {
+      console.log('第一个提交记录对象:', submissions.data.data[0]);
+    }
+    console.log('当前用户 studentId:', userStore.userId, typeof userStore.userId);
     // 从所有提交中查找当前用户的提交记录
     const studentSubmission = submissions.data.data.find(
-      submission => submission.studentId === userStore.userId
+      submission => String(submission.studentId) === String(userStore.userId)
     );
     console.log('找到的学生提交记录:', studentSubmission);
-    
-    // 如果未找到提交记录，提示练习未完成
+    // 如果未找到提交记录，详细打印所有提交记录和 userId
     if (!studentSubmission || !studentSubmission.id) {
+      console.warn('未找到学生提交记录，所有提交记录为:', submissions.data.data, 'userId:', userStore.userId);
       showAlert.value = true;
       alertMessage.value = "该练习未完成，暂无练习记录！";
       setTimeout(() => { showAlert.value = false; }, 2000);

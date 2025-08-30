@@ -31,12 +31,12 @@ export function submitAssignmentAnswers(classId, assignmentId, data) {
     return request
         .post(`/api/classes/${classId}/assignments/${assignmentId}/submissions`, data)
         .then(res => {
-            if (res.data && res.data.code === 201) {
-                return res.data.data
+            if (res.data && (res.data.code === 201 || res.data.code === 200)) {
+                return res.data.data;
             } else {
-                throw new Error(res.data?.message || '提交失败')
+                throw new Error(res.data?.message || '提交失败');
             }
-        })
+        });
 }
 
 /**
@@ -121,13 +121,7 @@ export function createAssignment(classId, assignmentData) {
 export function getAssignmentSubmissions(classId, assignmentId) {
     return request
         .get(`/api/classes/${classId}/assignments/${assignmentId}/submissions`)
-        .then(res => {
-            if (res.data && res.data.code === 200) {
-                return res.data.data;
-            } else {
-                throw new Error(res.data?.message || '获取提交列表失败');
-            }
-        });
+        .then(res => res.data);
 }
 
 /**
@@ -139,13 +133,7 @@ export function getAssignmentSubmissions(classId, assignmentId) {
 export function getAssignmentSubmissionsList(classId, assignmentId) {
     return request
         .get(`/api/classes/${classId}/assignments/${assignmentId}/submissions`)
-        .then(res => {
-            if (res.data && res.data.code === 200) {
-                return res.data.data;
-            } else {
-                throw new Error(res.data?.message || '获取提交列表失败');
-            }
-        });
+        .then(res => res.data);
 }
 /**
  * 教师批改主观题
@@ -153,9 +141,12 @@ export function getAssignmentSubmissionsList(classId, assignmentId) {
  * @param {Array<{questionId: string, score: number, feedback?: string}>} grades 批改结果
  * @returns {Promise<ApiResponse<Submission>>} 更新后的提交记录
  */
-export function gradeSubmission(submissionId, grades) {
+export function gradeSubmission(submissionId, grades, overallFeedback) {
+    const body = { grades };
+    if (overallFeedback !== undefined) body.overallFeedback = overallFeedback;
+    console.log('gradeSubmission 请求体:', body);
     return request
-        .put(`/api/submissions/${submissionId}/grade`, { grades })
+        .put(`/api/submissions/${submissionId}/grade`, body)
         .then(res => {
             if (res.data && res.data.code === 200) {
                 return res.data.data;
