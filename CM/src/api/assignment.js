@@ -140,7 +140,13 @@ export function createAssignment(classId, assignmentData) {
 export function getAssignmentSubmissions(classId, assignmentId) {
     return request
         .get(`/api/classes/${classId}/assignments/${assignmentId}/submissions`)
-        .then(res => res.data);
+        .then(res => {
+            if (res.data && res.data.code === 200) {
+                return res.data.data;
+            } else {
+                throw new Error(res.data?.message || '获取提交列表失败');
+            }
+        });
 }
 
 /**
@@ -152,7 +158,13 @@ export function getAssignmentSubmissions(classId, assignmentId) {
 export function getAssignmentSubmissionsList(classId, assignmentId) {
     return request
         .get(`/api/classes/${classId}/assignments/${assignmentId}/submissions`)
-        .then(res => res.data);
+        .then(res => {
+            if (res.data && res.data.code === 200) {
+                return res.data.data;
+            } else {
+                throw new Error(res.data?.message || '获取提交列表失败');
+            }
+        });
 }
 /**
  * 教师批改主观题
