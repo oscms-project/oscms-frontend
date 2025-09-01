@@ -584,7 +584,7 @@ const filteredMaterials = computed(() => {
 // 完善下载函数 - 使用正确的API接口
 const downloadFile = (materialId, filename) => {
   // 构建正确的下载URL
-  const downloadUrl = `http://localhost:8080/api/courses/${courseId.value}/resources/${materialId}/download`;
+          const downloadUrl = `/api/courses/${courseId.value}/resources/${materialId}/download`;
   
   fetch(downloadUrl, {
     method: 'GET',

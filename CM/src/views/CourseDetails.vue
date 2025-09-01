@@ -2135,7 +2135,7 @@ const previewResource = (resource) => {
 // 下载资源 - 使用正确的API接口
 const downloadResource = (resource) => {
   // 构建正确的下载URL
-  const downloadUrl = `http://localhost:8080/api/courses/${courseId.value}/resources/${resource.id}/download`;
+          const downloadUrl = `/api/courses/${courseId.value}/resources/${resource.id}/download`;
   
   fetch(downloadUrl, {
     method: 'GET',
