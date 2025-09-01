@@ -5,6 +5,12 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      api_base_url:
+        description: 'VITE_API_BASE_URL for build (overrides repo vars)'
+        required: false
+        default: ''
 
 jobs:
   build:
@@ -12,6 +18,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+    env:
+      # Priority: workflow input > repo/environment variables > default
+      API_BASE_URL: ${{ inputs.api_base_url != '' && inputs.api_base_url || (vars.FRONTEND_API_BASE_URL != '' && vars.FRONTEND_API_BASE_URL || 'http://localhost:30081') }}
 
     steps:
     - name: Checkout repository
@@ -63,7 +72,7 @@ jobs:
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
         build-args: |
-          VITE_API_BASE_URL=http://localhost:30081
+          VITE_API_BASE_URL=${{ env.API_BASE_URL }}
           VITE_APP_TITLE=OSCMS - 在线课程管理系统
 
     - name: Upload build artifacts
