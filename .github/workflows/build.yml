@@ -63,7 +63,7 @@ jobs:
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
         build-args: |
-          VITE_API_BASE_URL=/api
+          VITE_API_BASE_URL=http://localhost:30081
           VITE_APP_TITLE=OSCMS - 在线课程管理系统
 
     - name: Upload build artifacts
