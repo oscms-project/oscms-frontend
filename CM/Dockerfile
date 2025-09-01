@@ -14,7 +14,11 @@ RUN npm ci
 # 复制源代码
 COPY . .
 
-# 构建应用
+# 构建应用（支持构建时环境变量）
+ARG VITE_API_BASE_URL
+ARG VITE_APP_TITLE
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+ENV VITE_APP_TITLE=${VITE_APP_TITLE}
 RUN npm run build
 
 # 阶段2：生产阶段

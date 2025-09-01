@@ -2,7 +2,7 @@ import axios from 'axios'
 import { useUserStore } from '@/stores/user'
 
 const instance = axios.create({
-  baseURL: 'http://localhost:8080', // 根据 openapi servers 配置
+  baseURL: import.meta.env.VITE_API_BASE_URL || '', // 使用环境变量，默认为空字符串（相对路径）
   timeout: 10000
 })
 //请求拦截器

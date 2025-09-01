@@ -94,7 +94,7 @@ jobs:
         working-directory: ./CM
         run: |
           echo Building image: %IMAGE_NAME_LATEST% and %IMAGE_NAME_WITH_TAG%
-          docker build -t %IMAGE_NAME_LATEST% -t %IMAGE_NAME_WITH_TAG% -f Dockerfile .
+          docker build --build-arg VITE_API_BASE_URL=/api --build-arg VITE_APP_TITLE="OSCMS - 在线课程管理系统" -t %IMAGE_NAME_LATEST% -t %IMAGE_NAME_WITH_TAG% -f Dockerfile .
           
           echo Verifying built images:
           docker images | findstr %IMAGE_NAME%
