@@ -1954,10 +1954,10 @@ const uploadResource = async () => {
     formData.append('description', newResource.value.description);
   }
 
-  // 4. Add visibleForClasses (optional)
+  // 4. Add visibleClassIds (backend expects this name)
   if (resourcePermissions.value.visibility === 'specific' && resourcePermissions.value.selectedClasses.length > 0) {
     resourcePermissions.value.selectedClasses.forEach(classId => {
-      formData.append('visibleForClasses', classId.toString());
+      formData.append('visibleClassIds', classId.toString());
     });
   } else if (resourcePermissions.value.visibility === 'all') {
     // If visibility is 'all', add all class IDs for the current course.
@@ -1966,7 +1966,7 @@ const uploadResource = async () => {
    if (availableClassesForPermissions.value && availableClassesForPermissions.value.length > 0) {
     console.log("使用所有班级可见权限，添加班级列表:", availableClassesForPermissions.value);
     availableClassesForPermissions.value.forEach(classItem => {
-      formData.append('visibleForClasses', classItem.id.toString());
+      formData.append('visibleClassIds', classItem.id.toString());
     });
   } else {
     console.warn("所有人可见选项被选中，但没有可用的班级列表");
@@ -1975,7 +1975,7 @@ const uploadResource = async () => {
       const classesRes = await getCourseClasses(courseId.value);
       if (classesRes.data && classesRes.data.data && classesRes.data.data.length > 0) {
         classesRes.data.data.forEach(classItem => {
-          formData.append('visibleForClasses', classItem.id.toString());
+          formData.append('visibleClassIds', classItem.id.toString());
         });
       } else {
         console.warn("尝试重新获取班级列表，但没有结果");

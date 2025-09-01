@@ -10,15 +10,13 @@ export function getCourseMaterials(courseId, params) {
 }
 
 export function uploadMaterial(classId, formData) {
-  return axios.post(`/api/materials/${classId}`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  })
+  // 不要手动设置 Content-Type，浏览器会自动附带 boundary
+  return axios.post(`/api/materials/${classId}`, formData)
 }
 
 export function uploadCourseMaterialFile(courseId, formData) {
-  return axios.post(`/api/courses/${courseId}/resources`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  })
+  // 不要手动设置 Content-Type，浏览器会自动附带 boundary
+  return axios.post(`/api/courses/${courseId}/resources`, formData)
 }
 
 // 新增：获取资料的所有版本
