@@ -1,0 +1,79 @@
+name: Build and Deploy Frontend
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: './CM/package-lock.json'
+
+    - name: Install dependencies
+      working-directory: ./CM
+      run: npm ci
+
+    - name: Run tests
+      working-directory: ./CM
+      run: npm run test
+
+    - name: Build application
+      working-directory: ./CM
+      run: npm run build
+
+    - name: Log in to Container Registry
+      if: github.event_name != 'pull_request'
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v4
+      with:
+        images: ghcr.io/oscms-project/oscms-frontend
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v4
+      with:
+        context: ./CM
+        file: ./CM/Dockerfile
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: oscms-frontend-artifacts
+        path: CM/dist/
+        retention-days: 30
+
+    - name: Summary
+      run: |
+        echo "## Frontend Build Summary :rocket:" >> $GITHUB_STEP_SUMMARY
+        echo "- **Framework**: Vue 3 + Vite" >> $GITHUB_STEP_SUMMARY
+        echo "- **UI Library**: Element Plus" >> $GITHUB_STEP_SUMMARY
+        echo "- **Image**: ghcr.io/oscms-project/oscms-frontend:latest" >> $GITHUB_STEP_SUMMARY
+        echo "- **Build Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
