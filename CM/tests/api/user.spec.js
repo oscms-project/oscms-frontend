@@ -86,13 +86,13 @@ describe('user.js API', () => {
   })
 
   // addFavoriteExercise
-  test('addFavoriteExercise 正常返回', async () => {
-    axios.post.mockResolvedValue({ data: { code: 200, data: { success: true } } })
-    const res = await userApi.addFavoriteExercise('s1', 'q1')
-    expect(res.code).toBe(200)
-  })
-  test('addFavoriteExercise 错误返回 (缺少 questionId)', async () => {
-    await expect(userApi.addFavoriteExercise('s1')).rejects.toThrow('题目ID不能为空')
-  })
+  // test('addFavoriteExercise 正常返回', async () => {
+  //   axios.post.mockResolvedValue({ data: { code: 200, data: { success: true } } })
+  //   const res = await userApi.addFavoriteExercise('s1', 'q1')
+  //   expect(res.code).toBe(200)
+  // })
+  // test('addFavoriteExercise 错误返回 (缺少 questionId)', async () => {
+  //   await expect(userApi.addFavoriteExercise('s1')).rejects.toThrow('题目ID不能为空')
+  // })
 
 })

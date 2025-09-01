@@ -52,7 +52,17 @@
         <ul class="list-none pl-0 space-y-1 text-sm">
           <li v-for="(choice, index) in exercise.choices" :key="choice.id || index" 
               class="p-1.5 rounded bg-gray-50 border border-gray-100">
-            <span class="font-medium text-gray-600">{{ choice.label || String.fromCharCode(65 + index) }}.</span> {{ choice.text || choice.content }}
+            <span class="font-medium text-gray-600">{{ choice.label || String.fromCharCode(65 + index) }}.</span>
+            <!-- 兼容所有常见字段，兜底只展示所有字段值拼接，不显示key和引号 -->
+            {{
+              choice.text ||
+              choice.content ||
+              choice.optionText ||
+              choice.value ||
+              choice.labelText ||
+              choice.title ||
+              Object.values(choice).filter(v => typeof v === 'string' && v.trim() && v !== choice.label).join('，')
+            }}
           </li>
         </ul>
       </div>
