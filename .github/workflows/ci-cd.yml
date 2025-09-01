@@ -2,7 +2,7 @@ name: Frontend CI & Local Deploy (Local Only)
 
 on:
   push:
-    branches: [ "master", "dev" ] # 在推送到 master 或 dev 分支时触发
+    branches: [ "main", "master", "dev" ] # 在推送到 main、master 或 dev 分支时触发
   workflow_dispatch: # 允许手动触发
 
 jobs:

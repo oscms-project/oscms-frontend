@@ -62,6 +62,9 @@ jobs:
         push: ${{ github.event_name != 'pull_request' }}
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
+        build-args: |
+          VITE_API_BASE_URL=/api
+          VITE_APP_TITLE=OSCMS - 在线课程管理系统
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
